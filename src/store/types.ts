@@ -91,6 +91,21 @@ export type CatalogPriceRow = {
   fetched_at: string;
 };
 
+/** One record per daily run, so the site can show what changed and when. */
+export type RunRow = {
+  run_id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: "ok" | "failed";
+  new_tenders: number;
+  new_flags: number;
+  details_fetched: number;
+  errors: number;
+  message: string | null;
+  /** Tender ids first seen in this run, so "what's new" is exact. */
+  new_tender_ids: string[];
+};
+
 export type FindingTier = "confirmed" | "state_indicator" | "own_analysis";
 
 export type FindingRow = {
@@ -115,6 +130,7 @@ export interface Store {
   upsertMonitorings(rows: MonitoringRow[]): Promise<void>;
   upsertCatalogPrices(rows: CatalogPriceRow[]): Promise<void>;
   upsertFindings(rows: FindingRow[]): Promise<void>;
+  upsertRuns(rows: RunRow[]): Promise<void>;
 
   allTenders(): Promise<TenderRow[]>;
   allTenderItems(): Promise<TenderItemRow[]>;
@@ -125,6 +141,7 @@ export interface Store {
   allMonitorings(): Promise<MonitoringRow[]>;
   allCatalogPrices(): Promise<CatalogPriceRow[]>;
   allFindings(): Promise<FindingRow[]>;
+  allRuns(): Promise<RunRow[]>;
 
   getCursor(worker: string): Promise<string | null>;
   setCursor(worker: string, cursor: string): Promise<void>;

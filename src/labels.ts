@@ -119,11 +119,23 @@ export function procedureLabel(code: string | null): string | null {
 }
 
 /**
+ * Abbreviations that stay capitalised. A whitelist, not a length rule:
+ * treating every short token as an abbreviation produced
+ * "Департамент З благоустрою ТА реконструкції міської РАДИ".
+ */
+const ABBREVIATIONS = new Set([
+  "АТ", "ПАТ", "ПРАТ", "ПрАТ", "ВАТ", "ЗАТ", "ТОВ", "ТзОВ", "ПП", "ФОП",
+  "КП", "КНП", "ДП", "КУ", "УДП", "НДІ", "ДПТНЗ", "ЗДО", "ЗЗСО",
+  "ХОДА", "ОДА", "ОВА", "МВА", "МВС", "ЗСУ", "ДСНС", "УЗ", "РФ",
+  "ЦЗО", "ЦЗВ", "ХМР", "ХОР", "ЖКГ", "ТЕЦ", "ТЕС", "ГЕС", "АЕС",
+]);
+
+/**
  * The state registers write organisation names in capitals. Shouting is hard
  * to read, so fold them to normal sentence case: lower case throughout, an
- * initial capital at the start and after an opening quote, and short all-caps
- * abbreviations (КП, ТОВ, АТ, ХОДА) left alone. Names that already carry mixed
- * case are returned untouched.
+ * initial capital at the start and after an opening quote, and recognised
+ * abbreviations left alone. Names that already carry mixed case are returned
+ * untouched.
  */
 export function readableName(name: string | null): string {
   if (!name) return "";

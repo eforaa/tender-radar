@@ -189,6 +189,8 @@ dl.facts dd strong{font-weight:600}
 .pager a:hover{border-color:var(--accent)}
 .pager span{color:var(--ink-faint)}
 .empty{background:var(--surface);border:1px dashed var(--line);padding:3rem 1.5rem;text-align:center;color:var(--ink-soft)}
+.card ul{margin:.2rem 0 .9rem;padding-left:1.2rem;color:var(--ink-soft);max-width:68ch}
+.card li{margin-bottom:.4rem}
 .note{font-size:.9rem;color:var(--ink-faint);max-width:68ch;margin-top:2.5rem;padding-top:1.15rem;border-top:1px solid var(--line)}
 
 details.help{background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:1.75rem}
@@ -219,10 +221,12 @@ export function layout(opts: { title: string; nav?: string; body: string }): str
   <nav class="nav">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Знахідки</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>Залізниця</a>
+    <a href="/article/366"${opts.nav === "article-366" ? ' aria-current="page"' : ""}>Ст. 366</a>
     <a href="/entities"${opts.nav === "entities" ? ' aria-current="page"' : ""}>Замовники</a>
     <a href="/officers"${opts.nav === "officers" ? ' aria-current="page"' : ""}>Посадовці</a>
     <a href="/suppliers"${opts.nav === "suppliers" ? ' aria-current="page"' : ""}>Переможці</a>
     <a href="/indicators"${opts.nav === "indicators" ? ' aria-current="page"' : ""}>Що ми шукаємо</a>
+    <a href="/updates"${opts.nav === "updates" ? ' aria-current="page"' : ""}>Оновлення</a>
     <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>Про систему</a>
   </nav>
 </div></header>

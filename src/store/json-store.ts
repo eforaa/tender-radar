@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   Store, TenderRow, TenderItemRow, BidRow, AwardRow, RiskFlagRow,
-  RiskRuleRow, MonitoringRow, CatalogPriceRow, FindingRow,
+  RiskRuleRow, MonitoringRow, CatalogPriceRow, FindingRow, RunRow,
 } from "./types.ts";
 
 /** File-backed Store. One JSON array per table; adequate for the volumes here. */
@@ -62,6 +62,9 @@ export class JsonStore implements Store {
   upsertFindings(rows: FindingRow[]) {
     return this.#upsert("findings", rows, (r) => `${r.tender_id}|${r.detector_key}`);
   }
+  upsertRuns(rows: RunRow[]) {
+    return this.#upsert("runs", rows, (r) => r.run_id);
+  }
 
   allTenders() { return this.#read<TenderRow>("tenders"); }
   allTenderItems() { return this.#read<TenderItemRow>("tender_items"); }
@@ -72,6 +75,7 @@ export class JsonStore implements Store {
   allMonitorings() { return this.#read<MonitoringRow>("monitorings"); }
   allCatalogPrices() { return this.#read<CatalogPriceRow>("catalog_prices"); }
   allFindings() { return this.#read<FindingRow>("findings"); }
+  allRuns() { return this.#read<RunRow>("runs"); }
 
   async getCursor(worker: string): Promise<string | null> {
     const all = await this.#read<Record<string, string>>("cursors");

@@ -1,8 +1,10 @@
 // Server-rendered site over the local store. Zero dependencies.
 import { createServer } from "node:http";
-import { REGION, RAILWAY_EDRPOU, SOUTHERN_RAILWAY_EDRPOU, railwayScope, type RailwayScope } from "../src/config.ts";
+import { watch } from "node:fs";
+import { REGION, RAILWAY_EDRPOU, SOUTHERN_RAILWAY_EDRPOU, railwayScope, dataDir, type RailwayScope } from "../src/config.ts";
 import { RISK_LABELS, GROUP_ORDER, procedureLabel, readableName, type RiskGroup } from "../src/labels.ts";
 import { layout, esc, money, shortMoney, date, trim, plural } from "./html.ts";
+import { ARTICLES, isJointStock } from "../src/legal.ts";
 import { loadDataset, type Case, type Dataset } from "./data.ts";
 
 const PORT = Number(process.env.PORT ?? 3120);
@@ -15,6 +17,19 @@ console.log(
 );
 
 /* ---------- shared pieces ---------- */
+
+/**
+ * The daily run rewrites the data files while the server is up, so watch the
+ * directory and reload. Debounced: one run touches many files.
+ */
+let reloadTimer: NodeJS.Timeout | null = null;
+watch(dataDir(), () => {
+  if (reloadTimer) clearTimeout(reloadTimer);
+  reloadTimer = setTimeout(async () => {
+    db = await loadDataset();
+    console.log(`data changed — reloaded ${db.cases.length} tenders`);
+  }, 2000);
+});
 
 function shortRisk(riskId: string): string {
   return RISK_LABELS[riskId]?.short ?? db.ruleById.get(riskId)?.name ?? riskId;
@@ -735,6 +750,148 @@ ${topSuppliers
   });
 }
 
+
+/* ---------- criminal-code screening ---------- */
+
+function articlePage(code: string, url: URL): string {
+  const article = ARTICLES[code];
+  if (!article) return notFound();
+
+  const relevant = new Set(article.links.map((l) => l.risk_id));
+  const jointOnly = url.searchParams.get("at") === "1";
+
+  let list = db.cases.filter(
+    (c) => c.region === REGION && c.risks.some((r) => relevant.has(r)),
+  );
+  if (jointOnly) list = list.filter((c) => isJointStock(c.entity_name) || isJointStock(c.winner_name));
+
+  const value = list.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
+  const solo = list.filter((c) => c.bidders === 1).length;
+  const officers = new Set(list.map((c) => c.officer_key).filter(Boolean));
+
+  /** How many of this article's indicators fired — the screening priority. */
+  const score = (entry: Case) => entry.risks.filter((r) => relevant.has(r)).length;
+  const sorted = [...list].sort(
+    (a, b) => score(b) - score(a) || (b.value_amount ?? 0) - (a.value_amount ?? 0),
+  );
+
+  return layout({
+    title: `Стаття ${article.code}`,
+    nav: `article-${article.code}`,
+    body: `
+<h1>Ознаки за статтею ${esc(article.code)} — ${esc(article.title)}</h1>
+<p class="sub">Закупівлі ${esc(REGION)}, у яких державна система виявила документальні розбіжності того типу, який перевіряють за цією статтею.</p>
+
+<div class="card" style="border-left:3px solid var(--alarm)">
+  <h3>Це список для перевірки, а не звинувачення</h3>
+  <p class="lead">${esc(article.caution)}</p>
+</div>
+
+<div class="metrics">
+  <div class="metric"><span class="v">${list.length.toLocaleString("uk-UA")}</span><span class="k">закупівель для перевірки</span></div>
+  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">на таку суму</span></div>
+  <div class="metric"><span class="v">${solo}</span><span class="k">з єдиним учасником</span></div>
+  <div class="metric"><span class="v">${officers.size}</span><span class="k">відповідальних осіб</span></div>
+</div>
+
+<h2>Що каже стаття</h2>
+<div class="card">
+  <p class="lead">${esc(article.summary)}</p>
+  <p><strong>Що має бути доведено:</strong></p>
+  <ul>
+    ${article.elements.map((e) => `<li>${esc(e)}</li>`).join("")}
+  </ul>
+  <p class="faint">Наведено як довідку для юриста. Це не правова консультація і не кваліфікація чиїхось дій.</p>
+</div>
+
+<h2>Чому саме ці ознаки</h2>
+<p class="hint">Із чотирнадцяти державних індикаторів для цієї статті релевантні ${article.links.length}. Решта стосуються конкуренції та процедури, а не змісту документів.</p>
+${article.links
+  .map((link) => {
+    const label = RISK_LABELS[link.risk_id];
+    const hits = list.filter((c) => c.risks.includes(link.risk_id)).length;
+    return `<div class="card">
+  <h3>${esc(label?.short ?? link.risk_id)} <span class="faint">— ${hits} ${plural(hits, "закупівля", "закупівлі", "закупівель")}</span></h3>
+  <p class="lead">${esc(link.why)}</p>
+  <p class="code">Індикатор ${esc(link.risk_id)}</p>
+</div>`;
+  })
+  .join("")}
+
+<h2>Закупівлі для перевірки</h2>
+<form class="filters" method="get" action="/article/${esc(article.code)}">
+  <label class="check"><input type="checkbox" name="at" value="1"${jointOnly ? " checked" : ""}> лише акціонерні товариства (АТ)</label>
+  <button type="submit">Показати</button>
+  ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">скинути</a>` : ""}
+</form>
+<p class="hint">Спочатку ті, де збіглося найбільше релевантних ознак.</p>
+${sorted.length === 0 ? '<div class="empty">За цими умовами нічого не знайшлося.</div>' : `<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c)).join("")}</div>`}
+${sorted.length > 60 ? `<p class="hint" style="margin-top:.8rem">Показано 60 із ${sorted.length}.</p>` : ""}
+
+<p class="note">Перелік сформовано автоматично за індикаторами державної системи моніторингу закупівель. Він не встановлює факт правопорушення і не є твердженням щодо будь-якої названої особи чи компанії. Наступний крок — витребувати самі документи й перевірити їх.</p>
+`,
+  });
+}
+
+
+/* ---------- what changed ---------- */
+
+function updatesPage(): string {
+  const runs = [...db.runs].sort((a, b) => b.started_at.localeCompare(a.started_at));
+  const latest = runs[0];
+  const newIds = new Set(latest?.new_tender_ids ?? []);
+  const fresh = db.cases.filter((c) => newIds.has(c.tender_id)).sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+
+  return layout({
+    title: "Оновлення",
+    nav: "updates",
+    body: `
+<h1>Що змінилося</h1>
+<p class="sub">Система щодня перевіряє державний масив ризик-індикаторів і підтягує нові закупівлі ${esc(REGION)} та філій залізниці.</p>
+
+${
+  latest
+    ? `<div class="metrics">
+  <div class="metric"><span class="v">${latest.new_tenders}</span><span class="k">нових закупівель востаннє</span></div>
+  <div class="metric"><span class="v">${latest.new_flags}</span><span class="k">нових спрацювань</span></div>
+  <div class="metric"><span class="v">${date(latest.started_at)}</span><span class="k">останнє оновлення</span></div>
+  <div class="metric"><span class="v">${runs.length}</span><span class="k">${plural(runs.length, "запуск", "запуски", "запусків")}</span></div>
+</div>`
+    : '<div class="empty">Жодного запуску ще не було. Виконайте <code>npm run daily</code>.</div>'
+}
+
+${
+  fresh.length > 0
+    ? `<h2>Нові закупівлі з останнього оновлення</h2>
+<div class="rows">${fresh.slice(0, 40).map((c) => caseRow(c)).join("")}</div>
+${fresh.length > 40 ? `<p class="hint" style="margin-top:.8rem">Показано 40 найдорожчих із ${fresh.length}.</p>` : ""}`
+    : latest
+      ? `<h2>Нові закупівлі з останнього оновлення</h2><div class="empty">Нових закупівель не з’явилося. Це нормальний результат — держава не щодня додає позначки.</div>`
+      : ""
+}
+
+<h2>Історія запусків</h2>
+<div class="rows">
+${runs
+  .slice(0, 30)
+  .map(
+    (r) => `<div class="row">
+  <div class="who">
+    <div class="name">${date(r.started_at)}${r.status === "failed" ? ' <span class="flag alarm">збій</span>' : ""}</div>
+    <div class="meta">${r.new_tenders} ${plural(r.new_tenders, "нова закупівля", "нові закупівлі", "нових закупівель")} · ${r.new_flags} ${plural(r.new_flags, "нове спрацювання", "нові спрацювання", "нових спрацювань")} · ${r.details_fetched} ${plural(r.details_fetched, "картка", "картки", "карток")} завантажено${r.errors ? ` · ${r.errors} ${plural(r.errors, "помилка", "помилки", "помилок")}` : ""}</div>
+    ${r.message ? `<div class="meta">${esc(r.message)}</div>` : ""}
+  </div>
+  <div class="amount"><span class="big">${r.status === "ok" ? "✓" : "✕"}</span></div>
+</div>`,
+  )
+  .join("")}
+</div>
+
+<p class="note">Оновлення виконує скрипт <code>npm run daily</code>. Він безпечний до повторного запуску: усе, що вже є, не дублюється, а перерваний запуск довантажується наступного разу.</p>
+`,
+  });
+}
+
 function indicatorsPage(): string {
   // Every active indicator is listed, including those that never fired here —
   // a zero is information too.
@@ -814,6 +971,8 @@ const server = createServer(async (req, res) => {
   else if (path === "/officers") body = officersPage();
   else if (path === "/suppliers") body = suppliersPage();
   else if (path === "/railway") body = railwayPage();
+  else if (path === "/updates") body = updatesPage();
+  else if (path.startsWith("/article/")) body = articlePage(path.slice("/article/".length), url);
   else if (path === "/indicators") body = indicatorsPage();
   else if (path === "/about") body = aboutPage();
   else if (path.startsWith("/tender/")) body = tenderPage(path.slice("/tender/".length));

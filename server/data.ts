@@ -1,7 +1,7 @@
 // Loads the store once and joins it into the shapes the pages need.
 import { openStore } from "../src/config.ts";
 import { officerKey } from "../src/normalize/tender.ts";
-import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow } from "../src/store/types.ts";
+import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow, RunRow } from "../src/store/types.ts";
 
 /** One entry per tender: the flags that fired plus whatever the card added. */
 export type Case = {
@@ -34,6 +34,7 @@ export type Dataset = {
   ruleById: Map<string, RiskRuleRow>;
   flagCount: number;
   totalValue: number;
+  runs: RunRow[];
 };
 
 function activeAward(awards: AwardRow[]): AwardRow | undefined {
@@ -47,6 +48,7 @@ export async function loadDataset(): Promise<Dataset> {
   const tenders: TenderRow[] = await store.allTenders();
   const awards: AwardRow[] = await store.allAwards();
   const bids = await store.allBids();
+  const runs: RunRow[] = await store.allRuns();
 
   const tenderById = new Map(tenders.map((t) => [t.id, t]));
 
@@ -101,6 +103,7 @@ export async function loadDataset(): Promise<Dataset> {
     byTender,
     rules,
     ruleById: new Map(rules.map((r) => [r.risk_id, r])),
+    runs,
     flagCount: flags.length,
     totalValue: cases.reduce((sum, c) => sum + (c.value_amount ?? 0), 0),
   };
