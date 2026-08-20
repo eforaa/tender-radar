@@ -9,8 +9,9 @@ import { listRiskRuleIds, fetchRiskReportCsv, fetchRisksPage } from "../src/sour
 import { normalizeRiskReport, normalizeRiskRules } from "../src/normalize/risk.ts";
 import { fetchTender } from "../src/sources/openprocurement.ts";
 import { normalizeTender } from "../src/normalize/tender.ts";
+import { pricePoints, priceGroups, detectPeerPrice, detectOwnPriceGrowth } from "../src/analysis/peer-price.ts";
 import { openStore, REGION, RAILWAY_EDRPOU } from "../src/config.ts";
-import type { RiskFlagRow, TenderRow, TenderItemRow, BidRow, AwardRow, RunRow } from "../src/store/types.ts";
+import type { RiskFlagRow, TenderRow, TenderItemRow, BidRow, AwardRow, RunRow, FindingRow } from "../src/store/types.ts";
 
 const CONCURRENCY = Number(process.env.TR_CONCURRENCY ?? 6);
 const store = openStore();
@@ -110,7 +111,40 @@ try {
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   await flush();
 
-  /* ---- 3. record the run ---- */
+  /* ---- 3. our own price analysis over the whole corpus ---- */
+
+  const allTenders = await store.allTenders();
+  const allItems = await store.allTenderItems();
+  const allAwards = await store.allAwards();
+
+  const itemsByTender = new Map<string, TenderItemRow[]>();
+  for (const item of allItems) {
+    const list = itemsByTender.get(item.tender_id) ?? [];
+    list.push(item);
+    itemsByTender.set(item.tender_id, list);
+  }
+  const awardsByTender = new Map<string, AwardRow[]>();
+  for (const award of allAwards) {
+    const list = awardsByTender.get(award.tender_id) ?? [];
+    list.push(award);
+    awardsByTender.set(award.tender_id, list);
+  }
+
+  const points = pricePoints(allTenders, itemsByTender, awardsByTender);
+  const groups = priceGroups(points);
+  const findings: FindingRow[] = [];
+  for (const point of points) {
+    const group = groups.get(`${point.cpv_code}|${point.unit_code}`);
+    if (!group) continue;
+    const peer = detectPeerPrice(point, group, new Date().toISOString());
+    if (peer) findings.push(peer);
+    const growth = detectOwnPriceGrowth(point, group, new Date().toISOString());
+    if (growth) findings.push(growth);
+  }
+  await store.upsertFindings(findings);
+  log(`price analysis: ${points.length} comparable prices, ${groups.size} groups, ${findings.length} findings`);
+
+  /* ---- 4. record the run ---- */
 
   const run: RunRow = {
     run_id: runId,

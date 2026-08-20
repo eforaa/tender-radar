@@ -13,6 +13,16 @@ export function money(amount: number | null): string {
   return new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 0 }).format(amount) + " ₴";
 }
 
+/**
+ * Money that must keep its kopiykas: a unit price of 13.22 UAH per kWh becomes
+ * meaningless when rounded to 13.
+ */
+export function unitMoney(amount: number | null): string {
+  if (amount === null || !Number.isFinite(amount)) return "—";
+  const digits = Math.abs(amount) < 1000 ? 2 : 0;
+  return new Intl.NumberFormat("uk-UA", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount) + " ₴";
+}
+
 export function shortMoney(amount: number | null): string {
   if (amount === null || !Number.isFinite(amount)) return "—";
   if (amount >= 1e9) return (amount / 1e9).toFixed(2).replace(".", ",") + " млрд ₴";
@@ -101,6 +111,37 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
 .nav a{text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:.3rem .65rem;border-radius:2px}
 .nav a:hover{color:var(--accent);background:var(--surface-2)}
 .nav a[aria-current]{color:var(--accent);background:var(--accent-bg);font-weight:500}
+
+/* Slide-in drawer. CSS only — a checkbox drives it, because <details>
+   cannot animate between display:none and shown. The checkbox is hidden
+   visually rather than with display:none, which keeps it keyboard-reachable
+   and keeps the sibling selectors working. */
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+.burger{flex:none;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:4px;width:2.4rem;height:2.4rem;padding:.55rem;border:1px solid var(--line);background:var(--surface)}
+.burger span{display:block;height:2px;background:var(--ink);border-radius:1px;transition:background .2s ease}
+.burger:hover{border-color:var(--accent)}
+.burger:hover span{background:var(--accent)}
+#menu-toggle:focus-visible + .top .burger{outline:2px solid var(--accent);outline-offset:2px}
+
+.scrim{position:fixed;inset:0;background:rgba(10,18,24,.42);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease;z-index:40;cursor:pointer}
+#menu-toggle:checked ~ .scrim{opacity:1;visibility:visible}
+
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(20rem,86vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
+:root[data-theme="dark"] .drawer,:root:not([data-theme="light"]) .drawer{box-shadow:-18px 0 40px -24px rgba(0,0,0,.9)}
+#menu-toggle:checked ~ .drawer{transform:translateX(0)}
+
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.15rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+.drawer-head strong{font-family:var(--f-display);font-size:1.02rem;font-weight:700}
+.drawer-close{cursor:pointer;font-size:1.5rem;line-height:1;color:var(--ink-faint);padding:.1rem .45rem;border:1px solid transparent}
+.drawer-close:hover{color:var(--accent);border-color:var(--line)}
+.drawer a{display:flex;flex-direction:column;gap:.05rem;padding:.8rem 1.15rem;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);font-size:.99rem}
+.drawer a:last-child{border-bottom:0}
+.drawer a:hover{background:var(--surface-2);color:var(--accent)}
+.drawer a[aria-current]{background:var(--accent-bg);color:var(--accent);font-weight:500;box-shadow:inset 3px 0 0 var(--accent)}
+.drawer small{color:var(--ink-faint);font-size:.82rem;font-weight:400}
+
+@media (prefers-reduced-motion: reduce){.drawer,.scrim{transition-duration:.01ms}}
+@media (max-width:30rem){.nav a:not([href="/"]):not([href="/railway"]){display:none}}
 
 .wrap{max-width:72rem;margin:0 auto;padding:clamp(1.5rem,4vw,2.75rem) clamp(1rem,3vw,2rem) 6rem}
 
@@ -203,6 +244,19 @@ details.help p{margin:0 0 .7rem;color:var(--ink-soft);max-width:68ch}
 details.help p:last-child{margin-bottom:0}
 `;
 
+/** Everything reachable from the burger menu, with a line of orientation. */
+const MENU = [
+  { href: "/", nav: "feed", label: "Знахідки", hint: "усі закупівлі з позначками" },
+  { href: "/railway", nav: "railway", label: "Залізниця", hint: "Південна залізниця та філії УЗ" },
+  { href: "/article/366", nav: "article-366", label: "Ст. 366", hint: "документальні розбіжності" },
+  { href: "/entities", nav: "entities", label: "Замовники", hint: "хто закуповує" },
+  { href: "/officers", nav: "officers", label: "Посадовці", hint: "хто вів закупівлі" },
+  { href: "/suppliers", nav: "suppliers", label: "Переможці", hint: "хто виграє" },
+  { href: "/indicators", nav: "indicators", label: "Що ми шукаємо", hint: "14 державних ознак" },
+  { href: "/updates", nav: "updates", label: "Оновлення", hint: "що додалося за день" },
+  { href: "/about", nav: "about", label: "Про систему", hint: "джерела й межі" },
+];
+
 export function layout(opts: { title: string; nav?: string; body: string }): string {
   return `<!doctype html>
 <html lang="uk">
@@ -216,20 +270,27 @@ export function layout(opts: { title: string; nav?: string; body: string }): str
 <style>${STYLES}</style>
 </head>
 <body>
+<input type="checkbox" id="menu-toggle" class="sr-only" aria-label="Показати всі розділи">
 <header class="top"><div class="inner">
   <a class="brand" href="/">Tender<span>&nbsp;Radar</span></a>
   <nav class="nav">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Знахідки</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>Залізниця</a>
-    <a href="/article/366"${opts.nav === "article-366" ? ' aria-current="page"' : ""}>Ст. 366</a>
-    <a href="/entities"${opts.nav === "entities" ? ' aria-current="page"' : ""}>Замовники</a>
-    <a href="/officers"${opts.nav === "officers" ? ' aria-current="page"' : ""}>Посадовці</a>
-    <a href="/suppliers"${opts.nav === "suppliers" ? ' aria-current="page"' : ""}>Переможці</a>
-    <a href="/indicators"${opts.nav === "indicators" ? ' aria-current="page"' : ""}>Що ми шукаємо</a>
-    <a href="/updates"${opts.nav === "updates" ? ' aria-current="page"' : ""}>Оновлення</a>
     <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>Про систему</a>
   </nav>
+  <label class="burger" for="menu-toggle" role="button" aria-label="Усі розділи" title="Усі розділи"><span></span><span></span><span></span></label>
 </div></header>
+<label class="scrim" for="menu-toggle" aria-hidden="true"></label>
+<nav class="drawer" aria-label="Усі розділи">
+  <div class="drawer-head">
+    <strong>Розділи</strong>
+    <label class="drawer-close" for="menu-toggle" role="button" aria-label="Закрити">&times;</label>
+  </div>
+  ${MENU.map(
+    (item) =>
+      `<a href="${item.href}"${opts.nav === item.nav ? ' aria-current="page"' : ""}>${item.label}<small>${item.hint}</small></a>`,
+  ).join("")}
+</nav>
 <main class="wrap">
 ${opts.body}
 </main>

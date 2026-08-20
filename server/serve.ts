@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { watch } from "node:fs";
 import { REGION, RAILWAY_EDRPOU, SOUTHERN_RAILWAY_EDRPOU, railwayScope, dataDir, type RailwayScope } from "../src/config.ts";
 import { RISK_LABELS, GROUP_ORDER, procedureLabel, readableName, type RiskGroup } from "../src/labels.ts";
-import { layout, esc, money, shortMoney, date, trim, plural } from "./html.ts";
+import { layout, esc, money, unitMoney, shortMoney, date, trim, plural } from "./html.ts";
 import { ARTICLES, isJointStock } from "../src/legal.ts";
 import { loadDataset, type Case, type Dataset } from "./data.ts";
 
@@ -42,6 +42,7 @@ function riskFlag(riskId: string): string {
 /** The one-glance signals that make a case worth opening. */
 function alarms(entry: Case): string[] {
   const out: string[] = [];
+  for (const finding of entry.findings) out.push(finding.title);
   if (entry.detailed && entry.bidders === 1) out.push("Єдиний учасник");
   if ((entry.value_amount ?? 0) >= 1e9) out.push("Понад мільярд");
   if (entry.risks.length >= 3) out.push(`${entry.risks.length} індикатори одразу`);
@@ -151,6 +152,7 @@ function feedPage(url: URL): string {
   const sort = url.searchParams.get("sort") ?? "value";
   const railOnly = url.searchParams.get("rail") === "1";
   const soloOnly = url.searchParams.get("solo") === "1";
+  const priceOnly = url.searchParams.get("price") === "1";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
 
   let list = db.cases;
@@ -169,6 +171,7 @@ function feedPage(url: URL): string {
   if (risk) list = list.filter((c) => c.risks.includes(risk));
   if (railOnly) list = list.filter((c) => RAILWAY_EDRPOU.has(c.entity_edrpou ?? ""));
   if (soloOnly) list = list.filter((c) => c.bidders === 1);
+  if (priceOnly) list = list.filter((c) => c.findings.length > 0);
 
   list = [...list].sort((a, b) =>
     sort === "date"
@@ -189,11 +192,12 @@ function feedPage(url: URL): string {
     if (sort !== "value") p.set("sort", sort);
     if (railOnly) p.set("rail", "1");
     if (soloOnly) p.set("solo", "1");
+    if (priceOnly) p.set("price", "1");
     for (const [k, v] of Object.entries(over)) p.set(k, v);
     return `/?${p.toString()}`;
   };
 
-  const filtered = Boolean(q || risk || railOnly || soloOnly);
+  const filtered = Boolean(q || risk || railOnly || soloOnly || priceOnly);
 
   return layout({
     title: "Знахідки",
@@ -206,7 +210,7 @@ function feedPage(url: URL): string {
   <div class="metric"><span class="v">${db.cases.length.toLocaleString("uk-UA")}</span><span class="k">закупівель із позначками</span></div>
   <div class="metric"><span class="v">${shortMoney(db.totalValue)}</span><span class="k">на таку суму</span></div>
   <div class="metric"><span class="v">${db.flagCount.toLocaleString("uk-UA")}</span><span class="k">спрацювань індикаторів</span></div>
-  <div class="metric"><span class="v">${db.cases.filter((c) => c.bidders === 1).length.toLocaleString("uk-UA")}</span><span class="k">з єдиним учасником</span></div>
+  <div class="metric"><span class="v">${db.findingCount.toLocaleString("uk-UA")}</span><span class="k">наших цінових знахідок</span></div>
 </div>
 
 ${HELP}
@@ -226,6 +230,7 @@ ${HELP}
   </select>
   <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> лише залізниця</label>
   <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> лише з одним учасником</label>
+  <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> лише з ціновою знахідкою</label>
   <button type="submit">Показати</button>
   ${filtered ? '<a class="reset" href="/">скинути все</a>' : ""}
 </form>
@@ -312,6 +317,34 @@ ${
   </dl>
 </div>`
     : `<div class="card"><p>Переможця не визначено або картку ще не завантажено.</p></div>`
+}
+
+${
+  entry.findings.length
+    ? `<h2>Наш розрахунок ціни</h2>
+<p class="hint">Порівняння виконала ця система, а не держава. Нижче — числа, з яких зроблено висновок.</p>
+${entry.findings
+  .map((f) => {
+    const e = f.evidence as Record<string, number | string | null>;
+    const rows = Object.entries({
+      "Ціна за одиницю": typeof e.unit_price === "number" ? `${unitMoney(e.unit_price)}` : null,
+      "Типова ціна (медіана)": typeof e.peer_median === "number" ? `${unitMoney(e.peer_median)}` : null,
+      "Середня половина цін": typeof e.peer_p25 === "number" && typeof e.peer_p75 === "number" ? `${unitMoney(e.peer_p25)} — ${unitMoney(e.peer_p75)}` : null,
+      "Порівняно із закупівлями": typeof e.peer_count === "number" ? String(e.peer_count) : null,
+      "Попередня ціна цього замовника": typeof e.previous_price === "number" ? `${unitMoney(e.previous_price)}` : null,
+      "Зростання": typeof e.growth === "number" ? `${Math.round(e.growth * 100)}%` : null,
+      "Кількість": typeof e.quantity === "number" ? `${e.quantity.toLocaleString("uk-UA")} ${esc(String(e.unit_code ?? ""))}` : null,
+      "Різниця на всю закупівлю": typeof e.overpayment === "number" ? money(e.overpayment) : typeof e.extra_cost === "number" ? money(e.extra_cost) : null,
+      "Розрахунок від": e.basis === "award" ? "суми договору" : e.basis === "expected" ? "очікуваної вартості" : null,
+    }).filter(([, v]) => v !== null);
+    return `<div class="card">
+  <h3><span class="tier own">Наш аналіз</span> &nbsp;${esc(f.title)}</h3>
+  <p class="lead">${esc(f.explanation)}</p>
+  <dl class="facts">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl>
+</div>`;
+  })
+  .join("")}`
+    : ""
 }
 
 <h2>Що саме запідозрила держава</h2>

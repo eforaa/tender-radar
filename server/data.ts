@@ -1,7 +1,7 @@
 // Loads the store once and joins it into the shapes the pages need.
 import { openStore } from "../src/config.ts";
 import { officerKey } from "../src/normalize/tender.ts";
-import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow, RunRow } from "../src/store/types.ts";
+import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow, RunRow, FindingRow } from "../src/store/types.ts";
 
 /** One entry per tender: the flags that fired plus whatever the card added. */
 export type Case = {
@@ -25,6 +25,7 @@ export type Case = {
   winner_amount: number | null;
   bidders: number;
   detailed: boolean;
+  findings: FindingRow[];
 };
 
 export type Dataset = {
@@ -35,6 +36,7 @@ export type Dataset = {
   flagCount: number;
   totalValue: number;
   runs: RunRow[];
+  findingCount: number;
 };
 
 function activeAward(awards: AwardRow[]): AwardRow | undefined {
@@ -49,6 +51,14 @@ export async function loadDataset(): Promise<Dataset> {
   const awards: AwardRow[] = await store.allAwards();
   const bids = await store.allBids();
   const runs: RunRow[] = await store.allRuns();
+  const findings: FindingRow[] = await store.allFindings();
+
+  const findingsByTender = new Map<string, FindingRow[]>();
+  for (const finding of findings) {
+    const list = findingsByTender.get(finding.tender_id) ?? [];
+    list.push(finding);
+    findingsByTender.set(finding.tender_id, list);
+  }
 
   const tenderById = new Map(tenders.map((t) => [t.id, t]));
 
@@ -89,6 +99,7 @@ export async function loadDataset(): Promise<Dataset> {
         winner_amount: won?.amount ?? null,
         bidders: bidCount.get(flag.tender_id) ?? 0,
         detailed: Boolean(detail),
+        findings: findingsByTender.get(flag.tender_id) ?? [],
       };
       byTender.set(flag.tender_id, entry);
     }
@@ -104,6 +115,7 @@ export async function loadDataset(): Promise<Dataset> {
     rules,
     ruleById: new Map(rules.map((r) => [r.risk_id, r])),
     runs,
+    findingCount: findings.length,
     flagCount: flags.length,
     totalValue: cases.reduce((sum, c) => sum + (c.value_amount ?? 0), 0),
   };
