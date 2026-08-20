@@ -62,39 +62,20 @@ export function trim(text: string, max = 130): string {
 
 const STYLES = `
 :root {
-  --paper:#F2F5F6; --surface:#FFFFFF; --surface-2:#EBF0F2; --surface-3:#F7F9FA;
-  --ink:#141E28; --ink-soft:#42525D; --ink-faint:#6F818C;
-  --line:#D3DCE1; --line-soft:#E6ECEF;
-  --accent:#1B5670; --accent-bg:#E0EBF0; --accent-ink:#134156;
-  --alarm:#8C3A2E; --alarm-bg:#F6E4E1;
-  --warn:#8A6420; --warn-bg:#F6ECD9;
-  --calm:#2C6B4E; --calm-bg:#E0EFE7;
-  --shadow:0 1px 2px rgba(20,30,40,.05), 0 10px 28px -20px rgba(20,30,40,.35);
+  color-scheme: light;
+
+  --paper:#F6F8F9; --surface:#FFFFFF; --surface-2:#EEF3F5; --surface-3:#FAFCFC;
+  --ink:#17222B; --ink-soft:#4A5966; --ink-faint:#7C8B96;
+  --line:#DDE4E8; --line-soft:#EBF0F2;
+  --accent:#17607F; --accent-bg:#E6F0F4;
+  --alarm:#A03A2B; --alarm-bg:#FBE9E5;
+  --warn:#87621F; --warn-bg:#FAF0DC;
+  --calm:#276B4C; --calm-bg:#E4F1EA;
+  --shadow:0 1px 2px rgba(23,34,43,.04), 0 8px 24px -18px rgba(23,34,43,.26);
+  --radius:5px;
   --f-display:"Literata",Georgia,serif;
   --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",Consolas,monospace;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper:#0E151B; --surface:#161F27; --surface-2:#1C2831; --surface-3:#131C23;
-    --ink:#E6ECF0; --ink-soft:#A6B4BE; --ink-faint:#7C8B96;
-    --line:#293641; --line-soft:#202C35;
-    --accent:#7CBBD5; --accent-bg:#182D39; --accent-ink:#A8D5E7;
-    --alarm:#E09B90; --alarm-bg:#2D1C19;
-    --warn:#DBB46C; --warn-bg:#2C2617;
-    --calm:#7FC6A0; --calm-bg:#152B22;
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -20px rgba(0,0,0,.9);
-  }
-}
-:root[data-theme="dark"] {
-  --paper:#0E151B; --surface:#161F27; --surface-2:#1C2831; --surface-3:#131C23;
-  --ink:#E6ECF0; --ink-soft:#A6B4BE; --ink-faint:#7C8B96;
-  --line:#293641; --line-soft:#202C35;
-  --accent:#7CBBD5; --accent-bg:#182D39; --accent-ink:#A8D5E7;
-  --alarm:#E09B90; --alarm-bg:#2D1C19;
-  --warn:#DBB46C; --warn-bg:#2C2617;
-  --calm:#7FC6A0; --calm-bg:#152B22;
-  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -20px rgba(0,0,0,.9);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -117,17 +98,16 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
    visually rather than with display:none, which keeps it keyboard-reachable
    and keeps the sibling selectors working. */
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
-.burger{flex:none;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:4px;width:2.4rem;height:2.4rem;padding:.55rem;border:1px solid var(--line);background:var(--surface)}
+.burger{border-radius:var(--radius);flex:none;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:4px;width:2.4rem;height:2.4rem;padding:.55rem;border:1px solid var(--line);background:var(--surface)}
 .burger span{display:block;height:2px;background:var(--ink);border-radius:1px;transition:background .2s ease}
 .burger:hover{border-color:var(--accent)}
 .burger:hover span{background:var(--accent)}
-#menu-toggle:focus-visible + .top .burger{outline:2px solid var(--accent);outline-offset:2px}
+#menu-toggle:focus-visible + .top .burger{border-radius:var(--radius);outline:2px solid var(--accent);outline-offset:2px}
 
 .scrim{position:fixed;inset:0;background:rgba(10,18,24,.42);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease;z-index:40;cursor:pointer}
 #menu-toggle:checked ~ .scrim{opacity:1;visibility:visible}
 
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(20rem,86vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
-:root[data-theme="dark"] .drawer,:root:not([data-theme="light"]) .drawer{box-shadow:-18px 0 40px -24px rgba(0,0,0,.9)}
 #menu-toggle:checked ~ .drawer{transform:translateX(0)}
 
 .drawer-head{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.15rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
@@ -158,26 +138,24 @@ h2:first-of-type{margin-top:2rem}
 .back:hover{color:var(--accent)}
 
 /* ---------- metrics ---------- */
-.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(10.5rem,1fr));gap:1px;background:var(--line);border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:2rem}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(10.5rem,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:2rem}
 .metric{background:var(--surface);padding:1.1rem 1.25rem;display:flex;flex-direction:column;gap:.15rem}
 .metric .v{font-family:var(--f-display);font-weight:700;font-size:1.7rem;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .metric .k{font-size:.86rem;color:var(--ink-soft);line-height:1.4}
 
 /* ---------- filters ---------- */
 form.filters{display:flex;flex-wrap:wrap;gap:.55rem;margin-bottom:.9rem;align-items:center}
-input,select{font-family:inherit;font-size:.95rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);padding:.55rem .75rem;min-width:0}
+input,select{border-radius:var(--radius);font-family:inherit;font-size:.95rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);padding:.55rem .75rem;min-width:0}
 input[type=search]{flex:1 1 20rem}
 select{max-width:24rem}
-button{font-family:inherit;font-size:.95rem;font-weight:500;color:#fff;background:var(--accent);border:1px solid var(--accent);padding:.55rem 1.15rem;cursor:pointer}
-:root[data-theme="dark"] button,:root:not([data-theme="light"]) button{color:#0E151B}
-@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) button{color:#fff}}
+button{border-radius:var(--radius);font-family:inherit;font-size:.95rem;font-weight:500;color:#fff;background:var(--accent);border:1px solid var(--accent);padding:.55rem 1.15rem;cursor:pointer}
 button:hover{filter:brightness(1.08)}
 .check{display:flex;align-items:center;gap:.4rem;font-size:.93rem;color:var(--ink-soft);white-space:nowrap}
 .check input{min-width:auto}
 .reset{font-size:.9rem;color:var(--ink-faint)}
 
 /* ---------- result rows ---------- */
-.rows{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);box-shadow:var(--shadow)}
+.rows{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
 .row{background:var(--surface);padding:1.15rem 1.35rem;display:grid;grid-template-columns:1fr minmax(7rem,auto);gap:.55rem 1.75rem;align-items:start}
 .row:hover{background:var(--surface-3)}
 .row .who{min-width:0}
@@ -206,7 +184,7 @@ a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .code{font-family:var(--f-mono);font-size:.74rem;color:var(--ink-faint)}
 
 /* ---------- cards ---------- */
-.card{background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);padding:1.4rem 1.55rem;margin-bottom:1rem}
+.card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.4rem 1.55rem;margin-bottom:1rem}
 .card h3{margin:0 0 .5rem;font-size:1.08rem;font-weight:600;line-height:1.4;letter-spacing:-.005em}
 .card p{margin:0 0 .7rem;color:var(--ink-soft);max-width:68ch}
 .card p:last-child{margin-bottom:0}
@@ -234,7 +212,7 @@ dl.facts dd strong{font-weight:600}
 .card li{margin-bottom:.4rem}
 .note{font-size:.9rem;color:var(--ink-faint);max-width:68ch;margin-top:2.5rem;padding-top:1.15rem;border-top:1px solid var(--line)}
 
-details.help{background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:1.75rem}
+details.help{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:1.75rem}
 details.help summary{cursor:pointer;padding:.85rem 1.25rem;font-weight:500;font-size:.97rem;list-style:none;display:flex;align-items:center;gap:.5rem}
 details.help summary::-webkit-details-marker{display:none}
 details.help summary::before{content:"?";display:inline-flex;align-items:center;justify-content:center;width:1.35rem;height:1.35rem;border:1px solid var(--accent);color:var(--accent);font-size:.82rem;font-weight:600;flex:none}
@@ -246,15 +224,16 @@ details.help p:last-child{margin-bottom:0}
 
 /** Everything reachable from the burger menu, with a line of orientation. */
 const MENU = [
-  { href: "/", nav: "feed", label: "Знахідки", hint: "усі закупівлі з позначками" },
-  { href: "/railway", nav: "railway", label: "Залізниця", hint: "Південна залізниця та філії УЗ" },
-  { href: "/article/366", nav: "article-366", label: "Ст. 366", hint: "документальні розбіжності" },
-  { href: "/entities", nav: "entities", label: "Замовники", hint: "хто закуповує" },
-  { href: "/officers", nav: "officers", label: "Посадовці", hint: "хто вів закупівлі" },
-  { href: "/suppliers", nav: "suppliers", label: "Переможці", hint: "хто виграє" },
-  { href: "/indicators", nav: "indicators", label: "Що ми шукаємо", hint: "14 державних ознак" },
-  { href: "/updates", nav: "updates", label: "Оновлення", hint: "що додалося за день" },
-  { href: "/about", nav: "about", label: "Про систему", hint: "джерела й межі" },
+  { href: "/", nav: "feed", label: "Усі закупівлі", hint: "повний перелік, з пошуком і фільтрами" },
+  { href: "/railway", nav: "railway", label: "Залізниця", hint: "закупівлі залізниці Харківщини" },
+  { href: "/prices", nav: "prices", label: "Завищені ціни", hint: "де ми самі порахували переплату" },
+  { href: "/article/366", nav: "article-366", label: "Підроблення документів", hint: "розбіжності в договорах і звітах" },
+  { href: "/entities", nav: "entities", label: "Хто купує", hint: "установи-замовники" },
+  { href: "/suppliers", nav: "suppliers", label: "Хто продає", hint: "компанії-переможці" },
+  { href: "/officers", nav: "officers", label: "Хто відповідає", hint: "посадовці, що вели закупівлі" },
+  { href: "/indicators", nav: "indicators", label: "Що ми перевіряємо", hint: "усі ознаки простими словами" },
+  { href: "/updates", nav: "updates", label: "Що нового", hint: "останнє оновлення бази" },
+  { href: "/about", nav: "about", label: "Про систему", hint: "звідки дані і чого вона не робить" },
 ];
 
 export function layout(opts: { title: string; nav?: string; body: string }): string {
@@ -274,7 +253,7 @@ export function layout(opts: { title: string; nav?: string; body: string }): str
 <header class="top"><div class="inner">
   <a class="brand" href="/">Tender<span>&nbsp;Radar</span></a>
   <nav class="nav">
-    <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Знахідки</a>
+    <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Закупівлі</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>Залізниця</a>
     <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>Про систему</a>
   </nav>

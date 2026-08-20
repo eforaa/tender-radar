@@ -96,7 +96,7 @@ function riskCard(riskId: string, count?: number): string {
   const rule = db.ruleById.get(riskId);
   const label = RISK_LABELS[riskId];
   return `<div class="card">
-  <h3>${esc(label?.short ?? rule?.name ?? riskId)}${count ? ` <span class="faint">— ${count} ${plural(count, "раз", "рази", "разів")}</span>` : ""}</h3>
+  <h3><span class="tier state">Позначила держава</span> &nbsp;${esc(label?.short ?? rule?.name ?? riskId)}${count ? ` <span class="faint">— ${count} ${plural(count, "раз", "рази", "разів")}</span>` : ""}</h3>
   ${label ? `<p class="lead">${esc(label.means)}</p>` : ""}
   ${rule?.name && label ? `<p class="faint"><strong>Офіційне формулювання:</strong> ${esc(rule.name)}</p>` : ""}
   ${rule?.legitimateness ? `<p class="legal"><strong>Норма закону:</strong> ${esc(rule.legitimateness)}</p>` : ""}
@@ -204,13 +204,13 @@ function feedPage(url: URL): string {
     nav: "feed",
     body: `
 <h1>Закупівлі, які варто перевірити</h1>
-<p class="sub">${esc(REGION)} та філії АТ «Українська залізниця». Позначки ставить державна система моніторингу закупівель — ми збираємо їх в одному місці й пояснюємо звичайною мовою.</p>
+<p class="sub">Харківська область і залізниця. Держава сама позначає підозрілі закупівлі — ми збираємо ці позначки в одному місці, пояснюємо їх звичайною мовою і додаємо власний розрахунок цін.</p>
 
 <div class="metrics">
-  <div class="metric"><span class="v">${db.cases.length.toLocaleString("uk-UA")}</span><span class="k">закупівель із позначками</span></div>
-  <div class="metric"><span class="v">${shortMoney(db.totalValue)}</span><span class="k">на таку суму</span></div>
-  <div class="metric"><span class="v">${db.flagCount.toLocaleString("uk-UA")}</span><span class="k">спрацювань індикаторів</span></div>
-  <div class="metric"><span class="v">${db.findingCount.toLocaleString("uk-UA")}</span><span class="k">наших цінових знахідок</span></div>
+  <div class="metric"><span class="v">${db.cases.length.toLocaleString("uk-UA")}</span><span class="k">закупівель під питанням</span></div>
+  <div class="metric"><span class="v">${shortMoney(db.totalValue)}</span><span class="k">загальна сума</span></div>
+  <div class="metric"><span class="v">${db.flagCount.toLocaleString("uk-UA")}</span><span class="k">виявлених ознак</span></div>
+  <div class="metric"><span class="v">${db.findingCount.toLocaleString("uk-UA")}</span><span class="k">де ми знайшли переплату</span></div>
 </div>
 
 ${HELP}
@@ -229,8 +229,8 @@ ${HELP}
     <option value="risks"${sort === "risks" ? " selected" : ""}>Спочатку з найбільшою кількістю ознак</option>
   </select>
   <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> лише залізниця</label>
-  <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> лише з одним учасником</label>
-  <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> лише з ціновою знахідкою</label>
+  <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> лише без конкурентів</label>
+  <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> лише де ціна завищена</label>
   <button type="submit">Показати</button>
   ${filtered ? '<a class="reset" href="/">скинути все</a>' : ""}
 </form>
@@ -290,7 +290,7 @@ ${signals.length ? `<div class="flags" style="margin-bottom:1.5rem">${signals.ma
   </dl>
 </div>
 
-<h2>Хто вів цю закупівлю</h2>
+<h2>Хто відповідав за закупівлю</h2>
 ${
   entry.officer_name
     ? `<div class="card">
@@ -321,7 +321,7 @@ ${
 
 ${
   entry.findings.length
-    ? `<h2>Наш розрахунок ціни</h2>
+    ? `<h2>Скільки це коштує в інших</h2>
 <p class="hint">Порівняння виконала ця система, а не держава. Нижче — числа, з яких зроблено висновок.</p>
 ${entry.findings
   .map((f) => {
@@ -338,7 +338,7 @@ ${entry.findings
       "Розрахунок від": e.basis === "award" ? "суми договору" : e.basis === "expected" ? "очікуваної вартості" : null,
     }).filter(([, v]) => v !== null);
     return `<div class="card">
-  <h3><span class="tier own">Наш аналіз</span> &nbsp;${esc(f.title)}</h3>
+  <h3><span class="tier own">Порахували ми</span> &nbsp;${esc(f.title)}</h3>
   <p class="lead">${esc(f.explanation)}</p>
   <dl class="facts">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl>
 </div>`;
@@ -347,7 +347,7 @@ ${entry.findings
     : ""
 }
 
-<h2>Що саме запідозрила держава</h2>
+<h2>Що тут не так</h2>
 <p class="hint">Спрацювало ${entry.risks.length} ${plural(entry.risks.length, "індикатор", "індикатори", "індикаторів")} із чотирнадцяти чинних.</p>
 ${entry.risks.map((r) => riskCard(r)).join("")}
 
@@ -385,8 +385,8 @@ function officerPage(key: string): string {
 <p class="sub">Відповідальна особа в закупівлях${entity ? ` — ${esc(readableName(entity))}` : ""}.</p>
 
 <div class="metrics">
-  <div class="metric"><span class="v">${list.length}</span><span class="k">закупівель із позначками</span></div>
-  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">на таку суму</span></div>
+  <div class="metric"><span class="v">${list.length}</span><span class="k">закупівель під питанням</span></div>
+  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">загальна сума</span></div>
   <div class="metric"><span class="v">${solo}</span><span class="k">з єдиним учасником</span></div>
   <div class="metric"><span class="v">${ranked.length}</span><span class="k">різних ознак</span></div>
 </div>
@@ -480,8 +480,8 @@ function entityPage(edrpou: string): string {
 <p class="sub">ЄДРПОУ ${esc(edrpou)}${RAILWAY_EDRPOU.has(edrpou) ? " · філія АТ «Українська залізниця»" : ""}</p>
 
 <div class="metrics">
-  <div class="metric"><span class="v">${list.length}</span><span class="k">закупівель із позначками</span></div>
-  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">на таку суму</span></div>
+  <div class="metric"><span class="v">${list.length}</span><span class="k">закупівель під питанням</span></div>
+  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">загальна сума</span></div>
   <div class="metric"><span class="v">${solo}</span><span class="k">з єдиним учасником</span></div>
   <div class="metric"><span class="v">${rankedOfficers.length}</span><span class="k">відповідальних осіб</span></div>
 </div>
@@ -706,8 +706,8 @@ function railwayPage(): string {
 <p class="sub">Закупівлі залізничної галузі з позначками державної системи моніторингу. Нижче — три різні за природою групи, і ми їх не змішуємо.</p>
 
 <div class="metrics">
-  <div class="metric"><span class="v">${all.length.toLocaleString("uk-UA")}</span><span class="k">закупівель із позначками</span></div>
-  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">на таку суму</span></div>
+  <div class="metric"><span class="v">${all.length.toLocaleString("uk-UA")}</span><span class="k">закупівель під питанням</span></div>
+  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">загальна сума</span></div>
   <div class="metric"><span class="v">${solo}</span><span class="k">з єдиним учасником</span></div>
   <div class="metric"><span class="v">${southern.length}</span><span class="k">у «Південної залізниці»</span></div>
 </div>
@@ -822,7 +822,7 @@ function articlePage(code: string, url: URL): string {
 
 <div class="metrics">
   <div class="metric"><span class="v">${list.length.toLocaleString("uk-UA")}</span><span class="k">закупівель для перевірки</span></div>
-  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">на таку суму</span></div>
+  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">загальна сума</span></div>
   <div class="metric"><span class="v">${solo}</span><span class="k">з єдиним учасником</span></div>
   <div class="metric"><span class="v">${officers.size}</span><span class="k">відповідальних осіб</span></div>
 </div>
@@ -925,6 +925,57 @@ ${runs
   });
 }
 
+
+/* ---------- our own price findings ---------- */
+
+function pricesPage(): string {
+  const withFindings = db.cases.filter((c) => c.findings.length > 0);
+  const sum = (c: (typeof withFindings)[number]) =>
+    c.findings.reduce((total, f) => {
+      const e = f.evidence as { overpayment?: number; extra_cost?: number };
+      return total + (e.overpayment ?? e.extra_cost ?? 0);
+    }, 0);
+
+  const sorted = [...withFindings].sort((a, b) => sum(b) - sum(a));
+  const totalGap = withFindings.reduce((t, c) => t + sum(c), 0);
+  const peer = withFindings.filter((c) => c.findings.some((f) => f.detector_key === "peer_price")).length;
+  const growth = withFindings.filter((c) => c.findings.some((f) => f.detector_key === "own_price_growth")).length;
+
+  return layout({
+    title: "Завищені ціни",
+    nav: "prices",
+    body: `
+<h1>Де ціна виглядає завищеною</h1>
+<p class="sub">Тут система рахує сама, а не переказує висновок держави. Вона бере ціну за одиницю й порівнює з тим, скільки те саме коштувало іншим — і скільки коштувало цьому ж замовнику раніше.</p>
+
+<div class="metrics">
+  <div class="metric"><span class="v">${withFindings.length}</span><span class="k">закупівель із завищеною ціною</span></div>
+  <div class="metric"><span class="v">${shortMoney(totalGap)}</span><span class="k">різниця проти звичайної ціни</span></div>
+  <div class="metric"><span class="v">${peer}</span><span class="k">дорожче, ніж в інших</span></div>
+  <div class="metric"><span class="v">${growth}</span><span class="k">дорожче, ніж було торік</span></div>
+</div>
+
+<details class="help">
+  <summary>Як ми це рахуємо</summary>
+  <div class="inner">
+    <p>Спочатку рахуємо <strong>ціну за одиницю</strong>: суму договору ділимо на кількість. Наприклад, 4 млн грн за 200 холодильників — це 20 тисяч за штуку.</p>
+    <p>Далі шукаємо, за скільки те саме купували інші, і беремо середину. Якщо ціна помітно вища за середину — показуємо.</p>
+    <p>Окремо порівнюємо замовника з ним самим: скільки він платив за це раніше. Тут місцеві умови однакові, тож стрибок ціни складніше пояснити.</p>
+    <p><strong>Ми мовчимо, коли порівняти чесно не можна.</strong> Ремонти й послуги не порівнюємо — кожен об'єкт свій. Не порівнюємо й товари всередині надто широкого коду: під одним кодом можуть бути і прокладка за 400 грн, і редуктор за мільйон.</p>
+  </div>
+</details>
+
+${
+  sorted.length === 0
+    ? '<div class="empty">Поки що завищених цін не знайдено.</div>'
+    : `<div class="rows">${sorted.map((c) => caseRow(c)).join("")}</div>`
+}
+
+<p class="note">Різниця в ціні — це ще не порушення. Вона може мати пояснення: інші умови постачання, інший час, інша якість. Наше завдання — показати, де це пояснення варто запитати.</p>
+`,
+  });
+}
+
 function indicatorsPage(): string {
   // Every active indicator is listed, including those that never fired here —
   // a zero is information too.
@@ -959,9 +1010,9 @@ function aboutPage(): string {
 
 <div class="card">
   <h3>Три рівні достовірності</h3>
-  <p><span class="tier confirmed">Підтверджено</span> &nbsp;Держаудитслужба провела моніторинг і встановила порушення.</p>
-  <p><span class="tier state">Державний індикатор</span> &nbsp;Спрацював індикатор державної системи. Це підозра держави з посиланням на норму закону — саме це показано на сайті сьогодні.</p>
-  <p><span class="tier own">Власний аналіз</span> &nbsp;Наш розрахунок: ціна за одиницю проти каталожної. Підключається наступним етапом.</p>
+  <p><span class="tier confirmed">Перевірила держава</span> &nbsp;Держаудитслужба провела моніторинг і встановила порушення.</p>
+  <p><span class="tier state">Позначила держава</span> &nbsp;Спрацював індикатор державної системи. Це підозра держави з посиланням на норму закону — саме це показано на сайті сьогодні.</p>
+  <p><span class="tier own">Порахували ми</span> &nbsp;Наш розрахунок: ціна за одиницю проти каталожної. Підключається наступним етапом.</p>
   <p>Нижчий рівень ніколи не подається як вищий.</p>
 </div>
 
@@ -1005,6 +1056,7 @@ const server = createServer(async (req, res) => {
   else if (path === "/suppliers") body = suppliersPage();
   else if (path === "/railway") body = railwayPage();
   else if (path === "/updates") body = updatesPage();
+  else if (path === "/prices") body = pricesPage();
   else if (path.startsWith("/article/")) body = articlePage(path.slice("/article/".length), url);
   else if (path === "/indicators") body = indicatorsPage();
   else if (path === "/about") body = aboutPage();
