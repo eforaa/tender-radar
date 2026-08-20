@@ -14,6 +14,9 @@
     "ingest:market": "node scripts/ingest-market.ts",
     "analyze": "node scripts/analyze.ts",
     "report": "node scripts/report.ts",
-    "serve": "node server/serve.ts"
+    "serve": "node server/serve.ts",
+    "build:web": "node scripts/build-web-data.ts",
+    "deploy": "vercel deploy",
+    "deploy:prod": "vercel deploy --prod"
   }
 }

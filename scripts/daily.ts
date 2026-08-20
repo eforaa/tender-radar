@@ -10,6 +10,7 @@ import { normalizeRiskReport, normalizeRiskRules } from "../src/normalize/risk.t
 import { fetchTender } from "../src/sources/openprocurement.ts";
 import { normalizeTender } from "../src/normalize/tender.ts";
 import { pricePoints, priceGroups, detectPeerPrice, detectOwnPriceGrowth } from "../src/analysis/peer-price.ts";
+import { join } from "node:path";
 import { openStore, REGION, RAILWAY_EDRPOU } from "../src/config.ts";
 import type { RiskFlagRow, TenderRow, TenderItemRow, BidRow, AwardRow, RunRow, FindingRow } from "../src/store/types.ts";
 
@@ -159,6 +160,17 @@ try {
     new_tender_ids: newTenderIds,
   };
   await store.upsertRuns([run]);
+
+  // Refresh the slim export the deployed site reads, so a redeploy ships
+  // today's data rather than whatever was there when the site was last built.
+  const { execFileSync } = await import("node:child_process");
+  try {
+    execFileSync(process.execPath, [join(import.meta.dirname, "build-web-data.ts")], { stdio: "pipe" });
+    log("web-data export refreshed");
+  } catch (err) {
+    errors++;
+    log(`web-data export failed — ${(err as Error).message}`);
+  }
 
   const total = (await store.allRiskFlags()).length;
   const tenderCount = (await store.allTenders()).length;
