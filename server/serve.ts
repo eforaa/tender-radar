@@ -812,20 +812,17 @@ function articlePage(code: string, url: URL): string {
     title: `Стаття ${article.code}`,
     nav: `article-${article.code}`,
     body: `
-<h1>Ознаки за статтею ${esc(article.code)} — ${esc(article.title)}</h1>
-<p class="sub">Закупівлі ${esc(REGION)}, у яких державна система виявила документальні розбіжності того типу, який перевіряють за цією статтею.</p>
+<h1>Підроблення документів</h1>
+<p class="sub">Закупівлі Харківщини, де в договорах, додаткових угодах чи звітах є розбіжності — тобто те, що перевіряють за статтею ${esc(article.code)} «${esc(article.title)}».</p>
 
-<div class="card" style="border-left:3px solid var(--alarm)">
-  <h3>Це список для перевірки, а не звинувачення</h3>
-  <p class="lead">${esc(article.caution)}</p>
-</div>
+<p class="statline">
+  <b>${list.length.toLocaleString("uk-UA")}</b> ${plural(list.length, "закупівля", "закупівлі", "закупівель")} ·
+  <b>${shortMoney(value)}</b> ·
+  <b>${solo}</b> без конкурентів ·
+  <b>${officers.size}</b> ${plural(officers.size, "відповідальна особа", "відповідальні особи", "відповідальних осіб")}
+</p>
 
-<div class="metrics">
-  <div class="metric"><span class="v">${list.length.toLocaleString("uk-UA")}</span><span class="k">закупівель для перевірки</span></div>
-  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">загальна сума</span></div>
-  <div class="metric"><span class="v">${solo}</span><span class="k">з єдиним учасником</span></div>
-  <div class="metric"><span class="v">${officers.size}</span><span class="k">відповідальних осіб</span></div>
-</div>
+<p class="caution">Це список для перевірки, а не звинувачення: індикатори показують розбіжності в документах, а умисел встановлює лише суд.</p>
 
 <details class="help">
   <summary>Що каже стаття ${esc(article.code)}</summary>

@@ -132,6 +132,9 @@ h2{font-family:var(--f-display);font-weight:700;font-size:1.35rem;line-height:1.
 h2:first-of-type{margin-top:2rem}
 .sub{color:var(--ink-soft);max-width:64ch;margin:0 0 1.5rem;font-size:1.02rem}
 .hint{color:var(--ink-faint);font-size:.92rem;max-width:64ch;margin:.15rem 0 1.25rem}
+.statline{display:flex;flex-wrap:wrap;gap:.3rem .55rem;align-items:baseline;font-size:.95rem;color:var(--ink-soft);margin:0 0 .5rem;max-width:none}
+.statline b{font-family:var(--f-display);font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.caution{font-size:.88rem;line-height:1.5;color:var(--alarm);background:var(--alarm-bg);border:1px solid var(--alarm);border-radius:var(--radius);padding:.5rem .75rem;margin:0 0 1.5rem;max-width:72ch}
 
 /* ---------- breadcrumb ---------- */
 .back{display:inline-block;font-size:.9rem;color:var(--ink-soft);text-decoration:none;margin-bottom:1.1rem}
