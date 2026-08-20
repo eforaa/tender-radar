@@ -1,0 +1,16 @@
+{
+  "name": "tender-radar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "ingest:risks": "node scripts/ingest-risks.ts",
+    "ingest:tenders": "node scripts/ingest-tenders.ts",
+    "ingest:market": "node scripts/ingest-market.ts",
+    "analyze": "node scripts/analyze.ts",
+    "report": "node scripts/report.ts",
+    "serve": "node server/serve.ts"
+  }
+}

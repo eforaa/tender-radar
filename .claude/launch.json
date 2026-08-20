@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tender-radar",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server/serve.ts"],
+      "port": 3120
+    }
+  ]
+}
