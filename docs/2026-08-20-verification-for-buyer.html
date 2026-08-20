@@ -1,0 +1,885 @@
+<title>Перевірка вимог Tender Radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,400&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --paper:      #F3F5F6;
+    --surface:    #FFFFFF;
+    --surface-2:  #EDF1F3;
+    --ink:        #16202B;
+    --ink-soft:   #4A5A68;
+    --ink-faint:  #74858F;
+    --line:       #D5DDE2;
+    --line-soft:  #E5EBEE;
+    --accent:     #1E5A72;
+    --accent-ink: #16455A;
+    --accent-bg:  #E2EDF1;
+    --ok:         #2C6B4E;
+    --ok-bg:      #E0EFE7;
+    --wait:       #8A6420;
+    --wait-bg:    #F5EBD7;
+    --out:        #7C3B3B;
+    --out-bg:     #F2E3E3;
+    --shadow:     0 1px 2px rgba(22,32,43,.06), 0 8px 24px -16px rgba(22,32,43,.30);
+
+    --f-display: "Literata", Georgia, "Times New Roman", serif;
+    --f-body:    "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --f-mono:    "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+
+    --measure: 68ch;
+    --pad: clamp(1.15rem, 4vw, 3.25rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #10171E;
+      --surface:    #17212A;
+      --surface-2:  #1D2932;
+      --ink:        #E4EAEE;
+      --ink-soft:   #9DACB8;
+      --ink-faint:  #7A8994;
+      --line:       #2B3944;
+      --line-soft:  #222E38;
+      --accent:     #74B6D1;
+      --accent-ink: #A6D2E4;
+      --accent-bg:  #1A303C;
+      --ok:         #7FC6A0;
+      --ok-bg:      #162C23;
+      --wait:       #DBB46C;
+      --wait-bg:    #2E2718;
+      --out:        #DA9797;
+      --out-bg:     #2E1E1E;
+      --shadow:     0 1px 2px rgba(0,0,0,.40), 0 8px 24px -16px rgba(0,0,0,.80);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #10171E;
+    --surface:    #17212A;
+    --surface-2:  #1D2932;
+    --ink:        #E4EAEE;
+    --ink-soft:   #9DACB8;
+    --ink-faint:  #7A8994;
+    --line:       #2B3944;
+    --line-soft:  #222E38;
+    --accent:     #74B6D1;
+    --accent-ink: #A6D2E4;
+    --accent-bg:  #1A303C;
+    --ok:         #7FC6A0;
+    --ok-bg:      #162C23;
+    --wait:       #DBB46C;
+    --wait-bg:    #2E2718;
+    --out:        #DA9797;
+    --out-bg:     #2E1E1E;
+    --shadow:     0 1px 2px rgba(0,0,0,.40), 0 8px 24px -16px rgba(0,0,0,.80);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 0 var(--pad) 5rem;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: clamp(2.5rem, 6vw, 4.25rem) 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: .72rem;
+    font-weight: 500;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: clamp(2rem, 5.5vw, 3.15rem);
+    line-height: 1.08;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    font-family: var(--f-display);
+    font-size: clamp(1.02rem, 2.1vw, 1.2rem);
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: var(--measure);
+    margin: 0;
+  }
+
+  .docmeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .55rem 2.25rem;
+    font-family: var(--f-mono);
+    font-size: .78rem;
+    color: var(--ink-faint);
+    padding-top: .35rem;
+  }
+  .docmeta b {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { padding-top: clamp(2.75rem, 6vw, 4rem); }
+
+  h2 {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    line-height: 1.2;
+    letter-spacing: -.01em;
+    text-wrap: balance;
+    margin: 0 0 .35rem;
+    display: flex;
+    align-items: baseline;
+    gap: .7rem;
+  }
+  h2 .num {
+    font-family: var(--f-mono);
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: .06em;
+    flex: none;
+  }
+
+  h3 {
+    font-family: var(--f-body);
+    font-weight: 600;
+    font-size: 1.02rem;
+    letter-spacing: -.005em;
+    margin: 2rem 0 .5rem;
+  }
+
+  p { max-width: var(--measure); margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+
+  .lede { color: var(--ink-soft); margin-bottom: 1.75rem; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* ---------- status note ---------- */
+
+  .notice {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    padding: 1.35rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: .8rem;
+    box-shadow: var(--shadow);
+  }
+  .notice h3 { margin: 0; font-size: 1.05rem; }
+  .notice p { margin: 0; }
+
+  /* ---------- legend ---------- */
+
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: .75rem;
+    margin-top: 1.5rem;
+  }
+  .legend div {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    padding: .85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+  }
+  .legend span { font-size: .86rem; color: var(--ink-soft); }
+
+  .chip {
+    align-self: flex-start;
+    font-family: var(--f-mono);
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: .28rem .55rem;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .chip.ok   { color: var(--ok);   background: var(--ok-bg); }
+  .chip.wait { color: var(--wait); background: var(--wait-bg); }
+  .chip.out  { color: var(--out);  background: var(--out-bg); }
+
+  /* ---------- requirement blocks ---------- */
+
+  .reqs {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1.75rem;
+  }
+
+  .req {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    display: grid;
+    grid-template-columns: 3.5rem 1fr;
+  }
+
+  .req > .idx {
+    border-right: 1px solid var(--line-soft);
+    background: var(--surface-2);
+    font-family: var(--f-mono);
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--accent);
+    display: flex;
+    justify-content: center;
+    padding-top: 1.3rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .req > .body {
+    padding: 1.15rem 1.35rem 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    min-width: 0;
+  }
+
+  .req .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .6rem 1rem;
+  }
+  .req .head h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    max-width: 44ch;
+  }
+
+  .req dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: .45rem 1.1rem;
+    align-items: baseline;
+  }
+  .req dt {
+    font-family: var(--f-mono);
+    font-size: .68rem;
+    font-weight: 500;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    white-space: nowrap;
+    padding-top: .15rem;
+  }
+  .req dd { margin: 0; font-size: .95rem; color: var(--ink-soft); min-width: 0; }
+  .req dd strong { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 34rem) {
+    .req { grid-template-columns: 1fr; }
+    .req > .idx {
+      border-right: 0;
+      border-bottom: 1px solid var(--line-soft);
+      justify-content: flex-start;
+      padding: .5rem 1.35rem;
+    }
+    .req dl { grid-template-columns: 1fr; gap: .15rem; }
+    .req dd { margin-bottom: .55rem; }
+  }
+
+  /* ---------- code ---------- */
+
+  pre {
+    margin: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    padding: .7rem .85rem;
+    overflow-x: auto;
+    font-family: var(--f-mono);
+    font-size: .8rem;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+  code { font-family: var(--f-mono); font-size: .88em; }
+  p code, dd code, li code, td code {
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    padding: .06em .3em;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; min-width: 34rem; }
+  th, td { text-align: left; padding: .7rem .95rem; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--f-mono);
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ---------- metrics ---------- */
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-top: 1.5rem;
+    box-shadow: var(--shadow);
+  }
+  .metric {
+    background: var(--surface);
+    padding: 1.15rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+  }
+  .metric .v {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 1.85rem;
+    line-height: 1;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .metric .k {
+    font-size: .84rem;
+    color: var(--ink-soft);
+    max-width: 26ch;
+  }
+
+  /* ---------- lists ---------- */
+
+  ul.plain { list-style: none; padding: 0; margin: 1rem 0 0; display: flex; flex-direction: column; gap: .8rem; }
+  ul.plain li {
+    max-width: var(--measure);
+    padding-left: 1.15rem;
+    position: relative;
+    color: var(--ink-soft);
+  }
+  ul.plain li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: .68em;
+    width: .42rem; height: 1px;
+    background: var(--accent);
+  }
+  ul.plain li strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- signoff ---------- */
+
+  .signoff {
+    margin-top: 1.5rem;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  .signoff .row {
+    display: grid;
+    grid-template-columns: 2.6rem 1fr;
+    gap: 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .signoff .row:last-child { border-bottom: 0; }
+  .signoff .box {
+    border-right: 1px solid var(--line-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .signoff .box i {
+    display: block;
+    width: .95rem; height: .95rem;
+    border: 1.5px solid var(--ink-faint);
+  }
+  .signoff .txt { padding: .85rem 1.1rem; font-size: .95rem; }
+  .signoff .txt b { font-weight: 600; }
+  .signoff .txt span { display: block; color: var(--ink-faint); font-size: .85rem; margin-top: .15rem; }
+
+  footer {
+    margin-top: clamp(3rem, 7vw, 4.5rem);
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    font-size: .85rem;
+    color: var(--ink-faint);
+    max-width: var(--measure);
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Документ для перевірки замовником</div>
+    <h1>Аналіз ризиків закупівель Харківської області</h1>
+    <p class="standfirst">
+      Цей документ дає змогу самостійно перевірити, чи виконані умови, поставлені перед
+      проєктом. Кожна вимога супроводжується статусом і командою, яку можна виконати
+      власноруч і отримати той самий результат.
+    </p>
+    <div class="docmeta">
+      <span>Дата <b>20 серпня 2026</b></span>
+      <span>Стадія <b>дослідження та проєктування</b></span>
+      <span>Робоча назва <b>Tender Radar</b></span>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="num">01</span> Що саме передається на перевірку</h2>
+    <div class="notice">
+      <h3>Передається аналіз і проєкт, а не готовий сайт</h3>
+      <p>
+        На цій стадії виконано дослідження джерел даних і побудовано проєкт системи.
+        Програмний код сайту ще не написаний. Відповідно, перевірці підлягає
+        <strong>обґрунтованість аналізу</strong> — чи справді існують дані, на яких
+        будується проєкт, чи достатньо їх для поставлених завдань, і чи закриває
+        запропонована конструкція кожну з умов.
+      </p>
+      <p>
+        Усі джерела даних, названі в цьому документі, перевірені живими запитами
+        20 серпня 2026 року. Наведені цифри отримані з фактичних відповідей цих
+        джерел, а не з оцінок.
+      </p>
+    </div>
+
+    <h3>Як користуватися документом</h3>
+    <p>
+      Розділ 03 містить дев'ять вимог у тому вигляді, як вони були сформульовані
+      замовником. Для кожної вказано, що зроблено, який статус і як перевірити це
+      самостійно. Команди наведені для <code>curl</code>; кожну можна виконати
+      в терміналі або відкрити відповідну адресу в браузері.
+    </p>
+    <p>
+      Розділ 06 містить обмеження, про які треба знати <em>до</em> приймання —
+      їх краще обговорити зараз, ніж виявити на етапі розробки.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span> Позначення статусів</h2>
+    <p class="lede">Три статуси, які трапляються далі. Вони означають різні речі, і їх не слід зчитувати як однаково готові.</p>
+    <div class="legend">
+      <div>
+        <span class="chip ok">Джерело підтверджено</span>
+        <span>Дані існують, доступні та перевірені живим запитом. Умова забезпечена джерелом і закладена в проєкт.</span>
+      </div>
+      <div>
+        <span class="chip wait">Етап 2 або 3</span>
+        <span>Умова прийнята й спроєктована, але свідомо винесена на пізніший етап із зазначеною причиною.</span>
+      </div>
+      <div>
+        <span class="chip out">Обмежено</span>
+        <span>Умова виконується частково. Обмеження зовнішнє — його не можна усунути з боку виконавця.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span> Вимоги та їх перевірка</h2>
+    <p class="lede">
+      Вимоги наведені за порядком, у якому їх було сформульовано. Нумерація потрібна
+      для посилань під час обговорення.
+    </p>
+
+    <div class="reqs">
+
+      <article class="req">
+        <div class="idx">В1</div>
+        <div class="body">
+          <div class="head">
+            <h3>Аналіз тендерів по всій Україні з фокусом на Харківську область</h3>
+            <span class="chip ok">Джерело підтверджено</span>
+          </div>
+          <dl>
+            <dt>Джерело</dt>
+            <dd>Державна система ризик-індикаторів <code>risks.prozorro.gov.ua</code> (наказ Мінфіну № 476 від 27.09.2024) та основний API закупівель <code>public.api.openprocurement.org</code>. Обидва відкриті, без авторизації.</dd>
+            <dt>Результат</dt>
+            <dd>По Харківській області виявлено <strong>2 165 тендерів зі спрацьованими державними індикаторами ризику на 52,8 млрд грн</strong>. Регіон визначається полем <code>procuringEntityRegion</code>.</dd>
+            <dt>Перевірка</dt>
+            <dd>
+              <pre>curl -s "https://risks.prozorro.gov.ua/api/risks-report?risks=ari-1-1&amp;risks_all=false" -o ari.csv</pre>
+              У колонці <code>procuringEntityRegion</code> знайдіть значення «Харківська область».
+            </dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="req">
+        <div class="idx">В2</div>
+        <div class="body">
+          <div class="head">
+            <h3>Окремий фокус на закупівлях залізниці</h3>
+            <span class="chip ok">Джерело підтверджено</span>
+          </div>
+          <dl>
+            <dt>Зроблено</dt>
+            <dd>Ідентифіковано коди ЄДРПОУ філій АТ «Українська залізниця», зокрема харківської — <strong>РФ «Південна залізниця», ЄДРПОУ 40081216</strong>. Також: 40081347 (Центр забезпечення виробництва), 41022900 (Пасажирська компанія), 40123454, 45462724, 45246390.</dd>
+            <dt>Результат</dt>
+            <dd>Закупівлі цих установ наявні в масиві зі спрацьованими індикаторами. Фільтр за ЄДРПОУ на боці державного API працює.</dd>
+            <dt>Перевірка</dt>
+            <dd>
+              <pre>curl -s "https://risks.prozorro.gov.ua/api/risks?skip=0&amp;edrpou=40081216&amp;risks_all=false"</pre>
+              Поле <code>count</code> покаже кількість тендерів «Південної залізниці» зі спрацюваннями.
+            </dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="req">
+        <div class="idx">В3</div>
+        <div class="body">
+          <div class="head">
+            <h3>Виявлення завищення ціни через порівняння з ринковою</h3>
+            <span class="chip ok">Джерело підтверджено</span>
+          </div>
+          <dl>
+            <dt>Зроблено</dt>
+            <dd>Знайдено <strong>офіційний державний довідник цін</strong> — API електронного каталогу <code>market-api.prozorro.gov.ua</code>. Товар містить назву та код ДК021 (CPV), пропозиція — реальну ціну постачальника.</dd>
+            <dt>Чому так</dt>
+            <dd>Спершу планувалося зіставляти з цінами торгових сайтів. Державний каталог надійніший: він не змінює розмітку, не блокує запити й придатний як доказ. Скрейпінг роздрібу залишений як додатковий шар, а не основа.</dd>
+            <dt>Друга опора</dt>
+            <dd>Медіана ціни за одиницю по тому самому коду CPV серед усіх закупівель України. Працює й там, де каталожної ціни не існує — рейки, шпали, ремонтні роботи.</dd>
+            <dt>Перевірка</dt>
+            <dd>
+              <pre>curl -s "https://market-api.prozorro.gov.ua/api/products?descending=1&amp;limit=1"
+curl -s "https://market-api.prozorro.gov.ua/api/offers?limit=1"</pre>
+              У картці товару буде <code>classification</code> з кодом ДК021, у картці пропозиції — <code>value.amount</code>.
+            </dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="req">
+        <div class="idx">В4</div>
+        <div class="body">
+          <div class="head">
+            <h3>Дослідження проводиться автоматично, а не вручну</h3>
+            <span class="chip ok">Джерело підтверджено</span>
+          </div>
+          <dl>
+            <dt>Зроблено</dt>
+            <dd>Спроєктовано п'ять фонових процесів за розкладом: індикатори ризику (щодня), тендери (щогодини), моніторинги Держаудитслужби (щодня), каталог цін (щотижня), реєстр юридичних осіб (щомісяця). Кожен тримає власну позицію в потоці, тому збій не призводить до втрати даних.</dd>
+            <dt>Навантаження виміряно</dt>
+            <dd>За 20 серпня 2026 у стрічці змін <strong>понад 8 000 подій</strong> по Україні. Харківська область — близько <strong>4 %</strong> потоку, тобто 600–1 000 тендерів на добу. Обсяг підйомний.</dd>
+            <dt>Перевірка</dt>
+            <dd>
+              <pre>curl -s "https://public.api.openprocurement.org/api/2.5/tenders?descending=1&amp;limit=100&amp;opt_fields=tenderID,procuringEntity"</pre>
+              Кожен запис містить <code>procuringEntity.address.region</code> — за ним і відбувається відбір.
+            </dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="req">
+        <div class="idx">В5</div>
+        <div class="body">
+          <div class="head">
+            <h3>Визначення, хто подав тендер: замовник, учасники, переможець</h3>
+            <span class="chip ok">Джерело підтверджено</span>
+          </div>
+          <dl>
+            <dt>Зроблено</dt>
+            <dd>Повна картка тендера містить <code>procuringEntity</code> (замовник), <code>bids</code> (учасники), <code>awards</code> (переможець), <code>contracts</code> (договір) і <code>items</code> з кількістю та одиницею виміру — саме з них рахується ціна за одиницю.</dd>
+            <dt>Перевірка</dt>
+            <dd>
+              <pre>curl -s "https://public.api.openprocurement.org/api/2.5/tenders/&lt;id&gt;"</pre>
+              Ідентифікатор беремо з попередньої команди. У відповіді мають бути <code>bids</code>, <code>awards</code>, <code>items</code>.
+            </dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="req">
+        <div class="idx">В6</div>
+        <div class="body">
+          <div class="head">
+            <h3>Засновники компаній-учасників</h3>
+            <span class="chip out">Обмежено</span>
+          </div>
+          <dl>
+            <dt>Зроблено</dt>
+            <dd>Джерело — відкритий набір Єдиного державного реєстру на <code>data.gov.ua</code>. Файл <strong>UO.zip, 327 МБ, оновлений 18 серпня 2026</strong>. Містить перелік засновників і кінцевих бенефіціарних власників. Безкоштовно.</dd>
+            <dt>Обмеження</dt>
+            <dd>Адреси засновників і бенефіціарів <strong>приховані через воєнний стан</strong> — це рішення держави, обійти його неможливо. Прізвища, найменування та частки доступні.</dd>
+            <dt>Наслідок</dt>
+            <dd>Платні сервіси YouControl і Opendatabot не потрібні — витрат на дані немає.</dd>
+            <dt>Перевірка</dt>
+            <dd>
+              <pre>curl -s "https://data.gov.ua/api/3/action/package_show?id=a1799820-195b-4982-8141-6e84f58103e7"</pre>
+              У переліку ресурсів має бути <code>UO.zip</code> із розміром і датою оновлення.
+            </dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="req">
+        <div class="idx">В7</div>
+        <div class="body">
+          <div class="head">
+            <h3>Чи траплялися ті самі порушення в інших тендерах цих осіб</h3>
+            <span class="chip ok">Джерело підтверджено</span>
+          </div>
+          <dl>
+            <dt>Зроблено</dt>
+            <dd>Державна система ризик-індикаторів дозволяє запит за кодом ЄДРПОУ й повертає <strong>всі</strong> тендери цієї особи зі спрацюваннями по всій Україні. Саме це й потрібно для питання «чи попадалися вони раніше».</dd>
+            <dt>Приклад із живої відповіді</dt>
+            <dd>Запит за ЄДРПОУ 42574629 повернув <strong>254 тендери</strong> зі спрацьованими індикаторами.</dd>
+            <dt>Перевірка</dt>
+            <dd>
+              <pre>curl -s "https://risks.prozorro.gov.ua/api/risks?skip=0&amp;edrpou=42574629&amp;risks_all=false"</pre>
+              Підставте будь-який інший код — механізм той самий.
+            </dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="req">
+        <div class="idx">В8</div>
+        <div class="body">
+          <div class="head">
+            <h3>Статті, за якими притягалися</h3>
+            <span class="chip wait">Частково — етап 3</span>
+          </div>
+          <dl>
+            <dt>Що є вже</dt>
+            <dd>Кожен державний індикатор ризику містить поле <code>legitimateness</code> — <strong>точну статтю закону, яку порушено</strong>. Це надходить разом із даними, без домислів з нашого боку. Додатково — офіційні моніторинги Держаудитслужби через <code>audit-api.prozorro.gov.ua</code>, включно з висновками про встановлені порушення.</dd>
+            <dt>Чого ще немає</dt>
+            <dd>Єдиний державний реєстр судових рішень — тобто вироки й кримінальні провадження щодо конкретних осіб. Винесено на <strong>етап 3</strong>: реєстр жорстко обмежує автоматичні запити, і його включення в перший запуск зірвало б строки.</dd>
+            <dt>Перевірка</dt>
+            <dd>
+              <pre>curl -s "https://risks.prozorro.gov.ua/api/risks?skip=0" | grep -o "legitimateness"</pre>
+              Поле присутнє в кожному описі індикатора.
+            </dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="req">
+        <div class="idx">В9</div>
+        <div class="body">
+          <div class="head">
+            <h3>Видача зібраної інформації користувачеві</h3>
+            <span class="chip wait">Спроєктовано, етап 1 розробки</span>
+          </div>
+          <dl>
+            <dt>Зроблено</dt>
+            <dd>Спроєктовано єдину точку входу: користувач вводить код ЄДРПОУ, номер тендера або назву товару й отримує повне досьє — ціна за одиницю проти каталогу та проти медіани, спрацьовані індикатори зі статтями закону, наявність моніторингу, переможець, його засновники, інші його перемоги по Україні.</dd>
+            <dt>Сторінки</dt>
+            <dd>Стрічка знахідок, картка тендера, досьє постачальника, досьє замовника, пошук. Інтерфейс українською.</dd>
+            <dt>Стан</dt>
+            <dd>Код ще не написаний — це предмет наступного етапу. На перевірку зараз виноситься склад сторінок і повнота даних на них.</dd>
+          </dl>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span> Перевірені джерела даних</h2>
+    <p class="lede">Усі чотири джерела відкриті, безкоштовні й не потребують авторизації. Перевірені 20 серпня 2026.</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Джерело</th>
+            <th>Що дає</th>
+            <th>Підстава</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>risks.prozorro.gov.ua</code></td>
+            <td>14 діючих державних індикаторів ризику, 36 978 тендерів зі спрацюваннями, стаття закону по кожному</td>
+            <td>Наказ Мінфіну № 476 від 27.09.2024</td>
+          </tr>
+          <tr>
+            <td><code>audit-api.prozorro.gov.ua</code></td>
+            <td>Офіційні моніторинги Держаудитслужби: накази, підстави, висновки про порушення</td>
+            <td>Модуль моніторингу Prozorro</td>
+          </tr>
+          <tr>
+            <td><code>market-api.prozorro.gov.ua</code></td>
+            <td>Електронний каталог: товари з кодом ДК021 та реальні ціни пропозицій</td>
+            <td>Prozorro Market</td>
+          </tr>
+          <tr>
+            <td><code>public.api.openprocurement.org</code></td>
+            <td>Повні картки тендерів: позиції, кількість, учасники, переможці, договори</td>
+            <td>Основний API системи закупівель</td>
+          </tr>
+          <tr>
+            <td><code>data.gov.ua</code> — ЄДР</td>
+            <td>Засновники та кінцеві бенефіціарні власники юридичних осіб</td>
+            <td>Доступ відновлено 19.01.2026</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span> Виміряні показники</h2>
+    <p class="lede">Цифри отримані з фактичних відповідей джерел 20 серпня 2026 року.</p>
+    <div class="metrics">
+      <div class="metric">
+        <span class="v">2 165</span>
+        <span class="k">тендерів Харківської області зі спрацьованими державними індикаторами</span>
+      </div>
+      <div class="metric">
+        <span class="v">52,8 млрд</span>
+        <span class="k">гривень — сукупна вартість цих тендерів</span>
+      </div>
+      <div class="metric">
+        <span class="v">14</span>
+        <span class="k">діючих державних індикаторів ризику</span>
+      </div>
+      <div class="metric">
+        <span class="v">4 %</span>
+        <span class="k">частка Харківської області в загальноукраїнському потоці закупівель</span>
+      </div>
+    </div>
+    <p style="margin-top:1.35rem">
+      <strong>Уточнення до цифри 2 165.</strong> Це нижня межа. Її отримано з п'яти
+      індикаторів із чотирнадцяти — <code>ari-1-1</code>, <code>ari-1-2</code>,
+      <code>sas24-3-2</code>, <code>sas24-3-9</code>, <code>sas24-3-13</code> — які
+      разом дали 31 136 унікальних тендерів по Україні. Повне вивантаження всіх
+      чотирнадцяти індикаторів дасть більше. Цифра свідомо не округлена вгору.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span> Обмеження, які треба знати до приймання</h2>
+    <p class="lede">Це не перелік проблем, а перелік зовнішніх умов, у яких працюватиме система. Їх краще обговорити зараз.</p>
+    <ul class="plain">
+      <li><strong>Фільтр за регіоном на державному API не працює.</strong> Параметр <code>region</code> повертає нуль для будь-якого регіону. Обхід знайдено: регіон присутній у вивантаженні, тому відбір робиться на нашому боці. На результат не впливає.</li>
+      <li><strong>Пошуковий API Prozorro непридатний.</strong> <code>prozorro.gov.ua/api/search/tenders</code> мовчки ігнорує фільтри за регіоном, кодом CPV і ЄДРПОУ, а текстовий пошук завжди повертає нуль. Тому будується власний покажчик — це закладено в проєкт і в строки.</li>
+      <li><strong>Масових вивантажень бази тендерів не існує.</strong> Лише API. Довідник медіанних цін накопичується поступово, тому в перші дні детектори, що вимагають статистики, не спрацьовуватимуть. Це свідомий поріг точності, а не збій: краще не показати знахідку, ніж показати неперевірену.</li>
+      <li><strong>Каталог цін покриває стандартні товари.</strong> Для рейок, шпал і ремонтних робіт каталожної ціни не існує — там працює лише медіана по закупівлях.</li>
+      <li><strong>Адреси засновників закриті воєнним станом</strong> і в системі відсутні.</li>
+      <li><strong>Система видає індикатори ризику, а не встановлює злочин.</strong> Це принципова позиція, а не обережність у формулюваннях. Автоматичне позначення конкретної компанії злочинцем створює підставу для позову про захист ділової репутації й знецінює інструмент. Тому кожна знахідка супроводжується рівнем достовірності, арифметикою розрахунку й посиланням на першоджерело.</li>
+    </ul>
+
+    <h3>Три рівні достовірності</h3>
+    <p>Нижчий рівень ніколи не подається як вищий. Це головний механізм точності в проєкті.</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Рівень</th><th>Джерело</th><th>Як звучить для користувача</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Підтверджено</strong></td><td>Висновок моніторингу Держаудитслужби</td><td>«Держаудитслужба провела моніторинг і встановила порушення»</td></tr>
+          <tr><td><strong>Державний індикатор</strong></td><td>risks.prozorro.gov.ua</td><td>«Спрацював індикатор <code>ari-1-1</code>» + текст статті закону</td></tr>
+          <tr><td><strong>Власний аналіз</strong></td><td>Наші розрахунки цін</td><td>«Ціна за одиницю вища за каталожну в N разів — потребує перевірки»</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span> Що не входить у перший етап</h2>
+    <p class="lede">Названо явно, щоб очікування збігалися з обсягом робіт.</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Складова</th><th>Етап</th><th>Причина</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Медіанний довідник цін по всій Україні</td><td class="num">2</td><td>Потребує накопичення корпусу закупівель; масових вивантажень не існує</td></tr>
+          <tr><td>Власні детектори, крім порівняння з каталогом</td><td class="num">2</td><td>Залежать від довідника медіан</td></tr>
+          <tr><td>Зв'язки компаній через спільних засновників</td><td class="num">2</td><td>Потребує повного розбору реєстру юридичних осіб</td></tr>
+          <tr><td>Реєстр судових рішень: вироки й провадження</td><td class="num">3</td><td>Жорсткі обмеження на автоматичні запити</td></tr>
+          <tr><td>Ціни з торгових сайтів</td><td class="num">3</td><td>Необов'язковий шар; державний каталог надійніший</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">08</span> Чек-лист приймання</h2>
+    <p class="lede">Що підтверджується зараз. Позиції, які стосуються готового сайту, свідомо не включені — на цій стадії їх немає що перевіряти.</p>
+    <div class="signoff">
+      <div class="row">
+        <div class="box"><i></i></div>
+        <div class="txt"><b>Джерела даних існують і доступні</b><span>Виконано команди перевірки з розділу 03, відповіді отримані</span></div>
+      </div>
+      <div class="row">
+        <div class="box"><i></i></div>
+        <div class="txt"><b>Дані по Харківській області присутні в потрібному обсязі</b><span>Розділ 05, з урахуванням уточнення про нижню межу</span></div>
+      </div>
+      <div class="row">
+        <div class="box"><i></i></div>
+        <div class="txt"><b>Закупівлі залізниці ідентифіковані</b><span>Коди ЄДРПОУ філій, зокрема 40081216 — «Південна залізниця»</span></div>
+      </div>
+      <div class="row">
+        <div class="box"><i></i></div>
+        <div class="txt"><b>Спосіб виявлення завищення ціни прийнятний</b><span>Державний каталог як основа, медіана як друга опора, роздріб — додатково</span></div>
+      </div>
+      <div class="row">
+        <div class="box"><i></i></div>
+        <div class="txt"><b>Обмеження з розділу 06 прийняті</b><span>Зокрема позиція про індикатори ризику замість тверджень про злочин</span></div>
+      </div>
+      <div class="row">
+        <div class="box"><i></i></div>
+        <div class="txt"><b>Розподіл на етапи погоджено</b><span>Розділ 07: що входить у перший запуск, що переноситься</span></div>
+      </div>
+      <div class="row">
+        <div class="box"><i></i></div>
+        <div class="txt"><b>Склад сторінок сайту погоджено</b><span>Вимога В9: стрічка, картка тендера, досьє постачальника та замовника, пошук</span></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Документ описує стадію дослідження та проєктування станом на 20 серпня 2026 року.
+    Наведені показники отримані з фактичних відповідей державних відкритих джерел і
+    можуть змінюватися разом із даними цих джерел. Система призначена для виявлення
+    ознак ризику, що потребують перевірки, і не встановлює факт правопорушення.
+  </footer>
+
+</div>
