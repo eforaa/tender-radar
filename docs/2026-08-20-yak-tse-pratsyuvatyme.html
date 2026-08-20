@@ -1,0 +1,676 @@
+<title>Як це працюватиме</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,400&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --paper:      #F3F5F6;
+    --surface:    #FFFFFF;
+    --surface-2:  #EDF1F3;
+    --ink:        #16202B;
+    --ink-soft:   #45555F;
+    --ink-faint:  #74858F;
+    --line:       #D5DDE2;
+    --line-soft:  #E5EBEE;
+    --accent:     #1E5A72;
+    --accent-bg:  #E2EDF1;
+    --ok:         #2C6B4E;
+    --ok-bg:      #E0EFE7;
+    --wait:       #8A6420;
+    --wait-bg:    #F5EBD7;
+    --out:        #7C3B3B;
+    --out-bg:     #F2E3E3;
+    --shadow:     0 1px 2px rgba(22,32,43,.06), 0 8px 24px -16px rgba(22,32,43,.30);
+
+    --f-display: "Literata", Georgia, "Times New Roman", serif;
+    --f-body:    "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --f-mono:    "IBM Plex Mono", Consolas, monospace;
+
+    --measure: 66ch;
+    --pad: clamp(1.15rem, 4vw, 3.25rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #10171E;
+      --surface:    #17212A;
+      --surface-2:  #1D2932;
+      --ink:        #E4EAEE;
+      --ink-soft:   #A2B0BB;
+      --ink-faint:  #7A8994;
+      --line:       #2B3944;
+      --line-soft:  #222E38;
+      --accent:     #74B6D1;
+      --accent-bg:  #1A303C;
+      --ok:         #7FC6A0;
+      --ok-bg:      #162C23;
+      --wait:       #DBB46C;
+      --wait-bg:    #2E2718;
+      --out:        #DA9797;
+      --out-bg:     #2E1E1E;
+      --shadow:     0 1px 2px rgba(0,0,0,.40), 0 8px 24px -16px rgba(0,0,0,.80);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #10171E;
+    --surface:    #17212A;
+    --surface-2:  #1D2932;
+    --ink:        #E4EAEE;
+    --ink-soft:   #A2B0BB;
+    --ink-faint:  #7A8994;
+    --line:       #2B3944;
+    --line-soft:  #222E38;
+    --accent:     #74B6D1;
+    --accent-bg:  #1A303C;
+    --ok:         #7FC6A0;
+    --ok-bg:      #162C23;
+    --wait:       #DBB46C;
+    --wait-bg:    #2E2718;
+    --out:        #DA9797;
+    --out-bg:     #2E1E1E;
+    --shadow:     0 1px 2px rgba(0,0,0,.40), 0 8px 24px -16px rgba(0,0,0,.80);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 17px;
+    line-height: 1.68;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 54rem;
+    margin: 0 auto;
+    padding: 0 var(--pad) 5rem;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: clamp(2.5rem, 6vw, 4.25rem) 0 1.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+  }
+
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: .72rem;
+    font-weight: 500;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: clamp(2.05rem, 6vw, 3.3rem);
+    line-height: 1.06;
+    letter-spacing: -.018em;
+    text-wrap: balance;
+    margin: 0;
+    max-width: 18ch;
+  }
+
+  .standfirst {
+    font-family: var(--f-display);
+    font-size: clamp(1.05rem, 2.2vw, 1.24rem);
+    line-height: 1.56;
+    color: var(--ink-soft);
+    max-width: var(--measure);
+    margin: 0;
+  }
+
+  .docmeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2.25rem;
+    font-family: var(--f-mono);
+    font-size: .78rem;
+    color: var(--ink-faint);
+    padding-top: .25rem;
+  }
+  .docmeta b { color: var(--ink); font-weight: 500; }
+
+  /* ---------- sections ---------- */
+
+  section { padding-top: clamp(2.6rem, 6vw, 3.75rem); }
+
+  h2 {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: clamp(1.4rem, 3.2vw, 1.85rem);
+    line-height: 1.18;
+    letter-spacing: -.012em;
+    text-wrap: balance;
+    margin: 0 0 1rem;
+    max-width: 26ch;
+  }
+
+  h3 {
+    font-family: var(--f-body);
+    font-weight: 600;
+    font-size: 1.03rem;
+    letter-spacing: -.005em;
+    margin: 1.9rem 0 .55rem;
+    max-width: var(--measure);
+  }
+
+  p {
+    max-width: var(--measure);
+    margin: 0 0 1.05rem;
+  }
+  p:last-child { margin-bottom: 0; }
+
+  strong { font-weight: 600; }
+
+  /* ---------- opening pull ---------- */
+
+  .opening {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    box-shadow: var(--shadow);
+    padding: 1.6rem 1.75rem;
+  }
+  .opening p {
+    font-family: var(--f-display);
+    font-size: 1.08rem;
+    line-height: 1.62;
+  }
+
+  /* ---------- sources ---------- */
+
+  .sources {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    margin-top: 1.5rem;
+  }
+  .source {
+    background: var(--surface);
+    padding: 1.15rem 1.4rem;
+    display: grid;
+    grid-template-columns: 1.9rem 1fr;
+    gap: 0 1rem;
+    align-items: baseline;
+  }
+  .source .n {
+    font-family: var(--f-mono);
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .source h3 { margin: 0 0 .3rem; }
+  .source p { margin: 0; font-size: .96rem; color: var(--ink-soft); }
+
+  @media (max-width: 30rem) {
+    .source { grid-template-columns: 1fr; gap: .2rem; }
+  }
+
+  /* ---------- example calculation ---------- */
+
+  .example {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    margin: 1.5rem 0;
+  }
+  .example .cap {
+    font-family: var(--f-mono);
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding: .8rem 1.4rem;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--surface-2);
+  }
+  .steps { display: flex; flex-direction: column; }
+  .step {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: .4rem 1.5rem;
+    align-items: baseline;
+    padding: .85rem 1.4rem;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .step:last-child { border-bottom: 0; }
+  .step .lbl { font-size: .96rem; color: var(--ink-soft); }
+  .step .val {
+    font-family: var(--f-mono);
+    font-size: .95rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .step.result { background: var(--accent-bg); }
+  .step.result .lbl { color: var(--ink); font-weight: 600; }
+  .step.result .val { color: var(--accent); font-weight: 600; }
+
+  @media (max-width: 30rem) {
+    .step { grid-template-columns: 1fr; }
+  }
+
+  /* ---------- confidence scale ---------- */
+
+  .scale {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    margin-top: 1.5rem;
+  }
+  .level {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    padding: 1.1rem 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    border-left-width: 3px;
+    border-left-style: solid;
+  }
+  .level.l1 { border-left-color: var(--ok); }
+  .level.l2 { border-left-color: var(--wait); }
+  .level.l3 { border-left-color: var(--ink-faint); }
+
+  .level .top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem .85rem;
+  }
+  .level h3 { margin: 0; font-size: 1.02rem; }
+  .level p { margin: 0; font-size: .96rem; color: var(--ink-soft); }
+
+  .tag {
+    font-family: var(--f-mono);
+    font-size: .66rem;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: .25rem .5rem;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .tag.t1 { color: var(--ok);   background: var(--ok-bg); }
+  .tag.t2 { color: var(--wait); background: var(--wait-bg); }
+  .tag.t3 { color: var(--ink-faint); background: var(--surface-2); }
+
+  /* ---------- stages ---------- */
+
+  .stages { display: flex; flex-direction: column; gap: 1px; background: var(--line); border: 1px solid var(--line); box-shadow: var(--shadow); margin-top: 1.5rem; }
+  .stage { background: var(--surface); padding: 1.15rem 1.4rem; display: flex; flex-direction: column; gap: .4rem; }
+  .stage .when {
+    font-family: var(--f-mono);
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .stage p { margin: 0; font-size: .96rem; color: var(--ink-soft); }
+  .stage b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- caution ---------- */
+
+  .caution {
+    border: 1px solid var(--out);
+    background: var(--out-bg);
+    padding: 1.35rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    margin-top: 1.4rem;
+  }
+  .caution h3 { margin: 0; font-size: 1.03rem; color: var(--ink); }
+  .caution p { margin: 0; color: var(--ink); }
+
+  /* ---------- closing ---------- */
+
+  .closing {
+    margin-top: 1.4rem;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 1.6rem 0;
+  }
+  .closing p {
+    font-family: var(--f-display);
+    font-size: 1.1rem;
+    line-height: 1.6;
+  }
+
+  footer {
+    margin-top: clamp(3rem, 7vw, 4.5rem);
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--line);
+    font-size: .86rem;
+    color: var(--ink-faint);
+    max-width: var(--measure);
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Пояснення для замовника</div>
+    <h1>Як це працюватиме</h1>
+    <p class="standfirst">
+      Опис системи звичайною мовою, без технічних термінів. Що вона робить,
+      звідки бере дані, як знаходить завищену ціну і наскільки можна довіряти
+      тому, що вона показує.
+    </p>
+    <div class="docmeta">
+      <span>Дата <b>20 серпня 2026</b></span>
+      <span>Проєкт <b>аналіз закупівель Харківської області</b></span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Найкоротше пояснення</h2>
+    <div class="opening">
+      <p>
+        Уявіть невтомного службовця, який щодня приходить на роботу о шостій
+        ранку. Він переглядає всі державні закупівлі Харківської області, звіряє
+        ціни з офіційним довідником, виписує підозрілі й на кожну складає папку:
+        хто купує, хто продає, хто власники фірми-продавця і чи траплялися вони
+        на такому раніше.
+      </p>
+      <p style="margin-top:1rem">
+        Цей службовець не втомлюється, не пропускає жодної закупівлі й не бере
+        вихідних. Сайт — це його стіл, за яким ви цю роботу бачите.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Звідки береться інформація</h2>
+    <p>
+      Уся інформація — з чотирьох державних джерел. Ми нічого не вигадуємо і
+      нічого не купуємо: усе це держава публікує відкрито.
+    </p>
+
+    <div class="sources">
+      <div class="source">
+        <span class="n">01</span>
+        <div>
+          <h3>Державна система позначок ризику</h3>
+          <p>
+            Держава сама перевіряє кожну закупівлю за чотирнадцятьма правилами:
+            чи не порушено строки, чи не проігноровано рішення органу оскарження,
+            чи немає інших ознак порушення. Якщо правило спрацювало, закупівля
+            отримує позначку — і разом із нею держава вказує, яку саме статтю
+            закону порушено.
+          </p>
+        </div>
+      </div>
+      <div class="source">
+        <span class="n">02</span>
+        <div>
+          <h3>Офіційні перевірки Держаудитслужби</h3>
+          <p>
+            Це вже не підозра, а робота державних аудиторів: наказ про початок
+            перевірки, підстави, і по завершених — висновок про те, знайдено
+            порушення чи ні.
+          </p>
+        </div>
+      </div>
+      <div class="source">
+        <span class="n">03</span>
+        <div>
+          <h3>Державний каталог цін</h3>
+          <p>
+            Офіційний перелік товарів із цінами, за якими їх реально продають
+            державі. Саме з ним ми звіряємо ціни в закупівлях.
+          </p>
+        </div>
+      </div>
+      <div class="source">
+        <span class="n">04</span>
+        <div>
+          <h3>Реєстр підприємств</h3>
+          <p>
+            Звідти беремо власників і засновників фірм, які виграють тендери.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <h3>Скільки даних це дає вже сьогодні</h3>
+    <p>
+      Ми вже порахували: по Харківській області позначених державою закупівель
+      <strong>2 165, на 52,8 мільярда гривень</strong>. Це означає, що сайт
+      запрацює не з порожнім екраном, а з двома тисячами готових справ.
+    </p>
+  </section>
+
+  <section>
+    <h2>Як виявляється завищення ціни</h2>
+    <p>
+      Найпростіше пояснити на прикладі. Припустімо, лікарня купує двісті
+      холодильників, а в документах указана лише загальна сума. Сама по собі
+      ця цифра ні про що не говорить.
+    </p>
+
+    <div class="example">
+      <div class="cap">Приклад розрахунку</div>
+      <div class="steps">
+        <div class="step">
+          <span class="lbl">Загальна сума закупівлі</span>
+          <span class="val">4 000 000 ₴</span>
+        </div>
+        <div class="step">
+          <span class="lbl">Кількість</span>
+          <span class="val">200 шт</span>
+        </div>
+        <div class="step">
+          <span class="lbl">Ціна за одну штуку — перший крок системи</span>
+          <span class="val">20 000 ₴</span>
+        </div>
+        <div class="step">
+          <span class="lbl">Той самий холодильник у державному каталозі</span>
+          <span class="val">12 000 ₴</span>
+        </div>
+        <div class="step">
+          <span class="lbl">Середня ціна по інших закупівлях країни</span>
+          <span class="val">13 000 ₴</span>
+        </div>
+        <div class="step result">
+          <span class="lbl">Переплата на всій закупівлі</span>
+          <span class="val">1 600 000 ₴</span>
+        </div>
+      </div>
+    </div>
+
+    <p>
+      Отже, система робить два порівняння. <strong>З державним каталогом</strong> —
+      коли товар звичайний і в каталозі є. <strong>Із середньою ціною по
+      країні</strong> — тобто дивиться, за скільки такі самі холодильники
+      купували всі інші установи України.
+    </p>
+    <p>
+      Друге порівняння потрібне тому, що каталог покриває звичайні товари, а от
+      рейки, шпали чи ремонтні роботи в жодному каталозі не продаються. Для них
+      працює тільки порівняння з іншими закупівлями країни.
+    </p>
+  </section>
+
+  <section>
+    <h2>Як перевіряється фірма-переможець</h2>
+    <p>
+      Коли закупівля виглядає підозріло, наступне питання — хто її виграв.
+      Система відкриває папку на цю фірму: коли зареєстрована, хто засновники
+      й справжні власники, які ще тендери вона вигравала <strong>по всій
+      Україні</strong>, і чи були позначки ризику на тих тендерах теж.
+    </p>
+    <p>
+      Це і є відповідь на питання «чи попадалися вони раніше». Якщо фірма
+      зареєстрована три місяці тому й одразу бере контракт на сто мільйонів —
+      це видно. Якщо та сама фірма систематично виграє в того самого замовника —
+      це теж видно.
+    </p>
+
+    <div class="caution">
+      <h3>Одне обмеження, яке називаю відразу</h3>
+      <p>
+        Адреси власників держава приховала через воєнний стан. Прізвища та
+        частки доступні, адреси — ні. Обійти це неможливо: це рішення держави,
+        а не наша недоробка.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Наскільки можна довіряти знахідці</h2>
+    <p>
+      Це найважливіше в усьому проєкті. Знахідки бувають трьох ступенів
+      надійності, і система ніколи не видає слабшу за сильнішу.
+    </p>
+
+    <div class="scale">
+      <div class="level l1">
+        <div class="top">
+          <span class="tag t1">Найсильніший</span>
+          <h3>Держава встановила порушення</h3>
+        </div>
+        <p>Офіційний висновок аудиторів за результатами перевірки. Сумнівів немає.</p>
+      </div>
+      <div class="level l2">
+        <div class="top">
+          <span class="tag t2">Середній</span>
+          <h3>Спрацював державний індикатор</h3>
+        </div>
+        <p>Не вирок, але підозра самої держави — і до неї додається стаття закону.</p>
+      </div>
+      <div class="level l3">
+        <div class="top">
+          <span class="tag t3">Найслабший</span>
+          <h3>Порахували ми самі</h3>
+        </div>
+        <p>Ціна вища за каталожну. Привід подивитися уважніше, не більше.</p>
+      </div>
+    </div>
+
+    <p style="margin-top:1.4rem">
+      На сайті кожна знахідка позначена своїм ступенем, і поруч показано
+      розрахунок — які саме числа порівнювалися. Ви завжди бачите, звідки взявся
+      висновок, і можете перевірити його вручну.
+    </p>
+  </section>
+
+  <section>
+    <h2>Позиція, яку треба погодити</h2>
+    <p>
+      Система показує <strong>ознаки ризику, які потребують перевірки</strong>.
+      Вона не оголошує жодну фірму й жодну людину злочинцем.
+    </p>
+    <p>
+      Це не боягузтво у формулюваннях, а практичний розрахунок. Якщо сайт
+      автоматично назве конкретну компанію злочинною, компанія подасть позов про
+      захист ділової репутації — і виграє, бо жоден алгоритм не встановлює вину.
+      Один такий позов закриє проєкт.
+    </p>
+    <p>
+      А от формулювання «ціна вища за каталожну втричі, спрацював державний
+      індикатор, стаття така-то» — це факт, який неможливо оскаржити, і саме з
+      ним юрист чи слідчий іде далі. Інструмент від цього не слабшає, він стає
+      придатним до роботи.
+    </p>
+  </section>
+
+  <section>
+    <h2>Що людина побачить на сайті</h2>
+    <p>
+      <strong>Головна сторінка</strong> — перелік знахідок по Харківській
+      області, найсвіжіші зверху. Можна відібрати за сумою, за замовником, за
+      ступенем надійності.
+    </p>
+    <p>
+      <strong>Картка закупівлі</strong> — що купували, скільки штук, ціна за
+      штуку, з чим порівняли й наскільки вища, які позначки спрацювали і яка
+      стаття закону, чи була перевірка Держаудитслужби, хто подавався і хто
+      виграв.
+    </p>
+    <p>
+      <strong>Папка на фірму</strong> — власники, дата реєстрації, усі перемоги
+      по Україні, усі знахідки проти неї.
+    </p>
+    <p>
+      Є й зворотний шлях: можна одразу ввести код фірми, номер тендера або назву
+      товару — і отримати те саме досьє, не шукаючи його в переліку. Сайт
+      українською.
+    </p>
+  </section>
+
+  <section>
+    <h2>Що буде зроблено спочатку, а що пізніше</h2>
+    <div class="stages">
+      <div class="stage">
+        <span class="when">У першу чергу</span>
+        <p>
+          Усе, що працює вже сьогодні: державні позначки ризику зі статтями
+          закону, офіційні перевірки Держаудитслужби, порівняння з державним
+          каталогом цін, папки на фірми з власниками.
+          <b>Дві тисячі готових справ у день запуску.</b>
+        </p>
+      </div>
+      <div class="stage">
+        <span class="when">Другим кроком</span>
+        <p>
+          Порівняння із середніми цінами по країні. Тут є причина для затримки:
+          держава не дає всі закупівлі однією викачкою, їх треба накопичувати
+          поступово. Поки накопичених мало, система <b>навмисно мовчить</b>, а не
+          вигадує середню ціну з трьох випадків. Краще не показати знахідку, ніж
+          показати неправдиву.
+        </p>
+      </div>
+      <div class="stage">
+        <span class="when">Третім кроком</span>
+        <p>
+          Реєстр судових рішень — вироки та кримінальні справи щодо цих осіб.
+          Цей реєстр жорстко обмежує автоматичні звернення, і спроба втягнути
+          його в перший запуск зірвала б строки всього іншого.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Чого система не робить</h2>
+    <p>
+      Вона не оголошує вину. Не замінює аудитора, слідчого чи суд. Не вгадує там,
+      де даних бракує, — у такому разі вона прямо каже, що даних недостатньо.
+    </p>
+    <div class="closing">
+      <p>
+        Вона робить одну річ, але добре: знаходить у тисячах закупівель ті, на
+        які варто подивитися людині, і подає їх так, щоб людині не довелося
+        починати з нуля.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    Документ описує стадію дослідження та проєктування станом на 20 серпня 2026
+    року. Наведені показники отримані з фактичних відповідей державних відкритих
+    джерел і можуть змінюватися разом із даними цих джерел. Система призначена
+    для виявлення ознак ризику, що потребують перевірки, і не встановлює факт
+    правопорушення.
+  </footer>
+
+</div>
