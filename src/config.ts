@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { JsonStore } from "./store/json-store.ts";
 import type { Store } from "./store/types.ts";
@@ -49,9 +50,14 @@ export function railwayScope(entity: {
 /**
  * Resolved from this file's location, not the working directory, so the
  * server finds its data no matter where it is launched from.
+ *
+ * Falls back to the slim `web-data` export when the full working store is not
+ * there — which is the case on a deployment, where `data/` is not shipped.
  */
 export function dataDir(): string {
-  return process.env.TR_DATA_DIR ?? join(import.meta.dirname, "..", "data");
+  if (process.env.TR_DATA_DIR) return process.env.TR_DATA_DIR;
+  const working = join(import.meta.dirname, "..", "data");
+  return existsSync(working) ? working : join(import.meta.dirname, "..", "web-data");
 }
 
 export function openStore(): Store {
