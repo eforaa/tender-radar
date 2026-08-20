@@ -827,29 +827,31 @@ function articlePage(code: string, url: URL): string {
   <div class="metric"><span class="v">${officers.size}</span><span class="k">відповідальних осіб</span></div>
 </div>
 
-<h2>Що каже стаття</h2>
-<div class="card">
-  <p class="lead">${esc(article.summary)}</p>
-  <p><strong>Що має бути доведено:</strong></p>
-  <ul>
-    ${article.elements.map((e) => `<li>${esc(e)}</li>`).join("")}
-  </ul>
-  <p class="faint">Наведено як довідку для юриста. Це не правова консультація і не кваліфікація чиїхось дій.</p>
-</div>
+<details class="help">
+  <summary>Що каже стаття ${esc(article.code)}</summary>
+  <div class="inner">
+    <p class="lead">${esc(article.summary)}</p>
+    <p><strong>Що має бути доведено:</strong></p>
+    <ul>
+      ${article.elements.map((e) => `<li>${esc(e)}</li>`).join("")}
+    </ul>
+    <p class="faint">Наведено як довідку для юриста. Це не правова консультація і не кваліфікація чиїхось дій.</p>
+  </div>
+</details>
 
-<h2>Чому саме ці ознаки</h2>
-<p class="hint">Із чотирнадцяти державних індикаторів для цієї статті релевантні ${article.links.length}. Решта стосуються конкуренції та процедури, а не змісту документів.</p>
-${article.links
-  .map((link) => {
-    const label = RISK_LABELS[link.risk_id];
-    const hits = list.filter((c) => c.risks.includes(link.risk_id)).length;
-    return `<div class="card">
-  <h3>${esc(label?.short ?? link.risk_id)} <span class="faint">— ${hits} ${plural(hits, "закупівля", "закупівлі", "закупівель")}</span></h3>
-  <p class="lead">${esc(link.why)}</p>
-  <p class="code">Індикатор ${esc(link.risk_id)}</p>
-</div>`;
-  })
-  .join("")}
+<details class="help">
+  <summary>Чому саме ці ознаки, а не всі чотирнадцять</summary>
+  <div class="inner">
+    <p>Із чотирнадцяти державних індикаторів для цієї статті релевантні ${article.links.length}. Решта стосуються конкуренції та процедури, а не змісту документів.</p>
+    ${article.links
+      .map((link) => {
+        const label = RISK_LABELS[link.risk_id];
+        const hits = list.filter((c) => c.risks.includes(link.risk_id)).length;
+        return `<p><strong>${esc(label?.short ?? link.risk_id)}</strong> <span class="faint">— ${hits} ${plural(hits, "закупівля", "закупівлі", "закупівель")}</span><br>${esc(link.why)}</p>`;
+      })
+      .join("")}
+  </div>
+</details>
 
 <h2>Закупівлі для перевірки</h2>
 <form class="filters" method="get" action="/article/${esc(article.code)}">

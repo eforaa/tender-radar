@@ -220,6 +220,11 @@ details.help[open] summary{border-bottom:1px solid var(--line-soft)}
 details.help .inner{padding:1.1rem 1.25rem 1.35rem}
 details.help p{margin:0 0 .7rem;color:var(--ink-soft);max-width:68ch}
 details.help p:last-child{margin-bottom:0}
+details.help ul{margin:.2rem 0 .9rem;padding-left:1.2rem;color:var(--ink-soft);max-width:68ch}
+details.help li{margin-bottom:.35rem}
+details.help p.lead{color:var(--ink)}
+details.help p strong{color:var(--ink)}
+details.help + details.help{margin-top:-1rem}
 `;
 
 /** Everything reachable from the burger menu, with a line of orientation. */
