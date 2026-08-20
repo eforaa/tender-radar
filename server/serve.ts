@@ -6,6 +6,7 @@ import { RISK_LABELS, GROUP_ORDER, procedureLabel, readableName, type RiskGroup 
 import { layout, esc, money, unitMoney, shortMoney, date, trim, plural } from "./html.ts";
 import { ARTICLES, isJointStock } from "../src/legal.ts";
 import { loadDataset, type Case, type Dataset } from "./data.ts";
+import { DIMENSIONS, buildGroups, isDimension, type Dimension, type Group } from "./grouping.ts";
 
 const PORT = Number(process.env.PORT ?? 3120);
 const PAGE_SIZE = 30;
@@ -146,6 +147,29 @@ const HELP = `<details class="help">
 
 /* ---------- pages ---------- */
 
+/** Renders one group, and its nested groups, as a collapsible block. */
+function groupBlock(group: Group, depth: number): string {
+  const inner =
+    group.children.length > 0
+      ? group.children.map((child) => groupBlock(child, depth + 1)).join("")
+      : `<div class="rows">${group.cases.slice(0, 20).map((c) => caseRow(c)).join("")}</div>${
+          group.cases.length > 20
+            ? `<p class="hint" style="margin:.6rem 0 0">Показано 20 найдорожчих із ${group.cases.length}.</p>`
+            : ""
+        }`;
+
+  return `<details class="group-block depth-${depth}"${depth === 0 && group.cases.length <= 40 ? " open" : ""}>
+  <summary>
+    <span class="g-name">${esc(readableName(group.bucket.label))}</span>
+    <span class="g-meta">${group.cases.length} ${plural(group.cases.length, "закупівля", "закупівлі", "закупівель")} · ${shortMoney(group.value)}</span>
+  </summary>
+  <div class="g-body">
+    ${group.bucket.href ? `<p class="hint" style="margin:0 0 .6rem"><a href="${esc(group.bucket.href)}">Відкрити повне досьє →</a></p>` : ""}
+    ${inner}
+  </div>
+</details>`;
+}
+
 function feedPage(url: URL): string {
   const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
   const risk = url.searchParams.get("risk") ?? "";
@@ -153,7 +177,17 @@ function feedPage(url: URL): string {
   const railOnly = url.searchParams.get("rail") === "1";
   const soloOnly = url.searchParams.get("solo") === "1";
   const priceOnly = url.searchParams.get("price") === "1";
+  const year = url.searchParams.get("year") ?? "";
+  const min = Number(url.searchParams.get("min") ?? "") || 0;
+  const rawGroup = url.searchParams.get("group") ?? "";
+  const rawThen = url.searchParams.get("then") ?? "";
+  const group: Dimension = isDimension(rawGroup) ? rawGroup : "";
+  const then: Dimension = isDimension(rawThen) ? rawThen : "";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
+
+  const years = [...new Set(db.cases.map((c) => (c.date_assessed ?? "").slice(0, 4)).filter(Boolean))]
+    .sort()
+    .reverse();
 
   let list = db.cases;
   if (q) {
@@ -172,16 +206,24 @@ function feedPage(url: URL): string {
   if (railOnly) list = list.filter((c) => RAILWAY_EDRPOU.has(c.entity_edrpou ?? ""));
   if (soloOnly) list = list.filter((c) => c.bidders === 1);
   if (priceOnly) list = list.filter((c) => c.findings.length > 0);
+  if (year) list = list.filter((c) => (c.date_assessed ?? "").slice(0, 4) === year);
+  if (min > 0) list = list.filter((c) => (c.value_amount ?? 0) >= min);
 
   list = [...list].sort((a, b) =>
     sort === "date"
       ? String(b.date_assessed ?? "").localeCompare(String(a.date_assessed ?? ""))
-      : sort === "risks"
-        ? b.risks.length - a.risks.length || (b.value_amount ?? 0) - (a.value_amount ?? 0)
-        : (b.value_amount ?? 0) - (a.value_amount ?? 0),
+      : sort === "date-asc"
+        ? String(a.date_assessed ?? "").localeCompare(String(b.date_assessed ?? ""))
+        : sort === "value-asc"
+          ? (a.value_amount ?? 0) - (b.value_amount ?? 0)
+          : sort === "risks"
+            ? b.risks.length - a.risks.length || (b.value_amount ?? 0) - (a.value_amount ?? 0)
+            : (b.value_amount ?? 0) - (a.value_amount ?? 0),
   );
 
   const shownValue = list.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
+  const groups = group ? buildGroups(list, group, then, shortRisk) : [];
+
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const slice = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -193,56 +235,103 @@ function feedPage(url: URL): string {
     if (railOnly) p.set("rail", "1");
     if (soloOnly) p.set("solo", "1");
     if (priceOnly) p.set("price", "1");
+    if (year) p.set("year", year);
+    if (min > 0) p.set("min", String(min));
+    if (group) p.set("group", group);
+    if (then) p.set("then", then);
     for (const [k, v] of Object.entries(over)) p.set(k, v);
     return `/?${p.toString()}`;
   };
 
-  const filtered = Boolean(q || risk || railOnly || soloOnly || priceOnly);
+  const filtered = Boolean(q || risk || railOnly || soloOnly || priceOnly || year || min > 0);
+  const dimensionOptions = (selected: Dimension, skip?: Dimension) =>
+    DIMENSIONS.filter((d) => d.value !== skip || d.value === "")
+      .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
+      .join("");
 
   return layout({
-    title: "Знахідки",
+    title: "Закупівлі",
     nav: "feed",
     body: `
 <h1>Закупівлі, які варто перевірити</h1>
 <p class="sub">Харківська область і залізниця. Держава сама позначає підозрілі закупівлі — ми збираємо ці позначки в одному місці, пояснюємо їх звичайною мовою і додаємо власний розрахунок цін.</p>
 
-<div class="metrics">
-  <div class="metric"><span class="v">${db.cases.length.toLocaleString("uk-UA")}</span><span class="k">закупівель під питанням</span></div>
-  <div class="metric"><span class="v">${shortMoney(db.totalValue)}</span><span class="k">загальна сума</span></div>
-  <div class="metric"><span class="v">${db.flagCount.toLocaleString("uk-UA")}</span><span class="k">виявлених ознак</span></div>
-  <div class="metric"><span class="v">${db.findingCount.toLocaleString("uk-UA")}</span><span class="k">де ми знайшли переплату</span></div>
-</div>
+<p class="statline">
+  <b>${db.cases.length.toLocaleString("uk-UA")}</b> закупівель під питанням ·
+  <b>${shortMoney(db.totalValue)}</b> загальна сума ·
+  <b>${db.flagCount.toLocaleString("uk-UA")}</b> виявлених ознак ·
+  <b>${db.findingCount.toLocaleString("uk-UA")}</b> де ми знайшли переплату
+</p>
 
 ${HELP}
 
 <form class="filters" method="get" action="/">
   <input type="search" name="q" value="${esc(q)}" placeholder="Назва, замовник, посадовець, переможець, ЄДРПОУ або номер тендера" aria-label="Пошук">
-  <select name="risk" aria-label="Ознака">
-    <option value="">Будь-яка ознака</option>
-    ${db.rules
-      .map((r) => `<option value="${esc(r.risk_id)}"${r.risk_id === risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`)
-      .join("")}
-  </select>
-  <select name="sort" aria-label="Сортування">
-    <option value="value"${sort === "value" ? " selected" : ""}>Спочатку найдорожчі</option>
-    <option value="date"${sort === "date" ? " selected" : ""}>Спочатку найновіші</option>
-    <option value="risks"${sort === "risks" ? " selected" : ""}>Спочатку з найбільшою кількістю ознак</option>
-  </select>
-  <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> лише залізниця</label>
-  <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> лише без конкурентів</label>
-  <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> лише де ціна завищена</label>
-  <button type="submit">Показати</button>
-  ${filtered ? '<a class="reset" href="/">скинути все</a>' : ""}
+
+  <div class="filter-row">
+    <select name="risk" aria-label="Ознака">
+      <option value="">Будь-яка ознака</option>
+      ${db.rules
+        .map(
+          (r) =>
+            `<option value="${esc(r.risk_id)}"${r.risk_id === risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`,
+        )
+        .join("")}
+    </select>
+    <select name="year" aria-label="Рік">
+      <option value="">Будь-який рік</option>
+      ${years.map((y) => `<option value="${esc(y)}"${y === year ? " selected" : ""}>${esc(y)} рік</option>`).join("")}
+    </select>
+    <select name="min" aria-label="Сума">
+      <option value="">Будь-яка сума</option>
+      <option value="1000000"${min === 1000000 ? " selected" : ""}>від 1 млн ₴</option>
+      <option value="10000000"${min === 10000000 ? " selected" : ""}>від 10 млн ₴</option>
+      <option value="100000000"${min === 100000000 ? " selected" : ""}>від 100 млн ₴</option>
+      <option value="1000000000"${min === 1000000000 ? " selected" : ""}>від 1 млрд ₴</option>
+    </select>
+    <select name="sort" aria-label="Сортування">
+      <option value="value"${sort === "value" ? " selected" : ""}>Спочатку найдорожчі</option>
+      <option value="value-asc"${sort === "value-asc" ? " selected" : ""}>Спочатку найдешевші</option>
+      <option value="date"${sort === "date" ? " selected" : ""}>Спочатку найновіші</option>
+      <option value="date-asc"${sort === "date-asc" ? " selected" : ""}>Спочатку найстаріші</option>
+      <option value="risks"${sort === "risks" ? " selected" : ""}>Спочатку з найбільшою кількістю ознак</option>
+    </select>
+  </div>
+
+  <div class="filter-row">
+    <span class="filter-label">Групувати</span>
+    <select name="group" aria-label="Групування">${dimensionOptions(group)}</select>
+    <span class="filter-label">потім</span>
+    <select name="then" aria-label="Друге групування"${group ? "" : " disabled"}>${dimensionOptions(then, group || undefined)}</select>
+  </div>
+
+  <div class="filter-row">
+    <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> лише залізниця</label>
+    <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> лише без конкурентів</label>
+    <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> лише де ціна завищена</label>
+    <button type="submit">Показати</button>
+    ${filtered || group ? `<a class="reset" href="/">скинути все</a>` : ""}
+  </div>
 </form>
 
-<p class="hint">${filtered ? `Знайдено <strong>${list.length.toLocaleString("uk-UA")}</strong> закупівель на ${shortMoney(shownValue)}.` : "Показано всі, найдорожчі згори."}</p>
+<p class="hint">${
+      filtered
+        ? `Знайдено <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "закупівлю", "закупівлі", "закупівель")} на ${shortMoney(shownValue)}.`
+        : "Показано всі, найдорожчі згори."
+    }${group ? ` Згруповано у <strong>${groups.length}</strong> ${plural(groups.length, "групу", "групи", "груп")}.` : ""}</p>
 
 ${risk ? riskCard(risk) : ""}
 
-${slice.length === 0 ? '<div class="empty">За цими умовами нічого не знайшлося. Спробуйте прибрати частину фільтрів.</div>' : `<div class="rows">${slice.map((c) => caseRow(c)).join("")}</div>`}
+${
+  list.length === 0
+    ? `<div class="empty">За цими умовами нічого не знайшлося. Спробуйте прибрати частину фільтрів.</div>`
+    : group
+      ? groups.map((g) => groupBlock(g, 0)).join("")
+      : `<div class="rows">${slice.map((c) => caseRow(c)).join("")}</div>`
+}
 
 ${
-  pages > 1
+  !group && pages > 1
     ? `<div class="pager">
   ${page > 1 ? `<a href="${keep({ page: String(page - 1) })}">← попередні</a>` : ""}
   <span>сторінка ${page} з ${pages}</span>
@@ -384,12 +473,12 @@ function officerPage(key: string): string {
 <h1>${esc(name)}</h1>
 <p class="sub">Відповідальна особа в закупівлях${entity ? ` — ${esc(readableName(entity))}` : ""}.</p>
 
-<div class="metrics">
-  <div class="metric"><span class="v">${list.length}</span><span class="k">закупівель під питанням</span></div>
-  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">загальна сума</span></div>
-  <div class="metric"><span class="v">${solo}</span><span class="k">з єдиним учасником</span></div>
-  <div class="metric"><span class="v">${ranked.length}</span><span class="k">різних ознак</span></div>
-</div>
+<p class="statline">
+  <b>${list.length}</b> закупівель під питанням ·
+  <b>${shortMoney(value)}</b> загальна сума ·
+  <b>${solo}</b> з єдиним учасником ·
+  <b>${ranked.length}</b> різних ознак
+</p>
 
 <div class="card">
   <dl class="facts">
@@ -432,12 +521,12 @@ function supplierPage(edrpou: string): string {
 <h1>${esc(readableName(name))}</h1>
 <p class="sub">Постачальник · ЄДРПОУ ${esc(edrpou)}</p>
 
-<div class="metrics">
-  <div class="metric"><span class="v">${list.length}</span><span class="k">перемог у закупівлях із позначками</span></div>
-  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">сума договорів</span></div>
-  <div class="metric"><span class="v">${solo}</span><span class="k">де був єдиним учасником</span></div>
-  <div class="metric"><span class="v">${buyers.size}</span><span class="k">різних замовників</span></div>
-</div>
+<p class="statline">
+  <b>${list.length}</b> перемог у закупівлях із позначками ·
+  <b>${shortMoney(value)}</b> сума договорів ·
+  <b>${solo}</b> де був єдиним учасником ·
+  <b>${buyers.size}</b> різних замовників
+</p>
 
 <h2>Що держава запідозрила в цих закупівлях</h2>
 ${groupedRiskCards(ranked)}
@@ -479,12 +568,12 @@ function entityPage(edrpou: string): string {
 <h1 class="long">${esc(readableName(name))}</h1>
 <p class="sub">ЄДРПОУ ${esc(edrpou)}${RAILWAY_EDRPOU.has(edrpou) ? " · філія АТ «Українська залізниця»" : ""}</p>
 
-<div class="metrics">
-  <div class="metric"><span class="v">${list.length}</span><span class="k">закупівель під питанням</span></div>
-  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">загальна сума</span></div>
-  <div class="metric"><span class="v">${solo}</span><span class="k">з єдиним учасником</span></div>
-  <div class="metric"><span class="v">${rankedOfficers.length}</span><span class="k">відповідальних осіб</span></div>
-</div>
+<p class="statline">
+  <b>${list.length}</b> закупівель під питанням ·
+  <b>${shortMoney(value)}</b> загальна сума ·
+  <b>${solo}</b> з єдиним учасником ·
+  <b>${rankedOfficers.length}</b> відповідальних осіб
+</p>
 
 ${
   rankedOfficers.length > 0
@@ -705,12 +794,12 @@ function railwayPage(): string {
 <h1>Залізниця Харківської області</h1>
 <p class="sub">Закупівлі залізничної галузі з позначками державної системи моніторингу. Нижче — три різні за природою групи, і ми їх не змішуємо.</p>
 
-<div class="metrics">
-  <div class="metric"><span class="v">${all.length.toLocaleString("uk-UA")}</span><span class="k">закупівель під питанням</span></div>
-  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">загальна сума</span></div>
-  <div class="metric"><span class="v">${solo}</span><span class="k">з єдиним учасником</span></div>
-  <div class="metric"><span class="v">${southern.length}</span><span class="k">у «Південної залізниці»</span></div>
-</div>
+<p class="statline">
+  <b>${all.length.toLocaleString("uk-UA")}</b> закупівель під питанням ·
+  <b>${shortMoney(value)}</b> загальна сума ·
+  <b>${solo}</b> з єдиним учасником ·
+  <b>${southern.length}</b> у «Південної залізниці»
+</p>
 
 <details class="help">
   <summary>Що саме входить у цей розділ</summary>
@@ -883,12 +972,12 @@ function updatesPage(): string {
 
 ${
   latest
-    ? `<div class="metrics">
-  <div class="metric"><span class="v">${latest.new_tenders}</span><span class="k">нових закупівель востаннє</span></div>
-  <div class="metric"><span class="v">${latest.new_flags}</span><span class="k">нових спрацювань</span></div>
-  <div class="metric"><span class="v">${date(latest.started_at)}</span><span class="k">останнє оновлення</span></div>
-  <div class="metric"><span class="v">${runs.length}</span><span class="k">${plural(runs.length, "запуск", "запуски", "запусків")}</span></div>
-</div>`
+    ? `<p class="statline">
+  <b>${latest.new_tenders}</b> нових закупівель востаннє ·
+  <b>${latest.new_flags}</b> нових спрацювань ·
+  <b>${date(latest.started_at)}</b> останнє оновлення ·
+  <b>${runs.length}</b> ${plural(runs.length, "запуск", "запуски", "запусків")}
+</p>`
     : '<div class="empty">Жодного запуску ще не було. Виконайте <code>npm run daily</code>.</div>'
 }
 
@@ -947,12 +1036,12 @@ function pricesPage(): string {
 <h1>Де ціна виглядає завищеною</h1>
 <p class="sub">Тут система рахує сама, а не переказує висновок держави. Вона бере ціну за одиницю й порівнює з тим, скільки те саме коштувало іншим — і скільки коштувало цьому ж замовнику раніше.</p>
 
-<div class="metrics">
-  <div class="metric"><span class="v">${withFindings.length}</span><span class="k">закупівель із завищеною ціною</span></div>
-  <div class="metric"><span class="v">${shortMoney(totalGap)}</span><span class="k">різниця проти звичайної ціни</span></div>
-  <div class="metric"><span class="v">${peer}</span><span class="k">дорожче, ніж в інших</span></div>
-  <div class="metric"><span class="v">${growth}</span><span class="k">дорожче, ніж було торік</span></div>
-</div>
+<p class="statline">
+  <b>${withFindings.length}</b> закупівель із завищеною ціною ·
+  <b>${shortMoney(totalGap)}</b> різниця проти звичайної ціни ·
+  <b>${peer}</b> дорожче, ніж в інших ·
+  <b>${growth}</b> дорожче, ніж було торік
+</p>
 
 <details class="help">
   <summary>Як ми це рахуємо</summary>
