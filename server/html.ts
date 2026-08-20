@@ -153,6 +153,10 @@ button:hover{filter:brightness(1.08)}
 .reset{font-size:.9rem;color:var(--ink-faint)}
 form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
 .filter-row{display:flex;flex-wrap:wrap;gap:.55rem;align-items:center}
+/* Inputs must not stretch vertically: the form itself is a column, so a
+   bare flex-grow on a child would grow it down the page. */
+.filter-row input,.filter-row select,.filter-row button{align-self:center}
+.filter-row input[type=search]{flex:1 1 22rem;max-width:38rem}
 .filter-label{font-size:.92rem;color:var(--ink-faint);white-space:nowrap}
 select:disabled{opacity:.5;cursor:not-allowed}
 

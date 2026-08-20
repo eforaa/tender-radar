@@ -266,7 +266,9 @@ function feedPage(url: URL): string {
 ${HELP}
 
 <form class="filters" method="get" action="/">
-  <input type="search" name="q" value="${esc(q)}" placeholder="Назва, замовник, посадовець, переможець, ЄДРПОУ або номер тендера" aria-label="Пошук">
+  <div class="filter-row">
+    <input type="search" name="q" value="${esc(q)}" placeholder="Назва, замовник, посадовець, переможець, ЄДРПОУ або номер тендера" aria-label="Пошук">
+  </div>
 
   <div class="filter-row">
     <select name="risk" aria-label="Ознака">
