@@ -1,0 +1,107 @@
+// Loads the store once and joins it into the shapes the pages need.
+import { openStore } from "../src/config.ts";
+import { officerKey } from "../src/normalize/tender.ts";
+import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow } from "../src/store/types.ts";
+
+/** One entry per tender: the flags that fired plus whatever the card added. */
+export type Case = {
+  tender_id: string;
+  tender_ref: string;
+  title: string | null;
+  status: string | null;
+  method: string | null;
+  entity_edrpou: string | null;
+  entity_name: string | null;
+  region: string | null;
+  value_amount: number | null;
+  date_assessed: string | null;
+  risks: string[];
+  officer_name: string | null;
+  officer_email: string | null;
+  officer_phone: string | null;
+  officer_key: string | null;
+  winner_name: string | null;
+  winner_edrpou: string | null;
+  winner_amount: number | null;
+  bidders: number;
+  detailed: boolean;
+};
+
+export type Dataset = {
+  cases: Case[];
+  byTender: Map<string, Case>;
+  rules: RiskRuleRow[];
+  ruleById: Map<string, RiskRuleRow>;
+  flagCount: number;
+  totalValue: number;
+};
+
+function activeAward(awards: AwardRow[]): AwardRow | undefined {
+  return awards.find((a) => a.status === "active") ?? awards[0];
+}
+
+export async function loadDataset(): Promise<Dataset> {
+  const store = openStore();
+  const flags: RiskFlagRow[] = await store.allRiskFlags();
+  const rules: RiskRuleRow[] = await store.allRiskRules();
+  const tenders: TenderRow[] = await store.allTenders();
+  const awards: AwardRow[] = await store.allAwards();
+  const bids = await store.allBids();
+
+  const tenderById = new Map(tenders.map((t) => [t.id, t]));
+
+  const awardsByTender = new Map<string, AwardRow[]>();
+  for (const award of awards) {
+    const list = awardsByTender.get(award.tender_id) ?? [];
+    list.push(award);
+    awardsByTender.set(award.tender_id, list);
+  }
+
+  const bidCount = new Map<string, number>();
+  for (const bid of bids) bidCount.set(bid.tender_id, (bidCount.get(bid.tender_id) ?? 0) + 1);
+
+  const byTender = new Map<string, Case>();
+  for (const flag of flags) {
+    let entry = byTender.get(flag.tender_id);
+    if (!entry) {
+      const detail = tenderById.get(flag.tender_id);
+      const won = activeAward(awardsByTender.get(flag.tender_id) ?? []);
+      entry = {
+        tender_id: flag.tender_id,
+        tender_ref: flag.tender_ref || detail?.tender_id || "",
+        title: detail?.title ?? null,
+        status: detail?.status ?? null,
+        method: detail?.method ?? null,
+        entity_edrpou: flag.entity_edrpou ?? detail?.entity_edrpou ?? null,
+        entity_name: flag.entity_name ?? detail?.entity_name ?? null,
+        region: flag.region ?? detail?.region ?? null,
+        value_amount: flag.value_amount ?? detail?.value_amount ?? null,
+        date_assessed: flag.date_assessed,
+        risks: [],
+        officer_name: detail?.officer_name ?? null,
+        officer_email: detail?.officer_email ?? null,
+        officer_phone: detail?.officer_phone ?? null,
+        officer_key: detail ? officerKey(detail) : null,
+        winner_name: won?.supplier_name ?? null,
+        winner_edrpou: won?.supplier_edrpou ?? null,
+        winner_amount: won?.amount ?? null,
+        bidders: bidCount.get(flag.tender_id) ?? 0,
+        detailed: Boolean(detail),
+      };
+      byTender.set(flag.tender_id, entry);
+    }
+    if (!entry.tender_ref && flag.tender_ref) entry.tender_ref = flag.tender_ref;
+    if (entry.value_amount === null) entry.value_amount = flag.value_amount;
+    if (!entry.risks.includes(flag.risk_id)) entry.risks.push(flag.risk_id);
+  }
+
+  const cases = [...byTender.values()];
+  return {
+    cases,
+    byTender,
+    rules,
+    ruleById: new Map(rules.map((r) => [r.risk_id, r])),
+    flagCount: flags.length,
+    totalValue: cases.reduce((sum, c) => sum + (c.value_amount ?? 0), 0),
+  };
+}

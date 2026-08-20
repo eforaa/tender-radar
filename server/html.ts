@@ -151,6 +151,7 @@ export function layout(opts: { title: string; nav?: string; body: string }): str
   <nav class="nav">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Знахідки</a>
     <a href="/entities"${opts.nav === "entities" ? ' aria-current="page"' : ""}>Замовники</a>
+    <a href="/officers"${opts.nav === "officers" ? ' aria-current="page"' : ""}>Посадовці</a>
     <a href="/indicators"${opts.nav === "indicators" ? ' aria-current="page"' : ""}>Індикатори</a>
     <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>Про систему</a>
   </nav>

@@ -12,6 +12,10 @@ export type TenderRow = {
   entity_name: string | null;
   region: string | null;
   locality: string | null;
+  /** The official named in the tender as the responsible contact. */
+  officer_name: string | null;
+  officer_email: string | null;
+  officer_phone: string | null;
   raw: unknown;
 };
 
