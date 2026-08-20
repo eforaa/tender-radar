@@ -1,6 +1,6 @@
 // Server-rendered site over the local store. Zero dependencies.
 import { createServer } from "node:http";
-import { REGION, RAILWAY_EDRPOU } from "../src/config.ts";
+import { REGION, RAILWAY_EDRPOU, SOUTHERN_RAILWAY_EDRPOU, railwayScope, type RailwayScope } from "../src/config.ts";
 import { RISK_LABELS, GROUP_ORDER, procedureLabel, readableName, type RiskGroup } from "../src/labels.ts";
 import { layout, esc, money, shortMoney, date, trim, plural } from "./html.ts";
 import { loadDataset, type Case, type Dataset } from "./data.ts";
@@ -591,6 +591,150 @@ function suppliersPage(): string {
   });
 }
 
+
+/* ---------- railway ---------- */
+
+type RailwayBlock = { scope: RailwayScope; heading: string; note: string; list: Case[] };
+
+function railwayBlocks(): RailwayBlock[] {
+  const by = new Map<RailwayScope, Case[]>();
+  for (const entry of db.cases) {
+    const scope = railwayScope(entry);
+    if (!scope) continue;
+    const list = by.get(scope) ?? [];
+    list.push(entry);
+    by.set(scope, list);
+  }
+
+  const blocks: RailwayBlock[] = [
+    {
+      scope: "southern",
+      heading: "Регіональна філія «Південна залізниця»",
+      note: `Власне залізниця Харківщини — регіональна філія АТ «Українська залізниця» з осідком у Харкові, ЄДРПОУ ${SOUTHERN_RAILWAY_EDRPOU}.`,
+      list: by.get("southern") ?? [],
+    },
+    {
+      scope: "branch",
+      heading: "Інші філії АТ «Українська залізниця»",
+      note:
+        "Централізовані філії, які закуповують для всієї мережі, зокрема й для Харківського вузла. " +
+        "Зареєстровані поза межами області, тому ми показуємо їх окремо, а не змішуємо з харківськими.",
+      list: by.get("branch") ?? [],
+    },
+    {
+      scope: "local",
+      heading: "Залізничні заклади Харківщини",
+      note: "Організації залізничного профілю, зареєстровані в області: університет, ліцей, центр професійної освіти.",
+      list: by.get("local") ?? [],
+    },
+  ];
+  return blocks.filter((b) => b.list.length > 0);
+}
+
+function railwayPage(): string {
+  const blocks = railwayBlocks();
+  const all = blocks.flatMap((b) => b.list);
+  const value = all.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
+  const solo = all.filter((c) => c.bidders === 1).length;
+  const southern = blocks.find((b) => b.scope === "southern")?.list ?? [];
+
+  const suppliers = new Map<string, { name: string; count: number; value: number; solo: number }>();
+  for (const entry of all) {
+    const key = entry.winner_edrpou ?? "";
+    if (!key) continue;
+    const acc = suppliers.get(key) ?? { name: entry.winner_name ?? key, count: 0, value: 0, solo: 0 };
+    acc.count++;
+    acc.value += entry.winner_amount ?? entry.value_amount ?? 0;
+    if (entry.bidders === 1) acc.solo++;
+    suppliers.set(key, acc);
+  }
+  const topSuppliers = [...suppliers.entries()].sort((a, b) => b[1].value - a[1].value).slice(0, 15);
+
+  return layout({
+    title: "Залізниця Харківської області",
+    nav: "railway",
+    body: `
+<h1>Залізниця Харківської області</h1>
+<p class="sub">Закупівлі залізничної галузі з позначками державної системи моніторингу. Нижче — три різні за природою групи, і ми їх не змішуємо.</p>
+
+<div class="metrics">
+  <div class="metric"><span class="v">${all.length.toLocaleString("uk-UA")}</span><span class="k">закупівель із позначками</span></div>
+  <div class="metric"><span class="v">${shortMoney(value)}</span><span class="k">на таку суму</span></div>
+  <div class="metric"><span class="v">${solo}</span><span class="k">з єдиним учасником</span></div>
+  <div class="metric"><span class="v">${southern.length}</span><span class="k">у «Південної залізниці»</span></div>
+</div>
+
+<details class="help">
+  <summary>Що саме входить у цей розділ</summary>
+  <div class="inner">
+    <p><strong>Південна залізниця</strong> — регіональна філія АТ «Українська залізниця», що обслуговує Харківщину. Це і є залізниця області у прямому значенні.</p>
+    <p><strong>Інші філії Укрзалізниці</strong> зареєстровані в Києві, але закуповують централізовано для всієї мережі, зокрема й для харківських підрозділів. Ми відстежуємо їх окремо й не видаємо за харківські.</p>
+    <p><strong>Залізничні заклади Харківщини</strong> — освітні та наукові організації галузі, зареєстровані в області.</p>
+    <p>Відбір за назвою навмисно вузький. Ширший шаблон помилково зараховував до залізниці Зміївську теплову електростанцію та дослідну станцію птахівництва.</p>
+  </div>
+</details>
+
+${blocks
+  .map((block) => {
+    const blockValue = block.list.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
+    const entities = new Map<string, { name: string; count: number; value: number }>();
+    for (const entry of block.list) {
+      const key = entry.entity_edrpou ?? "";
+      const acc = entities.get(key) ?? { name: entry.entity_name ?? key, count: 0, value: 0 };
+      acc.count++;
+      acc.value += entry.value_amount ?? 0;
+      entities.set(key, acc);
+    }
+    const sorted = [...block.list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+
+    return `
+<h2>${esc(block.heading)}</h2>
+<p class="hint">${esc(block.note)}</p>
+<p class="hint"><strong>${block.list.length}</strong> ${plural(block.list.length, "закупівля", "закупівлі", "закупівель")} на ${shortMoney(blockValue)}, ${entities.size} ${plural(entities.size, "замовник", "замовники", "замовників")}.</p>
+<div class="rows">
+${[...entities.entries()]
+  .sort((a, b) => b[1].value - a[1].value)
+  .map(
+    ([edrpou, acc]) => `<div class="row">
+  <div class="who">
+    <div class="name"><a href="/entity/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
+    <div class="meta">ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "закупівля", "закупівлі", "закупівель")} із позначками</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
+</div>`,
+  )
+  .join("")}
+</div>
+<div class="rows" style="margin-top:1rem">${sorted.slice(0, 20).map((c) => caseRow(c)).join("")}</div>
+${sorted.length > 20 ? `<p class="hint" style="margin-top:.8rem">Показано 20 найдорожчих із ${sorted.length}.</p>` : ""}
+`;
+  })
+  .join("")}
+
+<h2>Що держава запідозрила в залізничних закупівлях</h2>
+${groupedRiskCards(rankRisks(all))}
+
+<h2>Хто виграє залізничні тендери</h2>
+<p class="hint">П'ятнадцять найбільших переможців за сумою договорів.</p>
+<div class="rows">
+${topSuppliers
+  .map(
+    ([edrpou, acc]) => `<div class="row">
+  <div class="who">
+    <div class="name"><a href="/supplier/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
+    <div class="meta">ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "перемога", "перемоги", "перемог")}${acc.solo ? ` · ${acc.solo} без конкурентів` : ""}</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
+</div>`,
+  )
+  .join("")}
+</div>
+
+<p class="note">Позначка означає, що спрацював індикатор державної системи моніторингу закупівель. Це ознака ризику, яка потребує перевірки, а не встановлений факт порушення.</p>
+`,
+  });
+}
+
 function indicatorsPage(): string {
   // Every active indicator is listed, including those that never fired here —
   // a zero is information too.
@@ -669,6 +813,7 @@ const server = createServer(async (req, res) => {
   else if (path === "/entities") body = entitiesPage();
   else if (path === "/officers") body = officersPage();
   else if (path === "/suppliers") body = suppliersPage();
+  else if (path === "/railway") body = railwayPage();
   else if (path === "/indicators") body = indicatorsPage();
   else if (path === "/about") body = aboutPage();
   else if (path.startsWith("/tender/")) body = tenderPage(path.slice("/tender/".length));

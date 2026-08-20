@@ -218,6 +218,7 @@ export function layout(opts: { title: string; nav?: string; body: string }): str
   <a class="brand" href="/">Tender<span>&nbsp;Radar</span></a>
   <nav class="nav">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Знахідки</a>
+    <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>Залізниця</a>
     <a href="/entities"${opts.nav === "entities" ? ' aria-current="page"' : ""}>Замовники</a>
     <a href="/officers"${opts.nav === "officers" ? ' aria-current="page"' : ""}>Посадовці</a>
     <a href="/suppliers"${opts.nav === "suppliers" ? ' aria-current="page"' : ""}>Переможці</a>
