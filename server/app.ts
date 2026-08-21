@@ -15,6 +15,10 @@ import {
 } from "./controls.ts";
 
 const PAGE_SIZE = 30;
+/** Chips beyond this crowd the row; the rest are one click away. */
+const MAX_ROW_FLAGS = 3;
+/** Grouping the whole country by buyer produced 10608 blocks in one page. */
+const MAX_GROUPS = 40;
 
 let db: Dataset = await loadDataset();
 console.log(
@@ -31,6 +35,22 @@ function shortRisk(riskId: string): string {
 function riskFlag(riskId: string): string {
   return `<a class="flag" href="/?risk=${encodeURIComponent(riskId)}">${esc(shortRisk(riskId))}</a>`;
 }
+
+/**
+ * A cheap severity for list rows. The full conclusion is too heavy to build
+ * for 36000 rows, so this uses the same signals it leans on most.
+ */
+function rowSeverity(entry: Case): "high" | "medium" | "low" {
+  if (entry.findings.length > 0) return "high";
+  if (entry.bidders === 1 || entry.risks.length >= 3) return "medium";
+  return "low";
+}
+
+const SEVERITY_TITLE: Record<string, string> = {
+  high: "Ми знайшли розбіжність у ціні",
+  medium: "Є на що подивитися: без конкурентів або кілька ознак",
+  low: "Позначено державою",
+};
 
 /** The one-glance signals that make a case worth opening. */
 function alarms(entry: Case): string[] {
@@ -64,36 +84,51 @@ function star(kind: FavKind, id: string, back: string, opts: { label?: boolean }
 function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?: boolean } = {}): string {
   const showOfficer = opts.showOfficer ?? true;
   const showEntity = opts.showEntity ?? true;
-  const title = entry.title ? trim(entry.title) : readableName(entry.entity_name) || "Закупівля";
+
+  // Tenders without a full card have no title of their own. Falling back to
+  // the buyer's name printed it twice: once as the heading, once in the meta.
+  const buyer = readableName(entry.entity_name);
+  const hasOwnTitle = Boolean(entry.title);
+  const title = hasOwnTitle ? trim(entry.title as string, 110) : buyer || "Закупівля";
 
   const meta: string[] = [];
-  if (showEntity && entry.entity_name) {
-    meta.push(
-      `<a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">${esc(readableName(entry.entity_name))}</a>`,
-    );
+  if (showEntity && buyer && hasOwnTitle) {
+    meta.push(`<a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">${esc(buyer)}</a>`);
   }
+  if (entry.region) meta.push(esc(entry.region));
+  if (entry.tender_date) meta.push(date(entry.tender_date));
+
+  const people: string[] = [];
   if (showOfficer && entry.officer_name) {
-    meta.push(`вів(ла) <a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a>`);
+    people.push(`вів(ла) <a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a>`);
   }
   if (entry.winner_name) {
-    meta.push(
+    people.push(
       `виграв <a href="/supplier/${encodeURIComponent(entry.winner_edrpou ?? "")}">${esc(readableName(entry.winner_name))}</a>`,
     );
   }
 
-  return `<div class="row">
+  const severity = rowSeverity(entry);
+
+  return `<div class="row sev-${severity}">
+  <span class="dot" title="${esc(SEVERITY_TITLE[severity])}" aria-label="${esc(SEVERITY_TITLE[severity])}"></span>
   <div class="who">
     <div class="name">${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
-    ${meta.length ? `<div class="meta">${meta.join(" · ")}</div>` : ""}
-    <div class="meta"><span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span>${entry.tender_date ? ` · закупівля від ${date(entry.tender_date)}` : ""}${entry.region ? ` · ${esc(entry.region)}` : ""}</div>
+    <div class="meta">${meta.join(" · ")}</div>
+    ${people.length ? `<div class="meta">${people.join(" · ")}</div>` : ""}
   </div>
   <div class="amount">
     <span class="big">${shortMoney(entry.value_amount)}</span>
-    <span class="exact">${money(entry.value_amount)}</span>
+    <span class="exact">${esc(entry.tender_ref || entry.tender_id)}</span>
   </div>
   <div class="flags">
     ${alarms(entry).map((a) => `<span class="flag alarm">${esc(a)}</span>`).join("")}
-    ${entry.risks.map(riskFlag).join("")}
+    ${entry.risks.slice(0, MAX_ROW_FLAGS).map(riskFlag).join("")}
+    ${
+      entry.risks.length > MAX_ROW_FLAGS
+        ? `<a class="flag more" href="/tender/${encodeURIComponent(entry.tender_id)}">ще ${entry.risks.length - MAX_ROW_FLAGS}</a>`
+        : ""
+    }
   </div>
 </div>`;
 }
@@ -187,6 +222,100 @@ const HELP = `<details class="help">
 
 /* ---------- pages ---------- */
 
+/**
+ * One-click starting points. A newcomer should not have to understand the
+ * filter vocabulary before seeing anything useful, so the common questions
+ * are pre-written as links.
+ */
+type Preset = { label: string; hint: string; query: string };
+
+function presetsFor(action: string): Preset[] {
+  const base: Preset[] = [
+    { label: "Усі", hint: "повний перелік", query: "" },
+    { label: "Завищена ціна", hint: "ми порахували переплату", query: "price=1" },
+    { label: "Без конкурентів", hint: "подався один учасник", query: "solo=1" },
+    { label: "Від 100 млн", hint: "найбільші суми", query: "min=100000000" },
+    { label: "Кілька ознак", hint: "спрацювало 2 і більше", query: "sort=risks" },
+    { label: "Найновіші", hint: "свіжі закупівлі", query: "sort=date" },
+  ];
+  return action === "/prices" ? base.filter((p) => p.query !== "price=1") : base;
+}
+
+/** Marks the preset that matches the current query, so the state is visible. */
+function presetBar(action: string, url: URL, c: Controls): string {
+  const current = new URLSearchParams();
+  if (c.priceOnly) current.set("price", "1");
+  if (c.soloOnly) current.set("solo", "1");
+  if (c.min > 0) current.set("min", String(c.min));
+  if (c.sort !== "value") current.set("sort", c.sort);
+  const currentKey = current.toString();
+
+  return `<div class="presets">
+  ${presetsFor(action)
+    .map((p) => {
+      const active = p.query === currentKey;
+      const href = p.query ? `${action}?${p.query}` : action;
+      return `<a class="preset${active ? " on" : ""}" href="${esc(href)}" title="${esc(p.hint)}">${esc(p.label)}</a>`;
+    })
+    .join("")}
+</div>`;
+}
+
+/** Sort and grouping, always visible — they are the two controls people use. */
+function sortBar(action: string, c: Controls): string {
+  const dimensionOptions = (selected: Dimension, skip?: Dimension) =>
+    DIMENSIONS.filter((d) => d.value !== skip || d.value === "")
+      .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
+      .join("");
+
+  const hidden = (name: string, value: string) =>
+    value ? `<input type="hidden" name="${name}" value="${esc(value)}">` : "";
+
+  return `<form class="sortbar" method="get" action="${esc(action)}">
+  <input type="search" name="q" value="${esc(c.q)}" placeholder="Пошук за назвою, замовником, ЄДРПОУ" aria-label="Пошук">
+  ${hidden("risk", c.risk)}${hidden("region", c.region)}
+  ${hidden("from", c.dateFrom)}${hidden("to", c.dateTo)}
+  ${hidden("min", c.min > 0 ? String(c.min) : "")}${hidden("max", c.max > 0 ? String(c.max) : "")}
+  ${c.railOnly ? '<input type="hidden" name="rail" value="1">' : ""}
+  ${c.soloOnly ? '<input type="hidden" name="solo" value="1">' : ""}
+  ${c.priceOnly ? '<input type="hidden" name="price" value="1">' : ""}
+
+  <label>Сорт.
+    <select name="sort" onchange="this.form.submit()">
+      <option value="value"${c.sort === "value" ? " selected" : ""}>за сумою, спадання</option>
+      <option value="value-asc"${c.sort === "value-asc" ? " selected" : ""}>за сумою, зростання</option>
+      <option value="date"${c.sort === "date" ? " selected" : ""}>новіші закупівлі</option>
+      <option value="date-asc"${c.sort === "date-asc" ? " selected" : ""}>старіші закупівлі</option>
+      <option value="assessed"${c.sort === "assessed" ? " selected" : ""}>нещодавно позначені</option>
+      <option value="risks"${c.sort === "risks" ? " selected" : ""}>більше ознак</option>
+    </select>
+  </label>
+
+  <label>Групи
+    <select name="group" onchange="this.form.submit()">${dimensionOptions(c.group)}</select>
+  </label>
+
+  ${
+    c.group
+      ? `<label>потім
+    <select name="then" onchange="this.form.submit()">${dimensionOptions(c.then, c.group)}</select>
+  </label>`
+      : ""
+  }
+
+  <button type="submit" class="go">Показати</button>
+</form>`;
+}
+
+/** One compact line, not a panel: a newcomer needs it once, a returning
+ *  reader needs the screen. The detail lives behind the link. */
+const PRIMER = `<div class="primer">
+  <span><b>1</b> держава позначає підозрілі</span>
+  <span><b>2</b> ми пояснюємо і рахуємо ціну</span>
+  <span><b>3</b> у кожній — висновок і звіт</span>
+  <a href="/about">Докладніше</a>
+</div>`;
+
 /** Renders one group, and its nested groups, as a collapsible block. */
 function groupBlock(group: Group, depth: number): string {
   const inner =
@@ -235,14 +364,9 @@ function filterPanel(action: string, c: Controls, opts: ControlOptions = {}): st
   const anything = isFiltered(c) || Boolean(c.group);
 
   return `<form class="filters" method="get" action="${esc(action)}">
-  <div class="filter-row">
-    <input type="search" name="q" value="${esc(c.q)}" placeholder="Назва, замовник, посадовець, переможець, ЄДРПОУ або номер тендера" aria-label="Пошук">
-    <button type="submit">Показати</button>
-    ${anything ? `<a class="reset" href="${esc(action)}">скинути все</a>` : ""}
-  </div>
-
+  <input type="hidden" name="q" value="${esc(c.q)}">
   <details class="filters-more"${anything ? " open" : ""}>
-    <summary>Фільтри та групування${active > 0 ? ` <span class="badge">${active}</span>` : ""}</summary>
+    <summary>Більше фільтрів${active > 0 ? ` <span class="badge">${active}</span>` : ""}${anything ? ` <a class="reset" href="${esc(action)}">скинути все</a>` : ""}</summary>
     <div class="inner">
       <div class="filter-row">
         <select name="risk" aria-label="Ознака">
@@ -260,14 +384,9 @@ function filterPanel(action: string, c: Controls, opts: ControlOptions = {}): st
             .map((r) => `<option value="${esc(r)}"${r === c.region ? " selected" : ""}>${esc(r)}</option>`)
             .join("")}
         </select>
-        <select name="sort" aria-label="Сортування">
-          <option value="value"${c.sort === "value" ? " selected" : ""}>Спочатку найдорожчі</option>
-          <option value="value-asc"${c.sort === "value-asc" ? " selected" : ""}>Спочатку найдешевші</option>
-          <option value="date"${c.sort === "date" ? " selected" : ""}>Спочатку найновіші закупівлі</option>
-          <option value="date-asc"${c.sort === "date-asc" ? " selected" : ""}>Спочатку найстаріші закупівлі</option>
-          <option value="assessed"${c.sort === "assessed" ? " selected" : ""}>Спочатку нещодавно позначені</option>
-          <option value="risks"${c.sort === "risks" ? " selected" : ""}>Спочатку з найбільшою кількістю ознак</option>
-        </select>
+        <input type="hidden" name="sort" value="${esc(c.sort)}">
+        <input type="hidden" name="group" value="${esc(c.group)}">
+        <input type="hidden" name="then" value="${esc(c.then)}">
       </div>
 
       <div class="filter-row">
@@ -283,13 +402,6 @@ function filterPanel(action: string, c: Controls, opts: ControlOptions = {}): st
         <span class="filter-label">по</span>
         <input type="number" name="max" value="${c.max > 0 ? c.max : ""}" placeholder="до" aria-label="Сума до" min="0" step="100000" class="num">
         <span class="filter-label faint">${esc(rangeHint)}</span>
-      </div>
-
-      <div class="filter-row">
-        <span class="filter-label">Групувати</span>
-        <select name="group" aria-label="Групування">${dimensionOptions(c.group)}</select>
-        <span class="filter-label">потім</span>
-        <select name="then" aria-label="Друге групування"${c.group ? "" : " disabled"}>${dimensionOptions(c.then, c.group || undefined)}</select>
       </div>
 
       <div class="filter-row">
@@ -320,7 +432,13 @@ function listBody(list: Case[], c: Controls, action: string): string {
 
   if (c.group) {
     const groups = buildGroups(list, c.group, c.then, shortRisk);
-    return `${resultLine(list, c, groups.length)}${groups.map((g) => groupBlock(g, 0)).join("")}`;
+    const shown = groups.slice(0, MAX_GROUPS);
+    const hidden = groups.length - shown.length;
+    return `${resultLine(list, c, groups.length)}${shown.map((g) => groupBlock(g, 0)).join("")}${
+      hidden > 0
+        ? `<p class="note">Показано ${MAX_GROUPS} найбільших ${plural(MAX_GROUPS, "групу", "групи", "груп")} із ${groups.length.toLocaleString("uk-UA")}. Звузьте вибірку фільтрами, щоб побачити решту.</p>`
+        : ""
+    }`;
   }
 
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
@@ -349,17 +467,19 @@ function feedPage(url: URL): string {
     nav: "feed",
     body: `
 <h1>Закупівлі, які варто перевірити</h1>
-<p class="sub">Харківська область і залізниця. Держава сама позначає підозрілі закупівлі — ми збираємо ці позначки в одному місці, пояснюємо їх звичайною мовою і додаємо власний розрахунок цін.</p>
+<p class="sub">Публічні закупівлі всієї України, які держава позначила як підозрілі.</p>
 
 <p class="statline">
-  <b>${db.cases.length.toLocaleString("uk-UA")}</b> закупівель під питанням ·
-  <b>${shortMoney(db.totalValue)}</b> загальна сума ·
-  <b>${db.flagCount.toLocaleString("uk-UA")}</b> виявлених ознак ·
-  <b>${db.findingCount.toLocaleString("uk-UA")}</b> де ми знайшли переплату
+  <b>${db.cases.length.toLocaleString("uk-UA")}</b> закупівель ·
+  <b>${shortMoney(db.totalValue)}</b> ·
+  <b>${db.flagCount.toLocaleString("uk-UA")}</b> ознак ·
+  <b>${db.findingCount.toLocaleString("uk-UA")}</b> переплат
 </p>
 
-${HELP}
+${PRIMER}
 
+${presetBar("/", url, c)}
+${sortBar("/", c)}
 ${filterPanel("/", c)}
 
 ${c.risk ? riskCard(c.risk) : ""}
@@ -990,6 +1110,8 @@ ${[...entities.entries()]
   .join("")}
 
 <h2>Закупівлі залізниці</h2>
+${presetBar("/railway", url, c)}
+${sortBar("/railway", c)}
 ${filterPanel("/railway", c, { hideRail: true })}
 ${listBody(filtered, c, "/railway")}
 
@@ -1200,6 +1322,8 @@ function pricesPage(url: URL): string {
   </div>
 </details>
 
+${presetBar("/prices", url, c)}
+${sortBar("/prices", c)}
 ${filterPanel("/prices", c, { hidePrice: true })}
 
 ${listBody(list, c, "/prices")}

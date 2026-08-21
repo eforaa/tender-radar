@@ -130,3 +130,13 @@ test("paging links carry every control forward", () => {
 test("a link with nothing applied stays clean", () => {
   assert.equal(keepControls("/prices", controlsFrom("")), "/prices");
 });
+
+test("grouping the whole country does not render a page per buyer", async () => {
+  // Grouping 36000 tenders by buyer produced 10608 blocks and a 51 MB page.
+  const app = await import("../server/app.ts");
+  const r = app.render(new URL("http://x/?group=entity&then=supplier"));
+  const blocks = (r.body.match(/class="group-block depth-0"/g) ?? []).length;
+  assert.ok(blocks <= 40, `expected at most 40 top-level groups, got ${blocks}`);
+  assert.ok(r.body.length < 3_000_000, `page is ${Math.round(r.body.length / 1024)} KB`);
+  assert.match(r.body, /Звузьте вибірку фільтрами/);
+});
