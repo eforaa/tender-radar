@@ -262,7 +262,7 @@ function presetBar(action: string, url: URL, c: Controls): string {
 }
 
 /** Sort and grouping, always visible — they are the two controls people use. */
-function sortBar(action: string, c: Controls): string {
+function sortBar(action: string, c: Controls, extra = ""): string {
   const dimensionOptions = (selected: Dimension, skip?: Dimension) =>
     DIMENSIONS.filter((d) => d.value !== skip || d.value === "")
       .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
@@ -273,6 +273,7 @@ function sortBar(action: string, c: Controls): string {
 
   return `<form class="sortbar" method="get" action="${esc(action)}">
   <input type="search" name="q" value="${esc(c.q)}" placeholder="Пошук за назвою, замовником, ЄДРПОУ" aria-label="Пошук">
+  ${extra}
   ${hidden("risk", c.risk)}${hidden("region", c.region)}
   ${hidden("from", c.dateFrom)}${hidden("to", c.dateTo)}
   ${hidden("min", c.min > 0 ? String(c.min) : "")}${hidden("max", c.max > 0 ? String(c.max) : "")}
@@ -345,7 +346,7 @@ function groupBlock(group: Group, depth: number): string {
  * The filter panel. Identical on every page that shows tenders; `action` is
  * where it submits, so each tab filters its own scope.
  */
-function filterPanel(action: string, c: Controls, opts: ControlOptions = {}): string {
+function filterPanel(action: string, c: Controls, opts: ControlOptions = {}, extra = ""): string {
   const dimensionOptions = (selected: Dimension, skip?: Dimension) =>
     DIMENSIONS.filter((d) => d.value !== skip || d.value === "")
       .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
@@ -365,6 +366,7 @@ function filterPanel(action: string, c: Controls, opts: ControlOptions = {}): st
 
   return `<form class="filters" method="get" action="${esc(action)}">
   <input type="hidden" name="q" value="${esc(c.q)}">
+  ${extra}
   <details class="filters-more"${anything ? " open" : ""}>
     <summary>Більше фільтрів${active > 0 ? ` <span class="badge">${active}</span>` : ""}${anything ? ` <a class="reset" href="${esc(action)}">скинути все</a>` : ""}</summary>
     <div class="inner">
@@ -425,7 +427,12 @@ function resultLine(list: Case[], c: Controls, groupCount: number): string {
 }
 
 /** Rows, or collapsible groups, plus the pager. Shared by every list page. */
-function listBody(list: Case[], c: Controls, action: string): string {
+function listBody(
+  list: Case[],
+  c: Controls,
+  action: string,
+  rowOpts: { showOfficer?: boolean; showEntity?: boolean } = {},
+): string {
   if (list.length === 0) {
     return '<div class="empty">За цими умовами нічого не знайшлося. Спробуйте прибрати частину фільтрів.</div>';
   }
@@ -446,7 +453,7 @@ function listBody(list: Case[], c: Controls, action: string): string {
   const slice = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return `${resultLine(list, c, 0)}
-<div class="rows">${slice.map((x) => caseRow(x)).join("")}</div>
+<div class="rows">${slice.map((x) => caseRow(x, rowOpts)).join("")}</div>
 ${
   pages > 1
     ? `<div class="pager">
@@ -702,7 +709,8 @@ ${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
   });
 }
 
-function officerPage(key: string): string {
+function officerPage(key: string, url: URL): string {
+  const dossierAction = `/officer/${encodeURIComponent(key)}`;
   const list = db.cases.filter((c) => c.officer_key === key);
   if (list.length === 0) return notFound();
 
@@ -714,7 +722,8 @@ function officerPage(key: string): string {
   const value = list.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
   const solo = list.filter((c) => c.bidders === 1).length;
   const ranked = rankRisks(list);
-  const sorted = [...list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  const ctrl = readControls(url);
+  const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
 
   return layout({
     title: name,
@@ -746,15 +755,17 @@ ${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
 ${groupedRiskCards(ranked)}
 
 <h2>Закупівлі</h2>
-<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c, { showOfficer: false })).join("")}</div>
-${sorted.length > 60 ? `<p class="note">Показано 60 найдорожчих із ${sorted.length}.</p>` : ""}
+${sortBar(dossierAction, ctrl)}
+${filterPanel(dossierAction, ctrl)}
+${listBody(shown, ctrl, dossierAction, { showOfficer: false })}
 
 <p class="note">Ця сторінка не є твердженням про правопорушення з боку названої особи. Вона показує, що державна система моніторингу позначила закупівлі, у яких цю особу вказано відповідальною контактною особою.</p>
 `,
   });
 }
 
-function supplierPage(edrpou: string): string {
+function supplierPage(edrpou: string, url: URL): string {
+  const dossierAction = `/supplier/${encodeURIComponent(edrpou)}`;
   const list = db.cases.filter((c) => c.winner_edrpou === edrpou);
   if (list.length === 0) return notFound();
 
@@ -763,7 +774,8 @@ function supplierPage(edrpou: string): string {
   const ranked = rankRisks(list);
   const buyers = new Set(list.map((c) => c.entity_edrpou).filter(Boolean));
   const solo = list.filter((c) => c.bidders === 1).length;
-  const sorted = [...list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  const ctrl = readControls(url);
+  const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
 
   return layout({
     title: name,
@@ -785,15 +797,17 @@ ${star("supplier", edrpou, "/supplier/" + encodeURIComponent(edrpou), { label: t
 ${groupedRiskCards(ranked)}
 
 <h2>Закупівлі</h2>
-<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c)).join("")}</div>
-${sorted.length > 60 ? `<p class="note">Показано 60 найдорожчих із ${sorted.length}.</p>` : ""}
+${sortBar(dossierAction, ctrl)}
+${filterPanel(dossierAction, ctrl)}
+${listBody(shown, ctrl, dossierAction)}
 
 <p class="note">Перелік охоплює лише закупівлі ${esc(REGION)} та філій залізниці, які вже завантажено. Це не повна історія компанії по Україні.</p>
 `,
   });
 }
 
-function entityPage(edrpou: string): string {
+function entityPage(edrpou: string, url: URL): string {
+  const dossierAction = `/entity/${encodeURIComponent(edrpou)}`;
   const list = db.cases.filter((c) => c.entity_edrpou === edrpou);
   if (list.length === 0) return notFound();
 
@@ -801,7 +815,8 @@ function entityPage(edrpou: string): string {
   const value = list.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
   const solo = list.filter((c) => c.bidders === 1).length;
   const ranked = rankRisks(list);
-  const sorted = [...list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  const ctrl = readControls(url);
+  const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
 
   const officers = new Map<string, { name: string; count: number; value: number }>();
   for (const entry of list) {
@@ -852,10 +867,80 @@ ${rankedOfficers
 ${groupedRiskCards(ranked)}
 
 <h2>Закупівлі</h2>
-<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c, { showEntity: false })).join("")}</div>
-${sorted.length > 60 ? `<p class="note">Показано 60 найдорожчих із ${sorted.length}.</p>` : ""}
+${sortBar(dossierAction, ctrl)}
+${filterPanel(dossierAction, ctrl)}
+${listBody(shown, ctrl, dossierAction, { showEntity: false })}
 `,
   });
+}
+
+/**
+ * Search and sorting for the three directory pages. They hold aggregates,
+ * not tenders, so the tender filters have nothing to bite on — a name, a
+ * count and a total are the whole of it.
+ */
+type DirSort = "value" | "value-asc" | "count" | "name";
+
+const DIR_SORTS: { value: DirSort; label: string }[] = [
+  { value: "value", label: "за сумою, спадання" },
+  { value: "value-asc", label: "за сумою, зростання" },
+  { value: "count", label: "за кількістю закупівель" },
+  { value: "name", label: "за назвою, А–Я" },
+];
+
+type DirControls = { q: string; sort: DirSort };
+
+function readDirControls(url: URL): DirControls {
+  const sort = url.searchParams.get("sort") ?? "";
+  return {
+    q: (url.searchParams.get("q") ?? "").trim().slice(0, 80),
+    sort: DIR_SORTS.some((x) => x.value === sort) ? (sort as DirSort) : "value",
+  };
+}
+
+type DirRow = {
+  href: string;
+  name: string;
+  meta: string;
+  value: number;
+  count: number;
+  kind?: FavKind;
+  id?: string;
+};
+
+function applyDirControls(rows: DirRow[], c: DirControls): DirRow[] {
+  const needle = c.q.toLowerCase();
+  // The meta line carries the EDRPOU, which is what someone actually pastes.
+  const kept = needle ? rows.filter((r) => `${r.name} ${r.meta}`.toLowerCase().includes(needle)) : rows;
+  const out = [...kept];
+  switch (c.sort) {
+    case "value-asc":
+      out.sort((a, b) => a.value - b.value);
+      break;
+    case "count":
+      out.sort((a, b) => b.count - a.count || b.value - a.value);
+      break;
+    case "name":
+      out.sort((a, b) => a.name.localeCompare(b.name, "uk"));
+      break;
+    default:
+      out.sort((a, b) => b.value - a.value);
+  }
+  return out;
+}
+
+function dirBar(action: string, c: DirControls): string {
+  const dirty = c.q !== "" || c.sort !== "value";
+  return `<form class="sortbar dir" method="get" action="${esc(action)}">
+  <input type="search" name="q" value="${esc(c.q)}" placeholder="Назва або ЄДРПОУ" aria-label="Пошук">
+  <button class="go" type="submit">Показати</button>
+  <label>Сорт.
+    <select name="sort" onchange="this.form.submit()">${DIR_SORTS.map(
+      (x) => `<option value="${x.value}"${x.value === c.sort ? " selected" : ""}>${esc(x.label)}</option>`,
+    ).join("")}</select>
+  </label>
+  ${dirty ? `<a class="reset" href="${esc(action)}">скинути</a>` : ""}
+</form>`;
 }
 
 /** Shared renderer for the three directory pages. */
@@ -864,19 +949,26 @@ function directoryPage(opts: {
   nav: string;
   heading: string;
   intro: string;
-  rows: { href: string; name: string; meta: string; value: number; kind?: FavKind; id?: string }[];
+  action: string;
+  url: URL;
+  rows: DirRow[];
 }): string {
+  const c = readDirControls(opts.url);
+  const rows = applyDirControls(opts.rows, c);
+  const total = rows.reduce((sum, r) => sum + r.value, 0);
   return layout({
     title: opts.title,
     nav: opts.nav,
     body: `
 <h1>${esc(opts.heading)}</h1>
 <p class="sub">${opts.intro}</p>
+${dirBar(opts.action, c)}
+<p class="hint">${c.q ? "Знайдено" : "Показано"} <strong>${rows.length.toLocaleString("uk-UA")}</strong> на ${shortMoney(total)}.</p>
 ${
-  opts.rows.length === 0
-    ? '<div class="empty">Даних поки немає.</div>'
+  rows.length === 0
+    ? '<div class="empty">За цим запитом нічого не знайшлося.</div>'
     : `<div class="rows">
-${opts.rows
+${rows
   .slice(0, 150)
   .map(
     (r) => `<div class="row">
@@ -890,12 +982,12 @@ ${opts.rows
   .join("")}
 </div>`
 }
-${opts.rows.length > 150 ? `<p class="note">Показано 150 найбільших із ${opts.rows.length}.</p>` : ""}
+${rows.length > 150 ? `<p class="note">Показано перші 150 із ${rows.length.toLocaleString("uk-UA")}. Звузьте пошуком, щоб побачити решту.</p>` : ""}
 `,
   });
 }
 
-function entitiesPage(): string {
+function entitiesPage(url: URL): string {
   const byEntity = new Map<string, { name: string; count: number; value: number }>();
   for (const entry of db.cases) {
     const key = entry.entity_edrpou ?? "";
@@ -910,21 +1002,22 @@ function entitiesPage(): string {
     title: "Замовники",
     nav: "entities",
     heading: "Замовники",
-    intro: `Установи ${esc(REGION)} та філії залізниці, у закупівлях яких спрацювали державні індикатори. Найбільші за сумою — згори.`,
-    rows: [...byEntity.entries()]
-      .sort((a, b) => b[1].value - a[1].value)
-      .map(([edrpou, acc]) => ({
-        kind: "entity" as FavKind,
-        id: edrpou,
-        href: `/entity/${encodeURIComponent(edrpou)}`,
-        name: readableName(acc.name),
-        meta: `ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "закупівля", "закупівлі", "закупівель")}${RAILWAY_EDRPOU.has(edrpou) ? " · залізниця" : ""}`,
-        value: acc.value,
-      })),
+    intro: "Установи, у закупівлях яких спрацювали державні індикатори.",
+    action: "/entities",
+    url,
+    rows: [...byEntity.entries()].map(([edrpou, acc]) => ({
+      kind: "entity" as FavKind,
+      id: edrpou,
+      href: `/entity/${encodeURIComponent(edrpou)}`,
+      name: readableName(acc.name),
+      meta: `ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "закупівля", "закупівлі", "закупівель")}${RAILWAY_EDRPOU.has(edrpou) ? " · залізниця" : ""}`,
+      value: acc.value,
+      count: acc.count,
+    })),
   });
 }
 
-function officersPage(): string {
+function officersPage(url: URL): string {
   const byOfficer = new Map<string, { name: string; entity: string; count: number; value: number }>();
   for (const entry of db.cases) {
     if (!entry.officer_key) continue;
@@ -943,22 +1036,22 @@ function officersPage(): string {
     title: "Посадовці",
     nav: "officers",
     heading: "Відповідальні посадовці",
-    intro:
-      "Особи, яких замовники вказали контактними в закупівлях із позначками. Це не перелік підозрюваних — це перелік тих, чиї закупівлі варто перевірити.",
-    rows: [...byOfficer.entries()]
-      .sort((a, b) => b[1].value - a[1].value)
-      .map(([key, acc]) => ({
-        kind: "officer" as FavKind,
-        id: key,
-        href: `/officer/${encodeURIComponent(key)}`,
-        name: acc.name,
-        meta: `${esc(readableName(acc.entity))} · ${acc.count} ${plural(acc.count, "закупівля", "закупівлі", "закупівель")}`,
-        value: acc.value,
-      })),
+    intro: "Контактні особи закупівель із позначками. Не перелік підозрюваних — перелік того, що варто перевірити.",
+    action: "/officers",
+    url,
+    rows: [...byOfficer.entries()].map(([key, acc]) => ({
+      kind: "officer" as FavKind,
+      id: key,
+      href: `/officer/${encodeURIComponent(key)}`,
+      name: acc.name,
+      meta: `${esc(readableName(acc.entity))} · ${acc.count} ${plural(acc.count, "закупівля", "закупівлі", "закупівель")}`,
+      value: acc.value,
+      count: acc.count,
+    })),
   });
 }
 
-function suppliersPage(): string {
+function suppliersPage(url: URL): string {
   const bySupplier = new Map<string, { name: string; count: number; value: number; solo: number }>();
   for (const entry of db.cases) {
     const key = entry.winner_edrpou ?? "";
@@ -974,17 +1067,18 @@ function suppliersPage(): string {
     title: "Переможці",
     nav: "suppliers",
     heading: "Переможці закупівель",
-    intro: "Компанії, які виграли закупівлі з позначками. Найбільші за сумою договорів — згори.",
-    rows: [...bySupplier.entries()]
-      .sort((a, b) => b[1].value - a[1].value)
-      .map(([edrpou, acc]) => ({
-        kind: "supplier" as FavKind,
-        id: edrpou,
-        href: `/supplier/${encodeURIComponent(edrpou)}`,
-        name: readableName(acc.name),
-        meta: `ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "перемога", "перемоги", "перемог")}${acc.solo ? ` · ${acc.solo} без конкурентів` : ""}`,
-        value: acc.value,
-      })),
+    intro: "Компанії, які виграли закупівлі з позначками.",
+    action: "/suppliers",
+    url,
+    rows: [...bySupplier.entries()].map(([edrpou, acc]) => ({
+      kind: "supplier" as FavKind,
+      id: edrpou,
+      href: `/supplier/${encodeURIComponent(edrpou)}`,
+      name: readableName(acc.name),
+      meta: `ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "перемога", "перемоги", "перемог")}${acc.solo ? ` · ${acc.solo} без конкурентів` : ""}`,
+      value: acc.value,
+      count: acc.count,
+    })),
   });
 }
 
@@ -1147,6 +1241,9 @@ function articlePage(code: string, url: URL): string {
 
   const relevant = new Set(article.links.map((l) => l.risk_id));
   const jointOnly = url.searchParams.get("at") === "1";
+  const articleAction = `/article/${article.code}`;
+  const jointHidden = jointOnly ? '<input type="hidden" name="at" value="1">' : "";
+  const ctrl = readControls(url);
 
   let list = db.cases.filter(
     (c) => c.region === REGION && c.risks.some((r) => relevant.has(r)),
@@ -1162,6 +1259,15 @@ function articlePage(code: string, url: URL): string {
   const sorted = [...list].sort(
     (a, b) => score(b) - score(a) || (b.value_amount ?? 0) - (a.value_amount ?? 0),
   );
+
+  // applyControls re-sorts by amount. On this page the article's own ranking
+  // — how many of its indicators fired — is the more useful order, so it
+  // stands unless the visitor picks a sort themselves.
+  let shown = applyControls(sorted, ctrl, RAILWAY_EDRPOU);
+  if (!url.searchParams.get("sort")) {
+    const keep = new Set(shown);
+    shown = sorted.filter((x) => keep.has(x));
+  }
 
   return layout({
     title: `Стаття ${article.code}`,
@@ -1207,13 +1313,15 @@ function articlePage(code: string, url: URL): string {
 
 <h2>Закупівлі для перевірки</h2>
 <form class="filters" method="get" action="/article/${esc(article.code)}">
-  <label class="check"><input type="checkbox" name="at" value="1"${jointOnly ? " checked" : ""}> лише акціонерні товариства (АТ)</label>
-  <button type="submit">Показати</button>
-  ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">скинути</a>` : ""}
+  <div class="filter-row">
+    <label class="check"><input type="checkbox" name="at" value="1"${jointOnly ? " checked" : ""}> лише акціонерні товариства (АТ)</label>
+    <button type="submit">Показати</button>
+    ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">скинути</a>` : ""}
+  </div>
 </form>
-<p class="hint">Спочатку — де збіглося найбільше ознак.</p>
-${sorted.length === 0 ? '<div class="empty">За цими умовами нічого не знайшлося.</div>' : `<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c)).join("")}</div>`}
-${sorted.length > 60 ? `<p class="hint" style="margin-top:.8rem">Показано 60 із ${sorted.length}.</p>` : ""}
+${sortBar(articleAction, ctrl, jointHidden)}
+${filterPanel(articleAction, ctrl, {}, jointHidden)}
+${listBody(shown, ctrl, articleAction)}
 
 <p class="note">Перелік сформовано автоматично за індикаторами державної системи моніторингу закупівель. Він не встановлює факт правопорушення і не є твердженням щодо будь-якої названої особи чи компанії. Наступний крок — витребувати самі документи й перевірити їх.</p>
 `,
@@ -1223,11 +1331,13 @@ ${sorted.length > 60 ? `<p class="hint" style="margin-top:.8rem">Показан�
 
 /* ---------- what changed ---------- */
 
-function updatesPage(): string {
+function updatesPage(url: URL): string {
   const runs = [...db.runs].sort((a, b) => b.started_at.localeCompare(a.started_at));
   const latest = runs[0];
   const newIds = new Set(latest?.new_tender_ids ?? []);
-  const fresh = db.cases.filter((c) => newIds.has(c.tender_id)).sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  const freshAll = db.cases.filter((x) => newIds.has(x.tender_id));
+  const c = readControls(url);
+  const fresh = applyControls(freshAll, c, RAILWAY_EDRPOU);
 
   return layout({
     title: "Оновлення",
@@ -1248,10 +1358,11 @@ ${
 }
 
 ${
-  fresh.length > 0
+  freshAll.length > 0
     ? `<h2>Нові закупівлі з останнього оновлення</h2>
-<div class="rows">${fresh.slice(0, 40).map((c) => caseRow(c)).join("")}</div>
-${fresh.length > 40 ? `<p class="hint" style="margin-top:.8rem">Показано 40 найдорожчих із ${fresh.length}.</p>` : ""}`
+${sortBar("/updates", c)}
+${filterPanel("/updates", c)}
+${listBody(fresh, c, "/updates")}`
     : latest
       ? `<h2>Нові закупівлі з останнього оновлення</h2><div class="empty">Нових закупівель не з’явилося. Це нормальний результат — держава не щодня додає позначки.</div>`
       : ""
@@ -1478,7 +1589,7 @@ ${
 ${section(
   "Закупівлі",
   tenders.length,
-  `${filterPanel("/starred", c)}${listBody(filteredTenders, c, "/starred")}${
+  `${sortBar("/starred", c)}${filterPanel("/starred", c)}${listBody(filteredTenders, c, "/starred")}${
     missingTenders > 0
       ? `<p class="note">${missingTenders} ${plural(missingTenders, "позначена закупівля більше не знайдена", "позначені закупівлі більше не знайдені", "позначених закупівель більше не знайдено")} в базі.</p>`
       : ""
@@ -1615,11 +1726,11 @@ export function render(url: URL, saved: Favourite[] = []): Rendered {
   if (path === "/starred") return { status: 200, body: starredPage(saved, url) };
 
   if (path === "/") return { status: 200, body: feedPage(url) };
-  if (path === "/entities") return { status: 200, body: entitiesPage() };
-  if (path === "/officers") return { status: 200, body: officersPage() };
-  if (path === "/suppliers") return { status: 200, body: suppliersPage() };
+  if (path === "/entities") return { status: 200, body: entitiesPage(url) };
+  if (path === "/officers") return { status: 200, body: officersPage(url) };
+  if (path === "/suppliers") return { status: 200, body: suppliersPage(url) };
   if (path === "/railway") return { status: 200, body: railwayPage(url) };
-  if (path === "/updates") return { status: 200, body: updatesPage() };
+  if (path === "/updates") return { status: 200, body: updatesPage(url) };
   if (path === "/prices") return { status: 200, body: pricesPage(url) };
   if (path === "/indicators") return { status: 200, body: indicatorsPage() };
   if (path === "/about") return { status: 200, body: aboutPage() };
@@ -1654,9 +1765,9 @@ export function render(url: URL, saved: Favourite[] = []): Rendered {
     }
     return { status: 200, body: tenderPage(rest) };
   }
-  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length)) };
-  if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length)) };
-  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length)) };
+  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length), url) };
+  if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length), url) };
+  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length), url) };
 
   return { status: 404, body: notFound() };
 }

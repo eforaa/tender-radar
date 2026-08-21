@@ -239,13 +239,15 @@ function procedureLabel(code) {
 }
 function readableName(name) {
   if (!name) return "";
-  const letters = name.replace(/[^\p{L}]/gu, "");
-  if (letters.length === 0) return name;
+  const clean = name.replace(/\s+/gu, " ").trim();
+  if (!clean) return "";
+  const letters = clean.replace(/[^\p{L}]/gu, "");
+  if (letters.length === 0) return clean;
   const upper = [...letters].filter((c) => c === c.toUpperCase()).length;
-  if (upper / letters.length < 0.8) return name;
+  if (upper / letters.length < 0.8) return clean;
   let first = true;
   let afterQuote = false;
-  return name.replace(new RegExp(`\\p{L}[\\p{L}'\u2019-]*|[\xAB"\u201C']`, "gu"), (token) => {
+  return clean.replace(new RegExp(`\\p{L}[\\p{L}'\u2019-]*|[\xAB"\u201C']`, "gu"), (token) => {
     if (/^[«"“']$/.test(token)) {
       afterQuote = true;
       return token;
@@ -648,6 +650,7 @@ details.help + details.help{margin-top:-1rem}
   .sortbar input[type=search]{flex:1 1 58%;min-width:0;min-height:2.6rem;font-size:16px}
   .sortbar .go{flex:0 0 auto;width:auto;min-height:2.6rem;padding:.4rem .95rem;font-size:16px}
   .sortbar label{order:1;flex:1 1 calc(50% - .2rem);flex-direction:column;align-items:stretch;gap:.1rem;font-size:.72rem;letter-spacing:.02em}
+  .sortbar.dir label{flex:1 1 100%}
   .sortbar select{width:100%;max-width:none;min-height:2.5rem;font-size:16px}
 
   /* every chip visible: a hidden one may as well not exist */
@@ -1979,11 +1982,12 @@ function presetBar(action, url, c) {
   }).join("")}
 </div>`;
 }
-function sortBar(action, c) {
+function sortBar(action, c, extra = "") {
   const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
   const hidden = (name, value) => value ? `<input type="hidden" name="${name}" value="${esc(value)}">` : "";
   return `<form class="sortbar" method="get" action="${esc(action)}">
   <input type="search" name="q" value="${esc(c.q)}" placeholder="\u041F\u043E\u0448\u0443\u043A \u0437\u0430 \u043D\u0430\u0437\u0432\u043E\u044E, \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u043E\u043C, \u0404\u0414\u0420\u041F\u041E\u0423" aria-label="\u041F\u043E\u0448\u0443\u043A">
+  ${extra}
   ${hidden("risk", c.risk)}${hidden("region", c.region)}
   ${hidden("from", c.dateFrom)}${hidden("to", c.dateTo)}
   ${hidden("min", c.min > 0 ? String(c.min) : "")}${hidden("max", c.max > 0 ? String(c.max) : "")}
@@ -2032,7 +2036,7 @@ function groupBlock(group, depth) {
   </div>
 </details>`;
 }
-function filterPanel(action, c, opts = {}) {
+function filterPanel(action, c, opts = {}, extra = "") {
   const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
   const stamps = db.cases.map((x) => x.tender_date ?? "").filter(Boolean).sort();
   const earliest = stamps[0] ?? "";
@@ -2044,6 +2048,7 @@ function filterPanel(action, c, opts = {}) {
   const anything = isFiltered(c) || Boolean(c.group);
   return `<form class="filters" method="get" action="${esc(action)}">
   <input type="hidden" name="q" value="${esc(c.q)}">
+  ${extra}
   <details class="filters-more"${anything ? " open" : ""}>
     <summary>\u0411\u0456\u043B\u044C\u0448\u0435 \u0444\u0456\u043B\u044C\u0442\u0440\u0456\u0432${active > 0 ? ` <span class="badge">${active}</span>` : ""}${anything ? ` <a class="reset" href="${esc(action)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0435</a>` : ""}</summary>
     <div class="inner">
@@ -2093,7 +2098,7 @@ function resultLine(list, c, groupCount) {
   const base = isFiltered(c) ? `\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(value)}.` : `\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(value)}.`;
   return `<p class="hint">${base}${c.group ? ` \u0417\u0433\u0440\u0443\u043F\u043E\u0432\u0430\u043D\u043E \u0443 <strong>${groupCount}</strong> ${plural(groupCount, "\u0433\u0440\u0443\u043F\u0443", "\u0433\u0440\u0443\u043F\u0438", "\u0433\u0440\u0443\u043F")}.` : ""}</p>`;
 }
-function listBody(list, c, action) {
+function listBody(list, c, action, rowOpts = {}) {
   if (list.length === 0) {
     return '<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0447\u0430\u0441\u0442\u0438\u043D\u0443 \u0444\u0456\u043B\u044C\u0442\u0440\u0456\u0432.</div>';
   }
@@ -2107,7 +2112,7 @@ function listBody(list, c, action) {
   const page2 = Math.min(c.page, pages);
   const slice = list.slice((page2 - 1) * PAGE_SIZE, page2 * PAGE_SIZE);
   return `${resultLine(list, c, 0)}
-<div class="rows">${slice.map((x) => caseRow(x)).join("")}</div>
+<div class="rows">${slice.map((x) => caseRow(x, rowOpts)).join("")}</div>
 ${pages > 1 ? `<div class="pager">
   ${page2 > 1 ? `<a href="${keepControls(action, c, { page: String(page2 - 1) })}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
   <span>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 ${page2} \u0437 ${pages}</span>
@@ -2317,7 +2322,8 @@ ${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
 `
   });
 }
-function officerPage(key) {
+function officerPage(key, url) {
+  const dossierAction = `/officer/${encodeURIComponent(key)}`;
   const list = db.cases.filter((c) => c.officer_key === key);
   if (list.length === 0) return notFound();
   const name = list.find((c) => c.officer_name)?.officer_name ?? key;
@@ -2328,7 +2334,8 @@ function officerPage(key) {
   const value = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
   const solo = list.filter((c) => c.bidders === 1).length;
   const ranked = rankRisks(list);
-  const sorted = [...list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  const ctrl = readControls(url);
+  const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
   return layout({
     title: name,
     nav: "officers",
@@ -2359,14 +2366,16 @@ ${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
 ${groupedRiskCards(ranked)}
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
-<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c, { showOfficer: false })).join("")}</div>
-${sorted.length > 60 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 60 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${sorted.length}.</p>` : ""}
+${sortBar(dossierAction, ctrl)}
+${filterPanel(dossierAction, ctrl)}
+${listBody(shown, ctrl, dossierAction, { showOfficer: false })}
 
 <p class="note">\u0426\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 \u043D\u0435 \u0454 \u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F\u043C \u043F\u0440\u043E \u043F\u0440\u0430\u0432\u043E\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0437 \u0431\u043E\u043A\u0443 \u043D\u0430\u0437\u0432\u0430\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438. \u0412\u043E\u043D\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454, \u0449\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0443 \u044F\u043A\u0438\u0445 \u0446\u044E \u043E\u0441\u043E\u0431\u0443 \u0432\u043A\u0430\u0437\u0430\u043D\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u043E\u044E \u043E\u0441\u043E\u0431\u043E\u044E.</p>
 `
   });
 }
-function supplierPage(edrpou) {
+function supplierPage(edrpou, url) {
+  const dossierAction = `/supplier/${encodeURIComponent(edrpou)}`;
   const list = db.cases.filter((c) => c.winner_edrpou === edrpou);
   if (list.length === 0) return notFound();
   const name = list.find((c) => c.winner_name)?.winner_name ?? edrpou;
@@ -2374,7 +2383,8 @@ function supplierPage(edrpou) {
   const ranked = rankRisks(list);
   const buyers = new Set(list.map((c) => c.entity_edrpou).filter(Boolean));
   const solo = list.filter((c) => c.bidders === 1).length;
-  const sorted = [...list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  const ctrl = readControls(url);
+  const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
   return layout({
     title: name,
     nav: "suppliers",
@@ -2395,21 +2405,24 @@ ${star("supplier", edrpou, "/supplier/" + encodeURIComponent(edrpou), { label: t
 ${groupedRiskCards(ranked)}
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
-<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c)).join("")}</div>
-${sorted.length > 60 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 60 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${sorted.length}.</p>` : ""}
+${sortBar(dossierAction, ctrl)}
+${filterPanel(dossierAction, ctrl)}
+${listBody(shown, ctrl, dossierAction)}
 
 <p class="note">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0445\u043E\u043F\u043B\u044E\u0454 \u043B\u0438\u0448\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0439 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456, \u044F\u043A\u0456 \u0432\u0436\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E. \u0426\u0435 \u043D\u0435 \u043F\u043E\u0432\u043D\u0430 \u0456\u0441\u0442\u043E\u0440\u0456\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457 \u043F\u043E \u0423\u043A\u0440\u0430\u0457\u043D\u0456.</p>
 `
   });
 }
-function entityPage(edrpou) {
+function entityPage(edrpou, url) {
+  const dossierAction = `/entity/${encodeURIComponent(edrpou)}`;
   const list = db.cases.filter((c) => c.entity_edrpou === edrpou);
   if (list.length === 0) return notFound();
   const name = list.find((c) => c.entity_name)?.entity_name ?? edrpou;
   const value = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
   const solo = list.filter((c) => c.bidders === 1).length;
   const ranked = rankRisks(list);
-  const sorted = [...list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  const ctrl = readControls(url);
+  const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
   const officers = /* @__PURE__ */ new Map();
   for (const entry of list) {
     if (!entry.officer_key) continue;
@@ -2452,20 +2465,71 @@ ${rankedOfficers.map(
 ${groupedRiskCards(ranked)}
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
-<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c, { showEntity: false })).join("")}</div>
-${sorted.length > 60 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 60 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${sorted.length}.</p>` : ""}
+${sortBar(dossierAction, ctrl)}
+${filterPanel(dossierAction, ctrl)}
+${listBody(shown, ctrl, dossierAction, { showEntity: false })}
 `
   });
 }
+var DIR_SORTS = [
+  { value: "value", label: "\u0437\u0430 \u0441\u0443\u043C\u043E\u044E, \u0441\u043F\u0430\u0434\u0430\u043D\u043D\u044F" },
+  { value: "value-asc", label: "\u0437\u0430 \u0441\u0443\u043C\u043E\u044E, \u0437\u0440\u043E\u0441\u0442\u0430\u043D\u043D\u044F" },
+  { value: "count", label: "\u0437\u0430 \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C" },
+  { value: "name", label: "\u0437\u0430 \u043D\u0430\u0437\u0432\u043E\u044E, \u0410\u2013\u042F" }
+];
+function readDirControls(url) {
+  const sort = url.searchParams.get("sort") ?? "";
+  return {
+    q: (url.searchParams.get("q") ?? "").trim().slice(0, 80),
+    sort: DIR_SORTS.some((x) => x.value === sort) ? sort : "value"
+  };
+}
+function applyDirControls(rows, c) {
+  const needle = c.q.toLowerCase();
+  const kept = needle ? rows.filter((r) => `${r.name} ${r.meta}`.toLowerCase().includes(needle)) : rows;
+  const out = [...kept];
+  switch (c.sort) {
+    case "value-asc":
+      out.sort((a, b) => a.value - b.value);
+      break;
+    case "count":
+      out.sort((a, b) => b.count - a.count || b.value - a.value);
+      break;
+    case "name":
+      out.sort((a, b) => a.name.localeCompare(b.name, "uk"));
+      break;
+    default:
+      out.sort((a, b) => b.value - a.value);
+  }
+  return out;
+}
+function dirBar(action, c) {
+  const dirty = c.q !== "" || c.sort !== "value";
+  return `<form class="sortbar dir" method="get" action="${esc(action)}">
+  <input type="search" name="q" value="${esc(c.q)}" placeholder="\u041D\u0430\u0437\u0432\u0430 \u0430\u0431\u043E \u0404\u0414\u0420\u041F\u041E\u0423" aria-label="\u041F\u043E\u0448\u0443\u043A">
+  <button class="go" type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
+  <label>\u0421\u043E\u0440\u0442.
+    <select name="sort" onchange="this.form.submit()">${DIR_SORTS.map(
+    (x) => `<option value="${x.value}"${x.value === c.sort ? " selected" : ""}>${esc(x.label)}</option>`
+  ).join("")}</select>
+  </label>
+  ${dirty ? `<a class="reset" href="${esc(action)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438</a>` : ""}
+</form>`;
+}
 function directoryPage(opts) {
+  const c = readDirControls(opts.url);
+  const rows = applyDirControls(opts.rows, c);
+  const total = rows.reduce((sum2, r) => sum2 + r.value, 0);
   return layout({
     title: opts.title,
     nav: opts.nav,
     body: `
 <h1>${esc(opts.heading)}</h1>
 <p class="sub">${opts.intro}</p>
-${opts.rows.length === 0 ? '<div class="empty">\u0414\u0430\u043D\u0438\u0445 \u043F\u043E\u043A\u0438 \u043D\u0435\u043C\u0430\u0454.</div>' : `<div class="rows">
-${opts.rows.slice(0, 150).map(
+${dirBar(opts.action, c)}
+<p class="hint">${c.q ? "\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E" : "\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E"} <strong>${rows.length.toLocaleString("uk-UA")}</strong> \u043D\u0430 ${shortMoney(total)}.</p>
+${rows.length === 0 ? '<div class="empty">\u0417\u0430 \u0446\u0438\u043C \u0437\u0430\u043F\u0438\u0442\u043E\u043C \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F.</div>' : `<div class="rows">
+${rows.slice(0, 150).map(
       (r) => `<div class="row">
   <div class="who">
     <div class="name">${r.kind && r.id ? star(r.kind, r.id, r.href) : ""}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
@@ -2475,11 +2539,11 @@ ${opts.rows.slice(0, 150).map(
 </div>`
     ).join("")}
 </div>`}
-${opts.rows.length > 150 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 150 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0438\u0445 \u0456\u0437 ${opts.rows.length}.</p>` : ""}
+${rows.length > 150 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E \u043F\u0435\u0440\u0448\u0456 150 \u0456\u0437 ${rows.length.toLocaleString("uk-UA")}. \u0417\u0432\u0443\u0437\u044C\u0442\u0435 \u043F\u043E\u0448\u0443\u043A\u043E\u043C, \u0449\u043E\u0431 \u043F\u043E\u0431\u0430\u0447\u0438\u0442\u0438 \u0440\u0435\u0448\u0442\u0443.</p>` : ""}
 `
   });
 }
-function entitiesPage() {
+function entitiesPage(url) {
   const byEntity = /* @__PURE__ */ new Map();
   for (const entry of db.cases) {
     const key = entry.entity_edrpou ?? "";
@@ -2493,18 +2557,21 @@ function entitiesPage() {
     title: "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438",
     nav: "entities",
     heading: "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438",
-    intro: `\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0457 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456, \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u044F\u043A\u0438\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0456 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438. \u041D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0456 \u0437\u0430 \u0441\u0443\u043C\u043E\u044E \u2014 \u0437\u0433\u043E\u0440\u0438.`,
-    rows: [...byEntity.entries()].sort((a, b) => b[1].value - a[1].value).map(([edrpou, acc]) => ({
+    intro: "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438, \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u044F\u043A\u0438\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0456 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438.",
+    action: "/entities",
+    url,
+    rows: [...byEntity.entries()].map(([edrpou, acc]) => ({
       kind: "entity",
       id: edrpou,
       href: `/entity/${encodeURIComponent(edrpou)}`,
       name: readableName(acc.name),
       meta: `\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}${RAILWAY_EDRPOU.has(edrpou) ? " \xB7 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F" : ""}`,
-      value: acc.value
+      value: acc.value,
+      count: acc.count
     }))
   });
 }
-function officersPage() {
+function officersPage(url) {
   const byOfficer = /* @__PURE__ */ new Map();
   for (const entry of db.cases) {
     if (!entry.officer_key) continue;
@@ -2522,18 +2589,21 @@ function officersPage() {
     title: "\u041F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
     nav: "officers",
     heading: "\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0456 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
-    intro: "\u041E\u0441\u043E\u0431\u0438, \u044F\u043A\u0438\u0445 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438 \u0432\u043A\u0430\u0437\u0430\u043B\u0438 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0438\u043C\u0438 \u0432 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438. \u0426\u0435 \u043D\u0435 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u043F\u0456\u0434\u043E\u0437\u0440\u044E\u0432\u0430\u043D\u0438\u0445 \u2014 \u0446\u0435 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u0442\u0438\u0445, \u0447\u0438\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432\u0430\u0440\u0442\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438.",
-    rows: [...byOfficer.entries()].sort((a, b) => b[1].value - a[1].value).map(([key, acc]) => ({
+    intro: "\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0456 \u043E\u0441\u043E\u0431\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438. \u041D\u0435 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u043F\u0456\u0434\u043E\u0437\u0440\u044E\u0432\u0430\u043D\u0438\u0445 \u2014 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u0442\u043E\u0433\u043E, \u0449\u043E \u0432\u0430\u0440\u0442\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438.",
+    action: "/officers",
+    url,
+    rows: [...byOfficer.entries()].map(([key, acc]) => ({
       kind: "officer",
       id: key,
       href: `/officer/${encodeURIComponent(key)}`,
       name: acc.name,
       meta: `${esc(readableName(acc.entity))} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}`,
-      value: acc.value
+      value: acc.value,
+      count: acc.count
     }))
   });
 }
-function suppliersPage() {
+function suppliersPage(url) {
   const bySupplier = /* @__PURE__ */ new Map();
   for (const entry of db.cases) {
     const key = entry.winner_edrpou ?? "";
@@ -2548,14 +2618,17 @@ function suppliersPage() {
     title: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456",
     nav: "suppliers",
     heading: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C",
-    intro: "\u041A\u043E\u043C\u043F\u0430\u043D\u0456\u0457, \u044F\u043A\u0456 \u0432\u0438\u0433\u0440\u0430\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438. \u041D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0456 \u0437\u0430 \u0441\u0443\u043C\u043E\u044E \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0456\u0432 \u2014 \u0437\u0433\u043E\u0440\u0438.",
-    rows: [...bySupplier.entries()].sort((a, b) => b[1].value - a[1].value).map(([edrpou, acc]) => ({
+    intro: "\u041A\u043E\u043C\u043F\u0430\u043D\u0456\u0457, \u044F\u043A\u0456 \u0432\u0438\u0433\u0440\u0430\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438.",
+    action: "/suppliers",
+    url,
+    rows: [...bySupplier.entries()].map(([edrpou, acc]) => ({
       kind: "supplier",
       id: edrpou,
       href: `/supplier/${encodeURIComponent(edrpou)}`,
       name: readableName(acc.name),
       meta: `\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433")}${acc.solo ? ` \xB7 ${acc.solo} \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432` : ""}`,
-      value: acc.value
+      value: acc.value,
+      count: acc.count
     }))
   });
 }
@@ -2693,6 +2766,9 @@ function articlePage(code, url) {
   if (!article) return notFound();
   const relevant = new Set(article.links.map((l) => l.risk_id));
   const jointOnly = url.searchParams.get("at") === "1";
+  const articleAction = `/article/${article.code}`;
+  const jointHidden = jointOnly ? '<input type="hidden" name="at" value="1">' : "";
+  const ctrl = readControls(url);
   let list = db.cases.filter(
     (c) => c.region === REGION && c.risks.some((r) => relevant.has(r))
   );
@@ -2704,6 +2780,11 @@ function articlePage(code, url) {
   const sorted = [...list].sort(
     (a, b) => score(b) - score(a) || (b.value_amount ?? 0) - (a.value_amount ?? 0)
   );
+  let shown = applyControls(sorted, ctrl, RAILWAY_EDRPOU);
+  if (!url.searchParams.get("sort")) {
+    const keep = new Set(shown);
+    shown = sorted.filter((x) => keep.has(x));
+  }
   return layout({
     title: `\u0421\u0442\u0430\u0442\u0442\u044F ${article.code}`,
     nav: `article-${article.code}`,
@@ -2746,23 +2827,27 @@ function articlePage(code, url) {
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438</h2>
 <form class="filters" method="get" action="/article/${esc(article.code)}">
-  <label class="check"><input type="checkbox" name="at" value="1"${jointOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0430\u043A\u0446\u0456\u043E\u043D\u0435\u0440\u043D\u0456 \u0442\u043E\u0432\u0430\u0440\u0438\u0441\u0442\u0432\u0430 (\u0410\u0422)</label>
-  <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
-  ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438</a>` : ""}
+  <div class="filter-row">
+    <label class="check"><input type="checkbox" name="at" value="1"${jointOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0430\u043A\u0446\u0456\u043E\u043D\u0435\u0440\u043D\u0456 \u0442\u043E\u0432\u0430\u0440\u0438\u0441\u0442\u0432\u0430 (\u0410\u0422)</label>
+    <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
+    ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438</a>` : ""}
+  </div>
 </form>
-<p class="hint">\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u2014 \u0434\u0435 \u0437\u0431\u0456\u0433\u043B\u043E\u0441\u044F \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0435 \u043E\u0437\u043D\u0430\u043A.</p>
-${sorted.length === 0 ? '<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F.</div>' : `<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c)).join("")}</div>`}
-${sorted.length > 60 ? `<p class="hint" style="margin-top:.8rem">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 60 \u0456\u0437 ${sorted.length}.</p>` : ""}
+${sortBar(articleAction, ctrl, jointHidden)}
+${filterPanel(articleAction, ctrl, {}, jointHidden)}
+${listBody(shown, ctrl, articleAction)}
 
 <p class="note">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u0441\u0444\u043E\u0440\u043C\u043E\u0432\u0430\u043D\u043E \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E \u0437\u0430 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0412\u0456\u043D \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u0444\u0430\u043A\u0442 \u043F\u0440\u0430\u0432\u043E\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0456 \u043D\u0435 \u0454 \u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F\u043C \u0449\u043E\u0434\u043E \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u043D\u0430\u0437\u0432\u0430\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438 \u0447\u0438 \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457. \u041D\u0430\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u043A\u0440\u043E\u043A \u2014 \u0432\u0438\u0442\u0440\u0435\u0431\u0443\u0432\u0430\u0442\u0438 \u0441\u0430\u043C\u0456 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0439 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0457\u0445.</p>
 `
   });
 }
-function updatesPage() {
+function updatesPage(url) {
   const runs = [...db.runs].sort((a, b) => b.started_at.localeCompare(a.started_at));
   const latest = runs[0];
   const newIds = new Set(latest?.new_tender_ids ?? []);
-  const fresh = db.cases.filter((c) => newIds.has(c.tender_id)).sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  const freshAll = db.cases.filter((x) => newIds.has(x.tender_id));
+  const c = readControls(url);
+  const fresh = applyControls(freshAll, c, RAILWAY_EDRPOU);
   return layout({
     title: "\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F",
     nav: "updates",
@@ -2777,9 +2862,10 @@ ${latest ? `<p class="statline">
   <b>${runs.length}</b> ${plural(runs.length, "\u0437\u0430\u043F\u0443\u0441\u043A", "\u0437\u0430\u043F\u0443\u0441\u043A\u0438", "\u0437\u0430\u043F\u0443\u0441\u043A\u0456\u0432")}
 </p>` : '<div class="empty">\u0416\u043E\u0434\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0443 \u0449\u0435 \u043D\u0435 \u0431\u0443\u043B\u043E. \u0412\u0438\u043A\u043E\u043D\u0430\u0439\u0442\u0435 <code>npm run daily</code>.</div>'}
 
-${fresh.length > 0 ? `<h2>\u041D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0441\u0442\u0430\u043D\u043D\u044C\u043E\u0433\u043E \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F</h2>
-<div class="rows">${fresh.slice(0, 40).map((c) => caseRow(c)).join("")}</div>
-${fresh.length > 40 ? `<p class="hint" style="margin-top:.8rem">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 40 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${fresh.length}.</p>` : ""}` : latest ? `<h2>\u041D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0441\u0442\u0430\u043D\u043D\u044C\u043E\u0433\u043E \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F</h2><div class="empty">\u041D\u043E\u0432\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043D\u0435 \u0437\u2019\u044F\u0432\u0438\u043B\u043E\u0441\u044F. \u0426\u0435 \u043D\u043E\u0440\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u2014 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043D\u0435 \u0449\u043E\u0434\u043D\u044F \u0434\u043E\u0434\u0430\u0454 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438.</div>` : ""}
+${freshAll.length > 0 ? `<h2>\u041D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0441\u0442\u0430\u043D\u043D\u044C\u043E\u0433\u043E \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F</h2>
+${sortBar("/updates", c)}
+${filterPanel("/updates", c)}
+${listBody(fresh, c, "/updates")}` : latest ? `<h2>\u041D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0441\u0442\u0430\u043D\u043D\u044C\u043E\u0433\u043E \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F</h2><div class="empty">\u041D\u043E\u0432\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043D\u0435 \u0437\u2019\u044F\u0432\u0438\u043B\u043E\u0441\u044F. \u0426\u0435 \u043D\u043E\u0440\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u2014 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043D\u0435 \u0449\u043E\u0434\u043D\u044F \u0434\u043E\u0434\u0430\u0454 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438.</div>` : ""}
 
 <h2>\u0406\u0441\u0442\u043E\u0440\u0456\u044F \u0437\u0430\u043F\u0443\u0441\u043A\u0456\u0432</h2>
 <div class="rows">
@@ -2937,7 +3023,7 @@ ${saved.length === 0 ? `<div class="empty">\u041F\u043E\u043A\u0438 \u043D\u0456
 ${section(
       "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
       tenders.length,
-      `${filterPanel("/starred", c)}${listBody(filteredTenders, c, "/starred")}${missingTenders > 0 ? `<p class="note">${missingTenders} ${plural(missingTenders, "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0430", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0456", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E")} \u0432 \u0431\u0430\u0437\u0456.</p>` : ""}`
+      `${sortBar("/starred", c)}${filterPanel("/starred", c)}${listBody(filteredTenders, c, "/starred")}${missingTenders > 0 ? `<p class="note">${missingTenders} ${plural(missingTenders, "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0430", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0456", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E")} \u0432 \u0431\u0430\u0437\u0456.</p>` : ""}`
     )}
 
 ${section(
@@ -3040,11 +3126,11 @@ function render(url, saved = []) {
   }
   if (path === "/starred") return { status: 200, body: starredPage(saved, url) };
   if (path === "/") return { status: 200, body: feedPage(url) };
-  if (path === "/entities") return { status: 200, body: entitiesPage() };
-  if (path === "/officers") return { status: 200, body: officersPage() };
-  if (path === "/suppliers") return { status: 200, body: suppliersPage() };
+  if (path === "/entities") return { status: 200, body: entitiesPage(url) };
+  if (path === "/officers") return { status: 200, body: officersPage(url) };
+  if (path === "/suppliers") return { status: 200, body: suppliersPage(url) };
   if (path === "/railway") return { status: 200, body: railwayPage(url) };
-  if (path === "/updates") return { status: 200, body: updatesPage() };
+  if (path === "/updates") return { status: 200, body: updatesPage(url) };
   if (path === "/prices") return { status: 200, body: pricesPage(url) };
   if (path === "/indicators") return { status: 200, body: indicatorsPage() };
   if (path === "/about") return { status: 200, body: aboutPage() };
@@ -3077,9 +3163,9 @@ function render(url, saved = []) {
     }
     return { status: 200, body: tenderPage(rest) };
   }
-  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length)) };
-  if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length)) };
-  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length)) };
+  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length), url) };
+  if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length), url) };
+  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length), url) };
   return { status: 404, body: notFound() };
 }
 

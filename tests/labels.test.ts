@@ -37,6 +37,15 @@ test("every labelled indicator belongs to a known group", () => {
   }
 });
 
+test("strips the stray whitespace registry names arrive with", () => {
+  // Four buyers in the store begin with a tab. Untrimmed, their rows render
+  // indented and sort ahead of every letter on the alphabetical listing.
+  assert.equal(readableName("\tВідділ освіти"), "Відділ освіти");
+  assert.equal(readableName("Комунальне   некомерційне  підприємство"), "Комунальне некомерційне підприємство");
+  assert.equal(readableName("  КП \"ХАРКІВСЬКІ ТЕПЛОВІ МЕРЕЖІ\"  "), 'КП "Харківські теплові мережі"');
+  assert.equal(readableName("   "), "");
+});
+
 test("covers all fourteen active indicators", () => {
   assert.equal(Object.keys(RISK_LABELS).length, 14);
 });

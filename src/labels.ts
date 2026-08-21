@@ -139,15 +139,20 @@ const ABBREVIATIONS = new Set([
  */
 export function readableName(name: string | null): string {
   if (!name) return "";
-  const letters = name.replace(/[^\p{L}]/gu, "");
-  if (letters.length === 0) return name;
+  // Registry names carry stray tabs and doubled spaces. Four buyers in the
+  // store begin with a tab, which indented their rows and sorted them ahead
+  // of every letter on the alphabetical listing.
+  const clean = name.replace(/\s+/gu, " ").trim();
+  if (!clean) return "";
+  const letters = clean.replace(/[^\p{L}]/gu, "");
+  if (letters.length === 0) return clean;
   const upper = [...letters].filter((c) => c === c.toUpperCase()).length;
-  if (upper / letters.length < 0.8) return name;
+  if (upper / letters.length < 0.8) return clean;
 
   let first = true;
   let afterQuote = false;
 
-  return name.replace(/\p{L}[\p{L}'’-]*|[«"“']/gu, (token) => {
+  return clean.replace(/\p{L}[\p{L}'’-]*|[«"“']/gu, (token) => {
     if (/^[«"“']$/.test(token)) {
       afterQuote = true;
       return token;

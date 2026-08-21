@@ -402,6 +402,7 @@ details.help + details.help{margin-top:-1rem}
   .sortbar input[type=search]{flex:1 1 58%;min-width:0;min-height:2.6rem;font-size:16px}
   .sortbar .go{flex:0 0 auto;width:auto;min-height:2.6rem;padding:.4rem .95rem;font-size:16px}
   .sortbar label{order:1;flex:1 1 calc(50% - .2rem);flex-direction:column;align-items:stretch;gap:.1rem;font-size:.72rem;letter-spacing:.02em}
+  .sortbar.dir label{flex:1 1 100%}
   .sortbar select{width:100%;max-width:none;min-height:2.5rem;font-size:16px}
 
   /* every chip visible: a hidden one may as well not exist */
