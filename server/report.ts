@@ -11,6 +11,7 @@ import { RISK_LABELS, procedureLabel, readableName } from "../src/labels.ts";
 import { INDICATOR_LEGAL, ARTICLES } from "../src/legal.ts";
 import { esc, shortDate } from "./html.ts";
 import { buildConclusion, type Conclusion } from "./conclusion.ts";
+import { buildQualification } from "./qualification.ts";
 
 export type ReportContext = {
   entry: Case;
@@ -189,6 +190,55 @@ function sections(ctx: ReportContext): { heading: string; lines: string[] }[] {
     }
     out.push({ heading: "РОЗРАХУНОК ЦІНИ ЦІЄЮ СИСТЕМОЮ", lines });
   }
+
+  const q = buildQualification(entry, rules);
+  const legalLines: string[] = [wrap(q.caution), ""];
+
+  legalLines.push("НОРМИ, ЯКІ ЗАЧЕПЛЕНІ", "");
+  for (const n of q.norms) {
+    legalLines.push(wrap(`${n.source === "state" ? "Норма, яку наводить держава" : "Норма — зіставлення цієї системи"}: ${n.norm}`));
+    if (n.note) legalLines.push(wrap(n.note));
+    legalLines.push(wrap(`Підстава: ${n.from.join("; ")}`), "");
+  }
+
+  if (q.consequences.length > 0) {
+    legalLines.push("ЩО З ЦЬОГО ВИПЛИВАЄ ЗА ЗАКОНОМ ПРО ЗАКУПІВЛІ", "");
+    for (const c of q.consequences) {
+      legalLines.push(wrap(c.norm), wrap(c.effect), "");
+    }
+  }
+
+  if (q.admin.length > 0) {
+    legalLines.push("АДМІНІСТРАТИВНА ВІДПОВІДАЛЬНІСТЬ", "");
+    for (const a of q.admin) {
+      legalLines.push(
+        wrap(`Стаття 164-14 КУпАП, ${a.part}: ${a.conduct}`),
+        wrap(`Санкція: ${a.fine} на службових та уповноважених осіб замовника.`),
+        wrap(`Підстава: ${a.from.join("; ")}`),
+        "",
+      );
+    }
+    legalLines.push(
+      wrap("Розмір наведено в неоподатковуваних мінімумах доходів громадян; для штрафів ця одиниця становить 17 грн."),
+      "",
+    );
+  }
+
+  if (q.criminal.length > 0) {
+    legalLines.push("КРИМІНАЛЬНО-ПРАВОВІ НАПРЯМИ", "");
+    for (const c of q.criminal) {
+      legalLines.push(`Стаття ${c.code} ККУ — ${c.title}`, wrap(c.summary));
+      legalLines.push("  Чому цей напрям виникає саме тут:");
+      for (const r of c.reasons) legalLines.push(wrap(`— ${r}`, 78, "    "));
+      legalLines.push("  Що має бути доведено:");
+      for (const e of c.elements) legalLines.push(wrap(`— ${e}`, 78, "    "));
+      legalLines.push("  Які документи витребувати:");
+      for (const e of c.evidence) legalLines.push(wrap(`— ${e}`, 78, "    "));
+      legalLines.push("");
+    }
+  }
+
+  out.push({ heading: "ПРАВОВА КВАЛІФІКАЦІЯ", lines: legalLines });
 
   out.push({
     heading: "МЕЖІ ЦЬОГО ЗВІТУ",

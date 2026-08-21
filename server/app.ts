@@ -8,6 +8,7 @@ import { DIMENSIONS, buildGroups, isDimension, type Dimension, type Group } from
 import { normaliseEdrpou, isStarred, type Favourite, type FavKind } from "./favourites.ts";
 import { reportText, reportHtml, type ReportContext } from "./report.ts";
 import { buildConclusion } from "./conclusion.ts";
+import { buildQualification } from "./qualification.ts";
 import {
   readControls, applyControls, activeCount, isFiltered, keepControls,
   type Controls, type ControlOptions,
@@ -370,6 +371,71 @@ ${listBody(list, c, "/")}
   });
 }
 
+/** The expanded legal qualification for one tender. */
+function qualificationBlock(entry: Case): string {
+  const q = buildQualification(entry, db.ruleById);
+
+  return `<p class="caution">${esc(q.caution)}</p>
+
+<h3 class="block-head">Норми, які зачеплені</h3>
+${q.norms
+  .map(
+    (n) => `<div class="card">
+  <p class="${n.source === "state" ? "legal" : "legal reading"}"><strong>${n.source === "state" ? "Норма, яку наводить держава" : "Норма — наше зіставлення"}:</strong> ${esc(n.norm)}</p>
+  ${n.note ? `<p class="faint">${esc(n.note)}</p>` : ""}
+  <p class="faint">Підстава: ${n.from.map((f) => esc(f)).join(" · ")}</p>
+</div>`,
+  )
+  .join("")}
+
+<h3 class="block-head">Що з цього випливає за законом про закупівлі</h3>
+${q.consequences
+  .map(
+    (c) => `<div class="card">
+  <h3>${esc(c.norm)}</h3>
+  <p class="lead">${esc(c.effect)}</p>
+</div>`,
+  )
+  .join("")}
+
+<h3 class="block-head">Адміністративна відповідальність</h3>
+${q.admin
+  .map(
+    (a) => `<div class="card">
+  <h3>Стаття 164-14 КУпАП, ${esc(a.part)}</h3>
+  <p class="lead">${esc(a.conduct)}</p>
+  <dl class="facts">
+    <dt>Санкція</dt><dd><strong>${esc(a.fine)}</strong> на службових та уповноважених осіб замовника</dd>
+    <dt>Підстава</dt><dd>${a.from.map((f) => esc(f)).join(" · ")}</dd>
+  </dl>
+  <p class="faint">Розмір наведено в неоподатковуваних мінімумах доходів громадян; для штрафів ця одиниця становить 17 грн.</p>
+</div>`,
+  )
+  .join("")}
+
+<h3 class="block-head">Кримінально-правові напрями</h3>
+<p class="hint">Для кожного напряму наведено, що має бути доведено і які документи для цього потрібні.</p>
+${q.criminal
+  .map(
+    (c) => `<div class="card">
+  <h3>Стаття ${esc(c.code)} ККУ — ${esc(c.title)}</h3>
+  <p class="lead">${esc(c.summary)}</p>
+  <p><strong>Чому цей напрям виникає саме тут:</strong></p>
+  <ul>${c.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
+  <details class="sub">
+    <summary>Що має бути доведено та які документи витребувати</summary>
+    <div class="inner">
+      <p><strong>Склад:</strong></p>
+      <ul>${c.elements.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>
+      <p><strong>Докази:</strong></p>
+      <ul>${c.evidence.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>
+    </div>
+  </details>
+</div>`,
+  )
+  .join("")}`;
+}
+
 /** The system's own reading of one tender, rendered for the page. */
 function conclusionBlock(entry: Case, sameEntity: Case[], sameOfficer: Case[], sameWinner: Case[]): string {
   const c = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
@@ -498,6 +564,9 @@ ${entry.findings
 <h2>Що тут не так</h2>
 <p class="hint">Спрацювало ${entry.risks.length} ${plural(entry.risks.length, "індикатор", "індикатори", "індикаторів")} із чотирнадцяти чинних.</p>
 ${entry.risks.map((r) => riskCard(r)).join("")}
+
+<h2>Правова кваліфікація</h2>
+${qualificationBlock(entry)}
 
 <h2>Наш висновок</h2>
 ${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
