@@ -365,11 +365,9 @@ details.help + details.help{margin-top:-1rem}
   .card{padding:1.2rem 1.3rem}
   h2{margin-top:2.25rem}
   .wrap{padding-bottom:4.5rem}
-  /* Below a wide desktop the third column is gone, so three flag chips wrap
-     onto three lines and every row grows by a third. Swipe them instead. */
-  .row .flags{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-  .row .flags::-webkit-scrollbar{display:none}
-  .row .flags .flag{flex:none}
+  /* Below a wide desktop the third column is gone and the chips wrap. Let
+     them: a flag nobody can see is a flag that may as well not be there. */
+  .row .flags .flag{font-size:.76rem;padding:.17rem .42rem}
 }
 
 @media (max-width:44rem){
@@ -390,7 +388,7 @@ details.help + details.help{margin-top:-1rem}
   h1{font-size:1.25rem;max-width:none;margin-bottom:.25rem}
   h2{font-size:1.15rem;margin-top:1.75rem}
   .sub{font-size:.88rem;margin-bottom:.4rem}
-  .statline{font-size:.8rem;gap:.1rem .45rem;margin-bottom:.5rem}
+  .statline{display:none}
   .presets{margin-bottom:.45rem}
   .sortbar{margin-bottom:.5rem}
   .sub,.hint,.card p,.card ul,.note,details.sub p{max-width:none}
@@ -406,10 +404,9 @@ details.help + details.help{margin-top:-1rem}
   .sortbar label{order:1;flex:1 1 calc(50% - .2rem);flex-direction:column;align-items:stretch;gap:.1rem;font-size:.72rem;letter-spacing:.02em}
   .sortbar select{width:100%;max-width:none;min-height:2.5rem;font-size:16px}
 
-  /* chips swipe sideways instead of stacking three rows deep */
-  .presets{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-1rem;padding:0 1rem .2rem;scroll-snap-type:x proximity}
-  .presets::-webkit-scrollbar{display:none}
-  .preset{flex:none;min-height:2.4rem;display:inline-flex;align-items:center;scroll-snap-align:start}
+  /* every chip visible: a hidden one may as well not exist */
+  .presets{flex-wrap:wrap;gap:.3rem}
+  .preset{flex:none;min-height:2.35rem;display:inline-flex;align-items:center;padding:.5rem .7rem;font-size:.86rem}
   .primer{display:none}
 
   /* full-bleed lists: on a phone the card frame is noise, the content is not */
@@ -421,9 +418,8 @@ details.help + details.help{margin-top:-1rem}
   .row .amount{grid-column:2;text-align:left;margin-top:.2rem}
   .row .amount .big{font-size:1rem}
   .row .amount .exact{display:inline;margin-left:.5rem}
-  .row .flags{grid-column:1 / -1;margin-top:.4rem;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-  .row .flags::-webkit-scrollbar{display:none}
-  .row .flags .flag{flex:none}
+  .row .flags{grid-column:1 / -1;margin-top:.4rem;gap:.22rem}
+  .row .flags .flag{font-size:.74rem;padding:.16rem .4rem;line-height:1.35}
   .row .star{padding:.3rem .5rem .3rem 0;font-size:1.3rem}
 
   .group-block summary{padding:.95rem 1rem}
