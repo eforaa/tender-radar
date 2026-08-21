@@ -16,8 +16,22 @@ import {
   exchangeCode,
   STATE_COOKIE,
 } from "./auth.ts";
+import {
+  FAVOURITES_COOKIE,
+  parseFavourites,
+  toggleFavourite,
+  favouritesCookie,
+  normaliseEdrpou,
+} from "./favourites.ts";
 
-export type HttpRequest = { url: URL; cookieHeader: string | null };
+export type HttpRequest = {
+  url: URL;
+  cookieHeader: string | null;
+  method?: string;
+  /** Form body, for the saved-companies toggle. */
+  body?: string;
+};
+
 export type HttpResponse = { status: number; body: string; headers: Record<string, string | string[]> };
 
 function page(status: number, body: string, headers: Record<string, string | string[]> = {}): HttpResponse {
@@ -30,6 +44,12 @@ function redirect(location: string, setCookie?: string | string[]): HttpResponse
   return { status: 302, body: "", headers };
 }
 
+/** Keeps a redirect target on this site, so a form cannot bounce elsewhere. */
+function safeBack(value: string | null): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/saved";
+  return value;
+}
+
 /**
  * Resolves one request to a response, enforcing the Google sign-in gate when
  * it is configured. With no Google credentials in the environment the gate
@@ -38,12 +58,25 @@ function redirect(location: string, setCookie?: string | string[]): HttpResponse
  */
 export async function handle(req: HttpRequest): Promise<HttpResponse> {
   const config = loadAuthConfig();
-  if (!config) {
-    const { status, body } = render(req.url);
+  const secure = req.url.protocol === "https:";
+  const saved = parseFavourites(readCookie(req.cookieHeader, FAVOURITES_COOKIE));
+
+  /** Everything past the gate — shared by the gated and ungated paths. */
+  function serve(): HttpResponse {
+    if (req.url.pathname === "/saved/toggle" && (req.method ?? "GET").toUpperCase() === "POST") {
+      const form = new URLSearchParams(req.body ?? "");
+      const code = normaliseEdrpou(form.get("edrpou") ?? "");
+      const back = safeBack(form.get("back"));
+      if (!code) return redirect(back);
+      return redirect(back, favouritesCookie(toggleFavourite(saved, code), secure));
+    }
+
+    const { status, body } = render(req.url, saved);
     return page(status, body);
   }
 
-  const secure = req.url.protocol === "https:";
+  if (!config) return serve();
+
   const redirectUri = `${req.url.origin}/auth/callback`;
 
   if (req.url.pathname === "/auth/login") {
@@ -86,6 +119,5 @@ export async function handle(req: HttpRequest): Promise<HttpResponse> {
     return page(200, loginPage());
   }
 
-  const { status, body } = render(req.url);
-  return page(status, body);
+  return serve();
 }

@@ -26,7 +26,18 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const { status, body, headers } = await handle({ url, cookieHeader: req.headers.cookie ?? null });
+  // The saved-companies toggle posts a form; everything else is a GET.
+  let payload = "";
+  if (req.method === "POST") {
+    for await (const chunk of req) payload += chunk;
+  }
+
+  const { status, body, headers } = await handle({
+    url,
+    cookieHeader: req.headers.cookie ?? null,
+    method: req.method,
+    body: payload,
+  });
   res.writeHead(status, headers);
   res.end(body);
 });

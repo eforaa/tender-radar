@@ -2,9 +2,10 @@
 import { REGION, RAILWAY_EDRPOU, SOUTHERN_RAILWAY_EDRPOU, railwayScope, dataDir, type RailwayScope } from "../src/config.ts";
 import { RISK_LABELS, GROUP_ORDER, procedureLabel, readableName, type RiskGroup } from "../src/labels.ts";
 import { layout, esc, money, unitMoney, shortMoney, date, trim, plural } from "./html.ts";
-import { ARTICLES, isJointStock } from "../src/legal.ts";
+import { ARTICLES, INDICATOR_LEGAL, isJointStock } from "../src/legal.ts";
 import { loadDataset, type Case, type Dataset } from "./data.ts";
 import { DIMENSIONS, buildGroups, isDimension, type Dimension, type Group } from "./grouping.ts";
+import { normaliseEdrpou } from "./favourites.ts";
 
 const PAGE_SIZE = 30;
 
@@ -80,11 +81,40 @@ function rankRisks(list: Case[]): [string, number][] {
 function riskCard(riskId: string, count?: number): string {
   const rule = db.ruleById.get(riskId);
   const label = RISK_LABELS[riskId];
+  const legal = INDICATOR_LEGAL[riskId];
+
+  // The state publishes the norm for eight of the fourteen indicators. Where
+  // it does, that citation is authoritative and is shown as the state's own;
+  // where it does not, our reading is shown and labelled as ours.
+  const stateNorm = rule?.legitimateness?.trim();
+  const norm = stateNorm
+    ? `<p class="legal"><strong>Норма, яку наводить держава:</strong> ${esc(stateNorm)}</p>`
+    : legal?.norm
+      ? `<p class="legal reading"><strong>Норма — наше зіставлення:</strong> ${esc(legal.norm)}</p>
+  <p class="faint">${esc(legal.normNote ?? "")}</p>`
+      : `<p class="faint">Держава не наводить норму для цього індикатора, і ми не беремося її добудувати.</p>`;
+
+  const criminal = legal?.criminal.length
+    ? `<details class="sub">
+  <summary>Що це може означати за кримінальним законом — ${legal.criminal.length} ${plural(legal.criminal.length, "напрям", "напрями", "напрямів")}</summary>
+  <div class="inner">
+    <p class="faint">Це напрями перевірки для юриста, а не кваліфікація дій. Умисел встановлює лише суд.</p>
+    ${legal.criminal
+      .map((direction) => {
+        const article = ARTICLES[direction.code];
+        return `<p><strong>Стаття ${esc(direction.code)} ККУ — ${esc(article?.title ?? "")}</strong><br>${esc(direction.why)}<br><a href="/article/${esc(direction.code)}">Усі закупівлі за цим напрямом →</a></p>`;
+      })
+      .join("")}
+  </div>
+</details>`
+    : "";
+
   return `<div class="card">
   <h3><span class="tier state">Позначила держава</span> &nbsp;${esc(label?.short ?? rule?.name ?? riskId)}${count ? ` <span class="faint">— ${count} ${plural(count, "раз", "рази", "разів")}</span>` : ""}</h3>
   ${label ? `<p class="lead">${esc(label.means)}</p>` : ""}
   ${rule?.name && label ? `<p class="faint"><strong>Офіційне формулювання:</strong> ${esc(rule.name)}</p>` : ""}
-  ${rule?.legitimateness ? `<p class="legal"><strong>Норма закону:</strong> ${esc(rule.legitimateness)}</p>` : ""}
+  ${norm}
+  ${criminal}
   <p class="code">Індикатор ${esc(riskId)} · державна система моніторингу закупівель</p>
 </div>`;
 }
@@ -161,17 +191,25 @@ function feedPage(url: URL): string {
   const railOnly = url.searchParams.get("rail") === "1";
   const soloOnly = url.searchParams.get("solo") === "1";
   const priceOnly = url.searchParams.get("price") === "1";
-  const year = url.searchParams.get("year") ?? "";
+  const dateFrom = (url.searchParams.get("from") ?? "").trim();
+  const dateTo = (url.searchParams.get("to") ?? "").trim();
   const min = Number(url.searchParams.get("min") ?? "") || 0;
+  const max = Number(url.searchParams.get("max") ?? "") || 0;
   const rawGroup = url.searchParams.get("group") ?? "";
   const rawThen = url.searchParams.get("then") ?? "";
   const group: Dimension = isDimension(rawGroup) ? rawGroup : "";
   const then: Dimension = isDimension(rawThen) ? rawThen : "";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
 
-  const years = [...new Set(db.cases.map((c) => (c.date_assessed ?? "").slice(0, 4)).filter(Boolean))]
-    .sort()
-    .reverse();
+  // Bounds for the date inputs and the amount hint, taken from the data
+  // itself so the controls never offer a range that returns nothing.
+  const stamps = db.cases.map((c) => (c.date_assessed ?? "").slice(0, 10)).filter(Boolean).sort();
+  const earliest = stamps[0] ?? "";
+  const latest = stamps[stamps.length - 1] ?? "";
+  const amounts = db.cases.map((c) => c.value_amount ?? 0).filter((n) => n > 0);
+  const rangeHint = amounts.length
+    ? `у базі від ${shortMoney(Math.min(...amounts))} до ${shortMoney(Math.max(...amounts))}`
+    : "";
 
   let list = db.cases;
   if (q) {
@@ -190,8 +228,12 @@ function feedPage(url: URL): string {
   if (railOnly) list = list.filter((c) => RAILWAY_EDRPOU.has(c.entity_edrpou ?? ""));
   if (soloOnly) list = list.filter((c) => c.bidders === 1);
   if (priceOnly) list = list.filter((c) => c.findings.length > 0);
-  if (year) list = list.filter((c) => (c.date_assessed ?? "").slice(0, 4) === year);
+  // Dates compare as ISO strings; the stored value starts with YYYY-MM-DD,
+  // so a plain string comparison is correct and needs no parsing.
+  if (dateFrom) list = list.filter((c) => (c.date_assessed ?? "") >= dateFrom);
+  if (dateTo) list = list.filter((c) => (c.date_assessed ?? "").slice(0, 10) <= dateTo);
   if (min > 0) list = list.filter((c) => (c.value_amount ?? 0) >= min);
+  if (max > 0) list = list.filter((c) => (c.value_amount ?? 0) <= max);
 
   list = [...list].sort((a, b) =>
     sort === "date"
@@ -219,15 +261,17 @@ function feedPage(url: URL): string {
     if (railOnly) p.set("rail", "1");
     if (soloOnly) p.set("solo", "1");
     if (priceOnly) p.set("price", "1");
-    if (year) p.set("year", year);
+    if (dateFrom) p.set("from", dateFrom);
+    if (dateTo) p.set("to", dateTo);
     if (min > 0) p.set("min", String(min));
+    if (max > 0) p.set("max", String(max));
     if (group) p.set("group", group);
     if (then) p.set("then", then);
     for (const [k, v] of Object.entries(over)) p.set(k, v);
     return `/?${p.toString()}`;
   };
 
-  const filtered = Boolean(q || risk || railOnly || soloOnly || priceOnly || year || min > 0);
+  const filtered = Boolean(q || risk || railOnly || soloOnly || priceOnly || dateFrom || dateTo || min > 0 || max > 0);
   const dimensionOptions = (selected: Dimension, skip?: Dimension) =>
     DIMENSIONS.filter((d) => d.value !== skip || d.value === "")
       .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
@@ -264,17 +308,6 @@ ${HELP}
         )
         .join("")}
     </select>
-    <select name="year" aria-label="Рік">
-      <option value="">Будь-який рік</option>
-      ${years.map((y) => `<option value="${esc(y)}"${y === year ? " selected" : ""}>${esc(y)} рік</option>`).join("")}
-    </select>
-    <select name="min" aria-label="Сума">
-      <option value="">Будь-яка сума</option>
-      <option value="1000000"${min === 1000000 ? " selected" : ""}>від 1 млн ₴</option>
-      <option value="10000000"${min === 10000000 ? " selected" : ""}>від 10 млн ₴</option>
-      <option value="100000000"${min === 100000000 ? " selected" : ""}>від 100 млн ₴</option>
-      <option value="1000000000"${min === 1000000000 ? " selected" : ""}>від 1 млрд ₴</option>
-    </select>
     <select name="sort" aria-label="Сортування">
       <option value="value"${sort === "value" ? " selected" : ""}>Спочатку найдорожчі</option>
       <option value="value-asc"${sort === "value-asc" ? " selected" : ""}>Спочатку найдешевші</option>
@@ -282,6 +315,21 @@ ${HELP}
       <option value="date-asc"${sort === "date-asc" ? " selected" : ""}>Спочатку найстаріші</option>
       <option value="risks"${sort === "risks" ? " selected" : ""}>Спочатку з найбільшою кількістю ознак</option>
     </select>
+  </div>
+
+  <div class="filter-row">
+    <span class="filter-label">Дата позначки</span>
+    <input type="date" name="from" value="${esc(dateFrom)}" aria-label="Дата від" min="${esc(earliest)}" max="${esc(latest)}">
+    <span class="filter-label">по</span>
+    <input type="date" name="to" value="${esc(dateTo)}" aria-label="Дата по" min="${esc(earliest)}" max="${esc(latest)}">
+  </div>
+
+  <div class="filter-row">
+    <span class="filter-label">Сума, ₴</span>
+    <input type="number" name="min" value="${min > 0 ? min : ""}" placeholder="від" aria-label="Сума від" min="0" step="100000" class="num">
+    <span class="filter-label">по</span>
+    <input type="number" name="max" value="${max > 0 ? max : ""}" placeholder="до" aria-label="Сума до" min="0" step="100000" class="num">
+    <span class="filter-label faint">${esc(rangeHint)}</span>
   </div>
 
   <div class="filter-row">
@@ -488,7 +536,7 @@ ${sorted.length > 60 ? `<p class="note">Показано 60 найдорожчи
   });
 }
 
-function supplierPage(edrpou: string): string {
+function supplierPage(edrpou: string, saved: string[] = []): string {
   const list = db.cases.filter((c) => c.winner_edrpou === edrpou);
   if (list.length === 0) return notFound();
 
@@ -506,6 +554,7 @@ function supplierPage(edrpou: string): string {
 <a class="back" href="/suppliers">← до переліку переможців</a>
 <h1>${esc(readableName(name))}</h1>
 <p class="sub">Постачальник · ЄДРПОУ ${esc(edrpou)}</p>
+${saveControl(edrpou, saved, "/supplier/" + encodeURIComponent(edrpou))}
 
 <p class="statline">
   <b>${list.length}</b> перемог у закупівлях із позначками ·
@@ -526,7 +575,7 @@ ${sorted.length > 60 ? `<p class="note">Показано 60 найдорожчи
   });
 }
 
-function entityPage(edrpou: string): string {
+function entityPage(edrpou: string, saved: string[] = []): string {
   const list = db.cases.filter((c) => c.entity_edrpou === edrpou);
   if (list.length === 0) return notFound();
 
@@ -553,6 +602,7 @@ function entityPage(edrpou: string): string {
 <a class="back" href="/entities">← до переліку замовників</a>
 <h1 class="long">${esc(readableName(name))}</h1>
 <p class="sub">ЄДРПОУ ${esc(edrpou)}${RAILWAY_EDRPOU.has(edrpou) ? " · філія АТ «Українська залізниця»" : ""}</p>
+${saveControl(edrpou, saved, "/entity/" + encodeURIComponent(edrpou))}
 
 <p class="statline">
   <b>${list.length}</b> закупівель під питанням ·
@@ -1050,6 +1100,134 @@ ${
   });
 }
 
+
+/* ---------- saved companies and EDRPOU lookup ---------- */
+
+/** The save / unsave button. A plain form so the site still needs no scripts. */
+function saveControl(edrpou: string, saved: string[], back: string): string {
+  const isSaved = saved.includes(edrpou);
+  return `<form class="save-form" method="post" action="/saved/toggle">
+  <input type="hidden" name="edrpou" value="${esc(edrpou)}">
+  <input type="hidden" name="back" value="${esc(back)}">
+  <button type="submit" class="save-btn${isSaved ? " on" : ""}">${isSaved ? "★ У збережених" : "☆ Зберегти підприємство"}</button>
+</form>`;
+}
+
+/** What we hold on one EDRPOU, from either side of a tender. */
+function profileOf(edrpou: string): { asBuyer: Case[]; asWinner: Case[]; name: string | null } {
+  const asBuyer = db.cases.filter((c) => c.entity_edrpou === edrpou);
+  const asWinner = db.cases.filter((c) => c.winner_edrpou === edrpou);
+  const name =
+    asBuyer.find((c) => c.entity_name)?.entity_name ?? asWinner.find((c) => c.winner_name)?.winner_name ?? null;
+  return { asBuyer, asWinner, name };
+}
+
+function lookupPage(code: string | null, typed: string, saved: string[]): string {
+  const profile = code ? profileOf(code) : null;
+  const found = Boolean(profile && (profile.asBuyer.length > 0 || profile.asWinner.length > 0));
+
+  return layout({
+    title: "Пошук за ЄДРПОУ",
+    nav: "lookup",
+    body: `
+<h1>Пошук підприємства за ЄДРПОУ</h1>
+<p class="sub">Введіть код будь-якого підприємства — замовника або переможця. Ми покажемо, що про нього є в базі закупівель Харківщини та залізниці.</p>
+
+<form class="filters" method="get" action="/lookup">
+  <div class="filter-row">
+    <input type="search" name="edrpou" value="${esc(typed)}" placeholder="Наприклад, 00131954 — АТ «Харківобленерго»" aria-label="ЄДРПОУ" inputmode="numeric">
+    <button type="submit">Знайти</button>
+  </div>
+</form>
+
+${
+  typed && !code
+    ? `<div class="empty">«${esc(typed)}» не схоже на код ЄДРПОУ. Це від шести до десяти цифр.</div>`
+    : ""
+}
+
+${
+  code && !found
+    ? `<div class="empty">
+  <p>Код <strong>${esc(code)}</strong> у нашій базі не зустрічається.</p>
+  <p class="faint">Ми зберігаємо лише закупівлі Харківської області та філій залізниці, у яких спрацював державний індикатор. Підприємство може існувати й працювати в інших регіонах.</p>
+  <p><a href="https://prozorro.gov.ua/search/tenders?edrpou=${encodeURIComponent(code)}" target="_blank" rel="noopener">Пошук цього коду в Prozorro →</a></p>
+</div>`
+    : ""
+}
+
+${
+  found && profile
+    ? `${saveControl(code as string, saved, "/lookup?edrpou=" + encodeURIComponent(code as string))}
+<h2>${esc(readableName(profile.name))}</h2>
+<p class="statline">
+  <b>${profile.asBuyer.length}</b> ${plural(profile.asBuyer.length, "закупівля як замовник", "закупівлі як замовник", "закупівель як замовник")} ·
+  <b>${profile.asWinner.length}</b> ${plural(profile.asWinner.length, "перемога як постачальник", "перемоги як постачальник", "перемог як постачальник")}
+</p>
+<div class="filter-row" style="margin-bottom:1.5rem">
+  ${profile.asBuyer.length ? `<a class="flag" href="/entity/${encodeURIComponent(code as string)}">Досьє замовника →</a>` : ""}
+  ${profile.asWinner.length ? `<a class="flag" href="/supplier/${encodeURIComponent(code as string)}">Досьє постачальника →</a>` : ""}
+</div>
+<div class="rows">${[...profile.asBuyer, ...profile.asWinner]
+        .sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0))
+        .slice(0, 30)
+        .map((c) => caseRow(c))
+        .join("")}</div>`
+    : ""
+}
+`,
+  });
+}
+
+function savedPage(saved: string[]): string {
+  const profiles = saved.map((code) => ({ code, ...profileOf(code) }));
+  const known = profiles.filter((p) => p.asBuyer.length > 0 || p.asWinner.length > 0);
+
+  return layout({
+    title: "Збережені",
+    nav: "saved",
+    body: `
+<h1>Збережені підприємства</h1>
+<p class="sub">Список зберігається у вашому браузері. Він не прив'язаний до облікового запису, тож на іншому пристрої буде порожнім.</p>
+
+<form class="filters" method="get" action="/lookup">
+  <div class="filter-row">
+    <input type="search" name="edrpou" placeholder="Додати за ЄДРПОУ — наприклад, 00131954" aria-label="ЄДРПОУ" inputmode="numeric">
+    <button type="submit">Знайти й додати</button>
+  </div>
+</form>
+
+${
+  saved.length === 0
+    ? `<div class="empty">Поки нічого не збережено. Відкрийте будь-яке підприємство і натисніть «Зберегти підприємство».</div>`
+    : `<div class="rows">
+${profiles
+  .map((p) => {
+    const total = [...p.asBuyer, ...p.asWinner].reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
+    const href = p.asBuyer.length ? `/entity/${encodeURIComponent(p.code)}` : p.asWinner.length ? `/supplier/${encodeURIComponent(p.code)}` : `/lookup?edrpou=${encodeURIComponent(p.code)}`;
+    return `<div class="row">
+  <div class="who">
+    <div class="name"><a href="${href}">${esc(readableName(p.name) || p.code)}</a></div>
+    <div class="meta">ЄДРПОУ ${esc(p.code)} · ${p.asBuyer.length} як замовник · ${p.asWinner.length} як постачальник</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(total)}</span></div>
+  <div class="flags">
+    <form class="save-form" method="post" action="/saved/toggle">
+      <input type="hidden" name="edrpou" value="${esc(p.code)}">
+      <input type="hidden" name="back" value="/saved">
+      <button type="submit" class="save-btn on">★ Прибрати зі збережених</button>
+    </form>
+  </div>
+</div>`;
+  })
+  .join("")}
+</div>
+${known.length < saved.length ? `<p class="note">Частина збережених кодів у базі не зустрічається — вони показані без цифр.</p>` : ""}`
+}
+`,
+  });
+}
+
 function indicatorsPage(): string {
   // Every active indicator is listed, including those that never fired here —
   // a zero is information too.
@@ -1129,8 +1307,16 @@ export type Rendered = { status: number; body: string };
  * Resolves one URL to a page. Pure with respect to I/O, so the same code
  * serves the local Node server and a serverless function.
  */
-export function render(url: URL): Rendered {
+export function render(url: URL, saved: string[] = []): Rendered {
   const path = decodeURIComponent(url.pathname);
+
+  // A EDRPOU typed into the lookup box: send it to whichever dossier exists.
+  if (path === "/lookup") {
+    const code = normaliseEdrpou(url.searchParams.get("edrpou") ?? "");
+    if (!code) return { status: 200, body: lookupPage(null, url.searchParams.get("edrpou") ?? "", saved) };
+    return { status: 200, body: lookupPage(code, code, saved) };
+  }
+  if (path === "/saved") return { status: 200, body: savedPage(saved) };
 
   if (path === "/") return { status: 200, body: feedPage(url) };
   if (path === "/entities") return { status: 200, body: entitiesPage() };
@@ -1143,9 +1329,9 @@ export function render(url: URL): Rendered {
   if (path === "/about") return { status: 200, body: aboutPage() };
   if (path.startsWith("/article/")) return { status: 200, body: articlePage(path.slice("/article/".length), url) };
   if (path.startsWith("/tender/")) return { status: 200, body: tenderPage(path.slice("/tender/".length)) };
-  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length)) };
+  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length), saved) };
   if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length)) };
-  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length)) };
+  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length), saved) };
 
   return { status: 404, body: notFound() };
 }

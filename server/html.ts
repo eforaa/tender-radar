@@ -157,6 +157,14 @@ form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
    bare flex-grow on a child would grow it down the page. */
 .filter-row input,.filter-row select,.filter-row button{align-self:center}
 .filter-row input[type=search]{flex:1 1 22rem;max-width:38rem}
+.filter-row input[type=date]{flex:0 0 auto;width:10.5rem}
+.filter-row input.num{flex:0 0 auto;width:9rem;font-variant-numeric:tabular-nums}
+.filter-label.faint{color:var(--ink-faint);font-size:.85rem}
+.save-form{display:inline-block;margin:0 0 1.5rem}
+.row .save-form{margin:0}
+.save-btn{background:var(--surface);color:var(--accent);border:1px solid var(--line);font-size:.9rem;padding:.45rem .9rem;cursor:pointer;border-radius:var(--radius)}
+.save-btn:hover{border-color:var(--accent);background:var(--accent-bg)}
+.save-btn.on{background:var(--accent-bg);border-color:var(--accent);font-weight:500}
 .filter-label{font-size:.92rem;color:var(--ink-faint);white-space:nowrap}
 select:disabled{opacity:.5;cursor:not-allowed}
 
@@ -209,7 +217,17 @@ a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .card p{margin:0 0 .7rem;color:var(--ink-soft);max-width:68ch}
 .card p:last-child{margin-bottom:0}
 .card p.lead{color:var(--ink);font-size:1.02rem}
-.legal{border-left:3px solid var(--accent);background:var(--accent-bg);padding:.75rem 1rem;font-size:.94rem;color:var(--ink);max-width:none}
+.legal{border-left:3px solid var(--accent);background:var(--accent-bg);padding:.75rem 1rem;font-size:.94rem;color:var(--ink);max-width:none;border-radius:0 var(--radius) var(--radius) 0}
+.legal.reading{border-left-color:var(--warn);background:var(--warn-bg)}
+details.sub{margin:.9rem 0 .2rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-3)}
+details.sub summary{cursor:pointer;list-style:none;padding:.6rem .9rem;font-size:.93rem;font-weight:500;color:var(--accent)}
+details.sub summary::-webkit-details-marker{display:none}
+details.sub summary::before{content:"+";display:inline-block;width:1.1rem;color:var(--ink-faint);font-weight:600}
+details.sub[open] summary::before{content:"−"}
+details.sub[open] summary{border-bottom:1px solid var(--line-soft)}
+details.sub .inner{padding:.85rem .9rem 1rem}
+details.sub p{margin:0 0 .8rem;font-size:.93rem;max-width:68ch}
+details.sub p:last-child{margin-bottom:0}
 .faint{color:var(--ink-faint);font-size:.9rem}
 
 .group{margin:2rem 0 .75rem;display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap}
@@ -252,6 +270,8 @@ const MENU = [
   { href: "/", nav: "feed", label: "Усі закупівлі", hint: "повний перелік, з пошуком і фільтрами" },
   { href: "/railway", nav: "railway", label: "Залізниця", hint: "закупівлі залізниці Харківщини" },
   { href: "/prices", nav: "prices", label: "Завищені ціни", hint: "де ми самі порахували переплату" },
+  { href: "/saved", nav: "saved", label: "Збережені", hint: "підприємства, які ви відстежуєте" },
+  { href: "/lookup", nav: "lookup", label: "Пошук за ЄДРПОУ", hint: "перевірити будь-яке підприємство" },
   { href: "/article/366", nav: "article-366", label: "Підроблення документів", hint: "розбіжності в договорах і звітах" },
   { href: "/entities", nav: "entities", label: "Хто купує", hint: "установи-замовники" },
   { href: "/suppliers", nav: "suppliers", label: "Хто продає", hint: "компанії-переможці" },

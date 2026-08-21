@@ -9,7 +9,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const host = (req.headers["x-forwarded-host"] as string) ?? req.headers.host ?? "localhost";
   const url = new URL(req.url ?? "/", `${proto}://${host}`);
 
-  const { status, body, headers } = await handle({ url, cookieHeader: req.headers.cookie ?? null });
+  let payload = "";
+  if (req.method === "POST") {
+    for await (const chunk of req) payload += chunk;
+  }
+
+  const { status, body, headers } = await handle({
+    url,
+    cookieHeader: req.headers.cookie ?? null,
+    method: req.method,
+    body: payload,
+  });
 
   res.statusCode = status;
   for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);

@@ -154,3 +154,86 @@ test("/auth/logout clears the session and sends the visitor back to sign in", as
     assert.match(String(res.headers["set-cookie"]), /tr_session=.*Max-Age=0/);
   });
 });
+
+/* ---------- saved companies ---------- */
+
+test("posting the toggle saves a company and returns to where you were", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({
+      url: new URL("https://x.example/saved/toggle"),
+      cookieHeader: null,
+      method: "POST",
+      body: "edrpou=40081216&back=%2Fentity%2F40081216",
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.location, "/entity/40081216");
+    assert.match(String(res.headers["set-cookie"]), /tr_saved=40081216/);
+  });
+});
+
+test("posting the toggle again removes the company", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({
+      url: new URL("https://x.example/saved/toggle"),
+      cookieHeader: "tr_saved=40081216",
+      method: "POST",
+      body: "edrpou=40081216&back=%2Fsaved",
+    });
+    assert.match(String(res.headers["set-cookie"]), /tr_saved=; .*Max-Age=0/);
+  });
+});
+
+test("the toggle refuses to bounce the visitor off this site", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({
+      url: new URL("https://x.example/saved/toggle"),
+      cookieHeader: null,
+      method: "POST",
+      body: "edrpou=40081216&back=https%3A%2F%2Fevil.example%2Fx",
+    });
+    assert.equal(res.headers.location, "/saved");
+  });
+});
+
+test("a protocol-relative redirect target is refused too", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({
+      url: new URL("https://x.example/saved/toggle"),
+      cookieHeader: null,
+      method: "POST",
+      body: "edrpou=40081216&back=%2F%2Fevil.example",
+    });
+    assert.equal(res.headers.location, "/saved");
+  });
+});
+
+test("looking up a EDRPOU we hold shows its dossier links", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({ url: new URL("https://x.example/lookup?edrpou=40081216"), cookieHeader: null });
+    assert.equal(res.status, 200);
+    assert.match(res.body, /Досьє замовника/);
+  });
+});
+
+test("looking up an unknown EDRPOU says so plainly instead of 404", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({ url: new URL("https://x.example/lookup?edrpou=99999999"), cookieHeader: null });
+    assert.equal(res.status, 200);
+    assert.match(res.body, /у нашій базі не зустрічається/);
+  });
+});
+
+test("a lookup that is not a EDRPOU explains the format", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({ url: new URL("https://x.example/lookup?edrpou=abc"), cookieHeader: null });
+    assert.match(res.body, /не схоже на код ЄДРПОУ/);
+  });
+});
+
+test("the saved page lists what the cookie holds", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({ url: new URL("https://x.example/saved"), cookieHeader: "tr_saved=40081216" });
+    assert.equal(res.status, 200);
+    assert.match(res.body, /40081216/);
+  });
+});
