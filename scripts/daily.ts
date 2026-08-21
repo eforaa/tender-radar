@@ -11,10 +11,15 @@ import { fetchTender } from "../src/sources/openprocurement.ts";
 import { normalizeTender } from "../src/normalize/tender.ts";
 import { pricePoints, priceGroups, detectPeerPrice, detectOwnPriceGrowth } from "../src/analysis/peer-price.ts";
 import { join } from "node:path";
+import { loadTelegramConfig, buildMessage, sendTelegram, pickHighlights } from "../src/notify/telegram.ts";
 import { openStore, REGION, RAILWAY_EDRPOU } from "../src/config.ts";
 import type { RiskFlagRow, TenderRow, TenderItemRow, BidRow, AwardRow, RunRow, FindingRow } from "../src/store/types.ts";
 
 const CONCURRENCY = Number(process.env.TR_CONCURRENCY ?? 6);
+/** How many new ids one run stores; the count itself is kept in full. */
+const MAX_STORED_IDS = 200;
+/** How many past runs to keep, so the history file stays small. */
+const KEEP_RUNS = 90;
 const store = openStore();
 const startedAt = new Date();
 const runId = startedAt.toISOString();
@@ -162,9 +167,16 @@ try {
     details_fetched: detailsFetched,
     errors,
     message: null,
-    new_tender_ids: newTenderIds,
+    new_tender_ids: newTenderIds.slice(0, MAX_STORED_IDS),
   };
   await store.upsertRuns([run]);
+
+  // Trim the history in place; nothing downstream reads beyond the recent runs.
+  const allRuns = await store.allRuns();
+  if (allRuns.length > KEEP_RUNS) {
+    const keep = [...allRuns].sort((a, b) => b.started_at.localeCompare(a.started_at)).slice(0, KEEP_RUNS);
+    await store.replaceRuns(keep);
+  }
 
   // Refresh the slim export the deployed site reads, so a redeploy ships
   // today's data rather than whatever was there when the site was last built.
@@ -184,6 +196,32 @@ try {
       `${detailsFetched} cards fetched, ${errors} errors. ` +
       `Store now holds ${tenderCount} tenders and ${total} flags.`,
   );
+
+  /* ---- 5. tell Telegram what happened ---- */
+
+  const telegram = loadTelegramConfig();
+  if (!telegram) {
+    log("telegram not configured — skipping the notification");
+  } else {
+    const { loadDataset } = await import("../server/data.ts");
+    const dataset = await loadDataset();
+    const freshIds = new Set(newTenderIds);
+    const result = await sendTelegram(
+      telegram,
+      buildMessage({
+        newTenders: newTenderIds.length,
+        newFlags,
+        cardsFetched: detailsFetched,
+        errors,
+        totalTenders: dataset.cases.length,
+        totalFlags: dataset.flagCount,
+        findings: dataset.findingCount,
+        highlights: pickHighlights(dataset.cases.filter((c) => freshIds.has(c.tender_id))),
+        siteUrl: process.env.SITE_URL ?? "https://tender-radar-five.vercel.app",
+      }),
+    );
+    log(result.sent ? "telegram notification sent" : `telegram notification failed — ${result.reason}`);
+  }
 } catch (err) {
   await store.upsertRuns([
     {
@@ -196,7 +234,7 @@ try {
       details_fetched: detailsFetched,
       errors: errors + 1,
       message: (err as Error).message,
-      new_tender_ids: newTenderIds,
+      new_tender_ids: newTenderIds.slice(0, MAX_STORED_IDS),
     },
   ]);
   log(`FAILED — ${(err as Error).message}`);

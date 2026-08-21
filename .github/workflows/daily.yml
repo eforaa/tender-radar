@@ -1,0 +1,61 @@
+name: Щоденне оновлення
+
+# Runs on its own every morning. The job holds the dataset in the repository
+# itself: `web-data/` is the slim export the site reads, small enough to commit,
+# so each run starts from yesterday's state and commits today's.
+on:
+  schedule:
+    # 05:20 UTC — after the state has published the night's assessments, and
+    # off the top of the hour where GitHub's scheduler is most congested.
+    - cron: "20 5 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: daily-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Перевірити код
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+
+      - name: Оновити дані та проаналізувати
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          # Fewer parallel requests than a desktop run: this is someone else's
+          # public API and the job has no deadline to meet.
+          TR_CONCURRENCY: "4"
+        run: npm run daily
+
+      - name: Зібрати бандл функції
+        run: npm run build:api
+
+      - name: Закомітити зміни
+        run: |
+          git config user.name "tender-radar-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add web-data api/index.js
+          if git diff --staged --quiet; then
+            echo "Нічого не змінилося — коміт не потрібен."
+          else
+            git commit -m "data: щоденне оновлення $(date -u +%Y-%m-%d)"
+            git push
+          fi

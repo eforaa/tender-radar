@@ -65,6 +65,9 @@ export class JsonStore implements Store {
   upsertRuns(rows: RunRow[]) {
     return this.#upsert("runs", rows, (r) => r.run_id);
   }
+  replaceRuns(rows: RunRow[]) {
+    return this.#write("runs", rows);
+  }
 
   allTenders() { return this.#read<TenderRow>("tenders"); }
   allTenderItems() { return this.#read<TenderItemRow>("tender_items"); }

@@ -102,7 +102,11 @@ export type RunRow = {
   details_fetched: number;
   errors: number;
   message: string | null;
-  /** Tender ids first seen in this run, so "what's new" is exact. */
+  /**
+   * Tender ids first seen in this run, capped — one nationwide backfill
+   * produced 33877 of them, and the full list is not worth carrying forever.
+   * `new_tenders` holds the true count.
+   */
   new_tender_ids: string[];
 };
 
@@ -131,6 +135,8 @@ export interface Store {
   upsertCatalogPrices(rows: CatalogPriceRow[]): Promise<void>;
   upsertFindings(rows: FindingRow[]): Promise<void>;
   upsertRuns(rows: RunRow[]): Promise<void>;
+  /** Replaces the whole run history — used to trim it. */
+  replaceRuns(rows: RunRow[]): Promise<void>;
 
   allTenders(): Promise<TenderRow[]>;
   allTenderItems(): Promise<TenderItemRow[]>;
