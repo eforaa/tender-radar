@@ -2706,6 +2706,12 @@ function railwayPage(url) {
   </div>
 </details>
 
+<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456</h2>
+${presetBar("/railway", url, c)}
+${sortBar("/railway", c)}
+${filterPanel("/railway", c, { hideRail: true })}
+${listBody(filtered, c, "/railway")}
+
 <h2>\u0425\u0442\u043E \u0437\u0430\u043A\u0443\u043F\u043E\u0432\u0443\u0454</h2>
 ${blocks.map((block) => {
       const blockValue = block.list.reduce((sum2, x) => sum2 + (x.value_amount ?? 0), 0);
@@ -2739,12 +2745,6 @@ ${[...entities.entries()].sort((a, b) => b[1].value - a[1].value).map(
   </div>
 </details>`;
     }).join("")}
-
-<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456</h2>
-${presetBar("/railway", url, c)}
-${sortBar("/railway", c)}
-${filterPanel("/railway", c, { hideRail: true })}
-${listBody(filtered, c, "/railway")}
 
 <h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
 ${groupedRiskCards(rankRisks(all))}

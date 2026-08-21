@@ -1169,6 +1169,12 @@ function railwayPage(url: URL): string {
   </div>
 </details>
 
+<h2>Закупівлі залізниці</h2>
+${presetBar("/railway", url, c)}
+${sortBar("/railway", c)}
+${filterPanel("/railway", c, { hideRail: true })}
+${listBody(filtered, c, "/railway")}
+
 <h2>Хто закуповує</h2>
 ${blocks
   .map((block) => {
@@ -1208,12 +1214,6 @@ ${[...entities.entries()]
 </details>`;
   })
   .join("")}
-
-<h2>Закупівлі залізниці</h2>
-${presetBar("/railway", url, c)}
-${sortBar("/railway", c)}
-${filterPanel("/railway", c, { hideRail: true })}
-${listBody(filtered, c, "/railway")}
 
 <h2>Що держава запідозрила в залізничних закупівлях</h2>
 ${groupedRiskCards(rankRisks(all))}
