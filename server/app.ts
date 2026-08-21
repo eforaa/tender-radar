@@ -534,7 +534,7 @@ ${q.admin
   .join("")}
 
 <h3 class="block-head">Кримінально-правові напрями</h3>
-<p class="hint">Для кожного напряму наведено, що має бути доведено і які документи для цього потрібні.</p>
+<p class="hint">Для кожного напряму — що доводити і якими документами.</p>
 ${q.criminal
   .map(
     (c) => `<div class="card">
@@ -656,7 +656,7 @@ ${
 ${
   entry.findings.length
     ? `<h2>Скільки це коштує в інших</h2>
-<p class="hint">Порівняння виконала ця система, а не держава. Нижче — числа, з яких зроблено висновок.</p>
+<p class="hint">Рахувала система, не держава. Нижче — числа.</p>
 ${entry.findings
   .map((f) => {
     const e = f.evidence as Record<string, number | string | null>;
@@ -742,7 +742,7 @@ ${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
 </div>
 
 <h2>Що держава запідозрила в її закупівлях</h2>
-<p class="hint">Це перелік ознак, які спрацювали. <strong>Це не судимість і не встановлена вина.</strong></p>
+<p class="hint">Перелік ознак, що спрацювали. <strong>Не судимість і не встановлена вина.</strong></p>
 ${groupedRiskCards(ranked)}
 
 <h2>Закупівлі</h2>
@@ -1056,7 +1056,7 @@ function railwayPage(url: URL): string {
     nav: "railway",
     body: `
 <h1>Залізниця Харківської області</h1>
-<p class="sub">Закупівлі залізничної галузі з позначками державної системи моніторингу. Нижче — три різні за природою групи, і ми їх не змішуємо.</p>
+<p class="sub">Закупівлі залізниці. Три групи, які ми не змішуємо.</p>
 
 <p class="statline">
   <b>${all.length.toLocaleString("uk-UA")}</b> закупівель із позначками ·
@@ -1119,7 +1119,7 @@ ${listBody(filtered, c, "/railway")}
 ${groupedRiskCards(rankRisks(all))}
 
 <h2>Хто виграє залізничні тендери</h2>
-<p class="hint">П'ятнадцять найбільших переможців за сумою договорів.</p>
+<p class="hint">П'ятнадцять найбільших переможців.</p>
 <div class="rows">
 ${topSuppliers
   .map(
@@ -1168,7 +1168,7 @@ function articlePage(code: string, url: URL): string {
     nav: `article-${article.code}`,
     body: `
 <h1>Підроблення документів</h1>
-<p class="sub">Закупівлі Харківщини, де в договорах, додаткових угодах чи звітах є розбіжності — тобто те, що перевіряють за статтею ${esc(article.code)} «${esc(article.title)}».</p>
+<p class="sub">Розбіжності в договорах, угодах і звітах — те, що перевіряють за статтею ${esc(article.code)}.</p>
 
 <p class="statline">
   <b>${list.length.toLocaleString("uk-UA")}</b> ${plural(list.length, "закупівля", "закупівлі", "закупівель")} ·
@@ -1211,7 +1211,7 @@ function articlePage(code: string, url: URL): string {
   <button type="submit">Показати</button>
   ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">скинути</a>` : ""}
 </form>
-<p class="hint">Спочатку ті, де збіглося найбільше релевантних ознак.</p>
+<p class="hint">Спочатку — де збіглося найбільше ознак.</p>
 ${sorted.length === 0 ? '<div class="empty">За цими умовами нічого не знайшлося.</div>' : `<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c)).join("")}</div>`}
 ${sorted.length > 60 ? `<p class="hint" style="margin-top:.8rem">Показано 60 із ${sorted.length}.</p>` : ""}
 
@@ -1234,7 +1234,7 @@ function updatesPage(): string {
     nav: "updates",
     body: `
 <h1>Що змінилося</h1>
-<p class="sub">Система щодня перевіряє державний масив ризик-індикаторів і підтягує нові закупівлі ${esc(REGION)} та філій залізниці.</p>
+<p class="sub">Щодня звіряємося з державним масивом і додаємо нове.</p>
 
 ${
   latest
@@ -1303,7 +1303,7 @@ function pricesPage(url: URL): string {
     nav: "prices",
     body: `
 <h1>Де ціна виглядає завищеною</h1>
-<p class="sub">Тут система рахує сама, а не переказує висновок держави. Вона бере ціну за одиницю й порівнює з тим, скільки те саме коштувало іншим — і скільки коштувало цьому ж замовнику раніше.</p>
+<p class="sub">Рахуємо самі: ціна за одиницю проти інших закупівель і проти минулих цін цього замовника.</p>
 
 <p class="statline">
   <b>${withFindings.length}</b> закупівель із завищеною ціною ·
@@ -1363,7 +1363,7 @@ function lookupPage(code: string | null, typed: string): string {
     nav: "lookup",
     body: `
 <h1>Пошук підприємства за ЄДРПОУ</h1>
-<p class="sub">Введіть код будь-якого підприємства — замовника або переможця. Ми покажемо, що про нього є в базі закупівель Харківщини та залізниці.</p>
+<p class="sub">Код підприємства — покажемо все, що про нього є в базі.</p>
 
 <form class="filters" method="get" action="/lookup">
   <div class="filter-row">

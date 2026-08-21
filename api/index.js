@@ -343,6 +343,7 @@ var STYLES = `
   --f-mono:"IBM Plex Mono",Consolas,monospace;
 }
 *{box-sizing:border-box}
+pre,table{overflow-x:auto;max-width:100%}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
 a{color:var(--accent);text-underline-offset:3px}
@@ -386,7 +387,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
 .drawer small{color:var(--ink-faint);font-size:.82rem;font-weight:400}
 
 @media (prefers-reduced-motion: reduce){.drawer,.scrim{transition-duration:.01ms}}
-@media (max-width:30rem){.nav a:not([href="/"]):not([href="/railway"]){display:none}}
+
 
 .wrap{max-width:72rem;margin:0 auto;padding:clamp(1rem,2.5vw,1.6rem) clamp(1rem,3vw,2rem) 6rem}
 
@@ -461,20 +462,6 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 .preset:hover{border-color:var(--accent);color:var(--accent)}
 .preset.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
 
-/* On a phone the chips and the explainer would each eat a third of the
-   screen if they wrapped. Swipe the chips instead; the explainer lives on
-   the About page anyway. */
-@media (max-width:34rem){
-  .presets{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:.15rem}
-  .presets::-webkit-scrollbar{display:none}
-  .preset{flex:none}
-  .primer{display:none}
-  .sortbar{gap:.4rem}
-  .sortbar input[type=search]{flex:1 1 100%}
-  .sortbar label{flex:1 1 45%}
-  .sortbar select{max-width:none;width:100%}
-}
-
 /* sorting and grouping, always in view */
 .sortbar{display:flex;flex-wrap:wrap;gap:.45rem .7rem;align-items:center;margin:0 0 .7rem;padding:.5rem .75rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
 .sortbar label{display:inline-flex;align-items:center;gap:.35rem;font-size:.86rem;color:var(--ink-faint);white-space:nowrap}
@@ -510,7 +497,7 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 .starred-btn{display:inline-flex;align-items:center;gap:.4rem;text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:.3rem .65rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
 .starred-btn:hover{color:var(--accent);border-color:var(--accent)}
 .starred-btn.on{color:var(--accent);background:var(--accent-bg);border-color:var(--accent);font-weight:500}
-@media (max-width:34rem){.starred-btn span{display:none}}
+
 .filter-label{font-size:.92rem;color:var(--ink-faint);white-space:nowrap}
 select:disabled{opacity:.5;cursor:not-allowed}
 
@@ -540,25 +527,17 @@ select:disabled{opacity:.5;cursor:not-allowed}
 .sev-low .dot{background:#C4D0D6}
 
 .row .who{min-width:0}
-.row .name{font-size:1rem;font-weight:600;line-height:1.4;letter-spacing:-.005em}
+.row .name{font-size:1rem;font-weight:600;line-height:1.4;letter-spacing:-.005em;overflow-wrap:anywhere}
 .row .name a{color:var(--ink);text-decoration:none}
 .row .name a:hover{color:var(--accent);text-decoration:underline}
-.row .meta{font-size:.85rem;color:var(--ink-soft);line-height:1.4}
+.row .meta{font-size:.85rem;color:var(--ink-soft);line-height:1.4;overflow-wrap:anywhere}
 .row .meta a{color:var(--ink-soft)}
 .row .meta a:hover{color:var(--accent)}
 .row .amount{text-align:right}
 .row .amount .big{font-family:var(--f-display);font-weight:700;font-size:1.05rem;line-height:1.3;font-variant-numeric:tabular-nums;white-space:nowrap}
 .row .amount .exact{font-family:var(--f-mono);font-size:.72rem;color:var(--ink-faint);white-space:nowrap;display:block;margin-top:.1rem}
 .row .flags{grid-column:2 / -1;display:flex;flex-wrap:wrap;gap:.28rem;margin-top:.3rem}
-@media (max-width:40rem){
-  .row{grid-template-columns:auto 1fr}
-  .row .amount{grid-column:2;text-align:left;margin-top:.2rem}
-  .row .amount .exact{display:inline;margin-left:.5rem}
-  .row .flags{grid-column:1 / -1}
-}
 
-/* ---------- badges ---------- */
-.flag{font-size:.79rem;line-height:1.3;padding:.2rem .5rem;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-soft);text-decoration:none;border-radius:2px}
 a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .flag.alarm{border-color:var(--alarm);background:var(--alarm-bg);color:var(--alarm);font-weight:500}
 .flag.warn{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
@@ -596,7 +575,7 @@ dl.facts{display:grid;grid-template-columns:minmax(8rem,max-content) 1fr;gap:.55
 dl.facts dt{font-size:.86rem;color:var(--ink-faint);padding-top:.1rem}
 dl.facts dd{margin:0;font-size:1rem}
 dl.facts dd strong{font-weight:600}
-@media (max-width:34rem){dl.facts{grid-template-columns:1fr;gap:.05rem}dl.facts dd{margin-bottom:.7rem}}
+
 
 /* ---------- misc ---------- */
 .pager{display:flex;gap:.6rem;align-items:center;margin-top:1.75rem;font-size:.94rem}
@@ -621,6 +600,101 @@ details.help li{margin-bottom:.35rem}
 details.help p.lead{color:var(--ink)}
 details.help p strong{color:var(--ink)}
 details.help + details.help{margin-top:-1rem}
+/* ---------- screens ----------
+   Every size decision lives here rather than beside the rule it overrides.
+   Phones get a single column, thumb-sized hit areas and 16px form text:
+   anything smaller and iOS zooms the whole page the moment a field is
+   focused, which then leaves the layout scrolled sideways. Tablets keep the
+   desktop shape with tighter spacing. */
+
+@media (max-width:64rem){
+  .card{padding:1.2rem 1.3rem}
+  h2{margin-top:2.25rem}
+  .wrap{padding-bottom:4.5rem}
+  /* Below a wide desktop the third column is gone, so three flag chips wrap
+     onto three lines and every row grows by a third. Swipe them instead. */
+  .row .flags{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .row .flags::-webkit-scrollbar{display:none}
+  .row .flags .flag{flex:none}
+}
+
+@media (max-width:44rem){
+  body{font-size:16px}
+
+  /* header: the drawer already lists every section, so the inline links are
+     duplication that costs a whole row on a narrow screen */
+  .nav{display:none}
+  .top .inner{padding:.55rem max(1rem,env(safe-area-inset-right)) .55rem max(1rem,env(safe-area-inset-left));gap:.45rem .8rem}
+  .brand{font-size:1rem}
+  .burger{width:2.75rem;height:2.75rem}
+  .starred-btn{min-height:2.75rem;padding:.5rem .8rem}
+  .starred-btn span{display:none}
+  .drawer{width:min(20rem,88vw)}
+  .drawer a{padding:.9rem 1.15rem}
+
+  .wrap{padding:.9rem 1rem 4rem}
+  h1{font-size:1.25rem;max-width:none;margin-bottom:.25rem}
+  h2{font-size:1.15rem;margin-top:1.75rem}
+  .sub{font-size:.88rem;margin-bottom:.4rem}
+  .statline{font-size:.8rem;gap:.1rem .45rem;margin-bottom:.5rem}
+  .presets{margin-bottom:.45rem}
+  .sortbar{margin-bottom:.5rem}
+  .sub,.hint,.card p,.card ul,.note,details.sub p{max-width:none}
+
+  /* iOS zoom guard \u2014 every control a finger can land in */
+  input,select,button{font-size:16px}
+
+  .sortbar{padding:.45rem .55rem;gap:.35rem}
+  /* two rows, not four: search shares its row with the button, the two
+     selects share the next one with their captions stacked above them */
+  .sortbar input[type=search]{flex:1 1 58%;min-width:0;min-height:2.6rem;font-size:16px}
+  .sortbar .go{flex:0 0 auto;width:auto;min-height:2.6rem;padding:.4rem .95rem;font-size:16px}
+  .sortbar label{order:1;flex:1 1 calc(50% - .2rem);flex-direction:column;align-items:stretch;gap:.1rem;font-size:.72rem;letter-spacing:.02em}
+  .sortbar select{width:100%;max-width:none;min-height:2.5rem;font-size:16px}
+
+  /* chips swipe sideways instead of stacking three rows deep */
+  .presets{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-1rem;padding:0 1rem .2rem;scroll-snap-type:x proximity}
+  .presets::-webkit-scrollbar{display:none}
+  .preset{flex:none;min-height:2.4rem;display:inline-flex;align-items:center;scroll-snap-align:start}
+  .primer{display:none}
+
+  /* full-bleed lists: on a phone the card frame is noise, the content is not */
+  .rows,.group-block{border-radius:0;border-left:0;border-right:0;margin-inline:-1rem;box-shadow:none}
+  .row{grid-template-columns:auto 1fr;padding:.7rem 1rem;gap:.1rem .7rem}
+  .row .name{font-size:.98rem}
+  .row .name a{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .row .meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .amount{grid-column:2;text-align:left;margin-top:.2rem}
+  .row .amount .big{font-size:1rem}
+  .row .amount .exact{display:inline;margin-left:.5rem}
+  .row .flags{grid-column:1 / -1;margin-top:.4rem;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .row .flags::-webkit-scrollbar{display:none}
+  .row .flags .flag{flex:none}
+  .row .star{padding:.3rem .5rem .3rem 0;font-size:1.3rem}
+
+  .group-block summary{padding:.95rem 1rem}
+  .g-name{flex:1 1 100%}
+  .g-body{padding:.7rem 1rem 1rem}
+
+  .card{padding:1.05rem 1.1rem;box-shadow:none}
+  .actions{gap:.45rem}
+  .action{flex:1 1 100%;justify-content:center;min-height:2.75rem}
+  .pager a{min-height:2.75rem;display:inline-flex;align-items:center}
+
+  .filters-more summary{padding:.8rem .9rem}
+  .filter-row input[type=search],.filter-row input[type=date],.filter-row input.num,.filter-row select{flex:1 1 100%;width:100%;max-width:none}
+
+  dl.facts{grid-template-columns:1fr;gap:.05rem}
+  dl.facts dd{margin-bottom:.7rem}
+
+  details.help summary,details.sub summary{padding:.85rem 1rem}
+  .legal{padding:.7rem .85rem}
+}
+
+@media (max-width:22rem){
+  .brand span{display:none}
+}
+
 `;
 var MENU = [
   { href: "/", nav: "feed", label: "\u0423\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", hint: "\u043F\u043E\u0432\u043D\u0438\u0439 \u043F\u0435\u0440\u0435\u043B\u0456\u043A, \u0437 \u043F\u043E\u0448\u0443\u043A\u043E\u043C \u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0430\u043C\u0438" },
@@ -2110,7 +2184,7 @@ ${q.admin.map(
   ).join("")}
 
 <h3 class="block-head">\u041A\u0440\u0438\u043C\u0456\u043D\u0430\u043B\u044C\u043D\u043E-\u043F\u0440\u0430\u0432\u043E\u0432\u0456 \u043D\u0430\u043F\u0440\u044F\u043C\u0438</h3>
-<p class="hint">\u0414\u043B\u044F \u043A\u043E\u0436\u043D\u043E\u0433\u043E \u043D\u0430\u043F\u0440\u044F\u043C\u0443 \u043D\u0430\u0432\u0435\u0434\u0435\u043D\u043E, \u0449\u043E \u043C\u0430\u0454 \u0431\u0443\u0442\u0438 \u0434\u043E\u0432\u0435\u0434\u0435\u043D\u043E \u0456 \u044F\u043A\u0456 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0434\u043B\u044F \u0446\u044C\u043E\u0433\u043E \u043F\u043E\u0442\u0440\u0456\u0431\u043D\u0456.</p>
+<p class="hint">\u0414\u043B\u044F \u043A\u043E\u0436\u043D\u043E\u0433\u043E \u043D\u0430\u043F\u0440\u044F\u043C\u0443 \u2014 \u0449\u043E \u0434\u043E\u0432\u043E\u0434\u0438\u0442\u0438 \u0456 \u044F\u043A\u0438\u043C\u0438 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u043C\u0438.</p>
 ${q.criminal.map(
     (c) => `<div class="card">
   <h3>\u0421\u0442\u0430\u0442\u0442\u044F ${esc(c.code)} \u041A\u041A\u0423 \u2014 ${esc(c.title)}</h3>
@@ -2206,7 +2280,7 @@ ${entry.winner_name ? `<div class="card">
 </div>` : `<div class="card"><p>\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0430\u0431\u043E \u043A\u0430\u0440\u0442\u043A\u0443 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E.</p></div>`}
 
 ${entry.findings.length ? `<h2>\u0421\u043A\u0456\u043B\u044C\u043A\u0438 \u0446\u0435 \u043A\u043E\u0448\u0442\u0443\u0454 \u0432 \u0456\u043D\u0448\u0438\u0445</h2>
-<p class="hint">\u041F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F \u0432\u0438\u043A\u043E\u043D\u0430\u043B\u0430 \u0446\u044F \u0441\u0438\u0441\u0442\u0435\u043C\u0430, \u0430 \u043D\u0435 \u0434\u0435\u0440\u0436\u0430\u0432\u0430. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0447\u0438\u0441\u043B\u0430, \u0437 \u044F\u043A\u0438\u0445 \u0437\u0440\u043E\u0431\u043B\u0435\u043D\u043E \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A.</p>
+<p class="hint">\u0420\u0430\u0445\u0443\u0432\u0430\u043B\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430, \u043D\u0435 \u0434\u0435\u0440\u0436\u0430\u0432\u0430. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0447\u0438\u0441\u043B\u0430.</p>
 ${entry.findings.map((f) => {
       const e = f.evidence;
       const rows = Object.entries({
@@ -2285,7 +2359,7 @@ ${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
 </div>
 
 <h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0457\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
-<p class="hint">\u0426\u0435 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0437\u043D\u0430\u043A, \u044F\u043A\u0456 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438. <strong>\u0426\u0435 \u043D\u0435 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432\u0438\u043D\u0430.</strong></p>
+<p class="hint">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0437\u043D\u0430\u043A, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438. <strong>\u041D\u0435 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432\u0438\u043D\u0430.</strong></p>
 ${groupedRiskCards(ranked)}
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
@@ -2544,7 +2618,7 @@ function railwayPage(url) {
     nav: "railway",
     body: `
 <h1>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F \u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u043E\u0457 \u043E\u0431\u043B\u0430\u0441\u0442\u0456</h1>
-<p class="sub">\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u043E\u0457 \u0433\u0430\u043B\u0443\u0437\u0456 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0442\u0440\u0438 \u0440\u0456\u0437\u043D\u0456 \u0437\u0430 \u043F\u0440\u0438\u0440\u043E\u0434\u043E\u044E \u0433\u0440\u0443\u043F\u0438, \u0456 \u043C\u0438 \u0457\u0445 \u043D\u0435 \u0437\u043C\u0456\u0448\u0443\u0454\u043C\u043E.</p>
+<p class="sub">\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456. \u0422\u0440\u0438 \u0433\u0440\u0443\u043F\u0438, \u044F\u043A\u0456 \u043C\u0438 \u043D\u0435 \u0437\u043C\u0456\u0448\u0443\u0454\u043C\u043E.</p>
 
 <p class="statline">
   <b>${all.length.toLocaleString("uk-UA")}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \xB7
@@ -2601,7 +2675,7 @@ ${listBody(filtered, c, "/railway")}
 ${groupedRiskCards(rankRisks(all))}
 
 <h2>\u0425\u0442\u043E \u0432\u0438\u0433\u0440\u0430\u0454 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0456 \u0442\u0435\u043D\u0434\u0435\u0440\u0438</h2>
-<p class="hint">\u041F'\u044F\u0442\u043D\u0430\u0434\u0446\u044F\u0442\u044C \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0438\u0445 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456\u0432 \u0437\u0430 \u0441\u0443\u043C\u043E\u044E \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0456\u0432.</p>
+<p class="hint">\u041F'\u044F\u0442\u043D\u0430\u0434\u0446\u044F\u0442\u044C \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0438\u0445 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456\u0432.</p>
 <div class="rows">
 ${topSuppliers.map(
       ([edrpou, acc]) => `<div class="row">
@@ -2639,7 +2713,7 @@ function articlePage(code, url) {
     nav: `article-${article.code}`,
     body: `
 <h1>\u041F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432</h1>
-<p class="sub">\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438, \u0434\u0435 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445, \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0438\u0445 \u0443\u0433\u043E\u0434\u0430\u0445 \u0447\u0438 \u0437\u0432\u0456\u0442\u0430\u0445 \u0454 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u2014 \u0442\u043E\u0431\u0442\u043E \u0442\u0435, \u0449\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u044E\u0442\u044C \u0437\u0430 \u0441\u0442\u0430\u0442\u0442\u0435\u044E ${esc(article.code)} \xAB${esc(article.title)}\xBB.</p>
+<p class="sub">\u0420\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445, \u0443\u0433\u043E\u0434\u0430\u0445 \u0456 \u0437\u0432\u0456\u0442\u0430\u0445 \u2014 \u0442\u0435, \u0449\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u044E\u0442\u044C \u0437\u0430 \u0441\u0442\u0430\u0442\u0442\u0435\u044E ${esc(article.code)}.</p>
 
 <p class="statline">
   <b>${list.length.toLocaleString("uk-UA")}</b> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \xB7
@@ -2680,7 +2754,7 @@ function articlePage(code, url) {
   <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
   ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438</a>` : ""}
 </form>
-<p class="hint">\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0442\u0456, \u0434\u0435 \u0437\u0431\u0456\u0433\u043B\u043E\u0441\u044F \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0435 \u0440\u0435\u043B\u0435\u0432\u0430\u043D\u0442\u043D\u0438\u0445 \u043E\u0437\u043D\u0430\u043A.</p>
+<p class="hint">\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u2014 \u0434\u0435 \u0437\u0431\u0456\u0433\u043B\u043E\u0441\u044F \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0435 \u043E\u0437\u043D\u0430\u043A.</p>
 ${sorted.length === 0 ? '<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F.</div>' : `<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c)).join("")}</div>`}
 ${sorted.length > 60 ? `<p class="hint" style="margin-top:.8rem">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 60 \u0456\u0437 ${sorted.length}.</p>` : ""}
 
@@ -2698,7 +2772,7 @@ function updatesPage() {
     nav: "updates",
     body: `
 <h1>\u0429\u043E \u0437\u043C\u0456\u043D\u0438\u043B\u043E\u0441\u044F</h1>
-<p class="sub">\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u0449\u043E\u0434\u043D\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u0439 \u043C\u0430\u0441\u0438\u0432 \u0440\u0438\u0437\u0438\u043A-\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u0456 \u043F\u0456\u0434\u0442\u044F\u0433\u0443\u0454 \u043D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0439 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456.</p>
+<p class="sub">\u0429\u043E\u0434\u043D\u044F \u0437\u0432\u0456\u0440\u044F\u0454\u043C\u043E\u0441\u044F \u0437 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u043C \u043C\u0430\u0441\u0438\u0432\u043E\u043C \u0456 \u0434\u043E\u0434\u0430\u0454\u043C\u043E \u043D\u043E\u0432\u0435.</p>
 
 ${latest ? `<p class="statline">
   <b>${latest.new_tenders}</b> \u043D\u043E\u0432\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0432\u043E\u0441\u0442\u0430\u043D\u043D\u0454 \xB7
@@ -2745,7 +2819,7 @@ function pricesPage(url) {
     nav: "prices",
     body: `
 <h1>\u0414\u0435 \u0446\u0456\u043D\u0430 \u0432\u0438\u0433\u043B\u044F\u0434\u0430\u0454 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u043E\u044E</h1>
-<p class="sub">\u0422\u0443\u0442 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0440\u0430\u0445\u0443\u0454 \u0441\u0430\u043C\u0430, \u0430 \u043D\u0435 \u043F\u0435\u0440\u0435\u043A\u0430\u0437\u0443\u0454 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0434\u0435\u0440\u0436\u0430\u0432\u0438. \u0412\u043E\u043D\u0430 \u0431\u0435\u0440\u0435 \u0446\u0456\u043D\u0443 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E \u0439 \u043F\u043E\u0440\u0456\u0432\u043D\u044E\u0454 \u0437 \u0442\u0438\u043C, \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0442\u0435 \u0441\u0430\u043C\u0435 \u043A\u043E\u0448\u0442\u0443\u0432\u0430\u043B\u043E \u0456\u043D\u0448\u0438\u043C \u2014 \u0456 \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u043A\u043E\u0448\u0442\u0443\u0432\u0430\u043B\u043E \u0446\u044C\u043E\u043C\u0443 \u0436 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0443 \u0440\u0430\u043D\u0456\u0448\u0435.</p>
+<p class="sub">\u0420\u0430\u0445\u0443\u0454\u043C\u043E \u0441\u0430\u043C\u0456: \u0446\u0456\u043D\u0430 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E \u043F\u0440\u043E\u0442\u0438 \u0456\u043D\u0448\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456 \u043F\u0440\u043E\u0442\u0438 \u043C\u0438\u043D\u0443\u043B\u0438\u0445 \u0446\u0456\u043D \u0446\u044C\u043E\u0433\u043E \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430.</p>
 
 <p class="statline">
   <b>${withFindings.length}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u043E\u044E \u0446\u0456\u043D\u043E\u044E \xB7
@@ -2788,7 +2862,7 @@ function lookupPage(code, typed) {
     nav: "lookup",
     body: `
 <h1>\u041F\u043E\u0448\u0443\u043A \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u0430 \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423</h1>
-<p class="sub">\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u043A\u043E\u0434 \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0433\u043E \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u0430 \u2014 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430 \u0430\u0431\u043E \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F. \u041C\u0438 \u043F\u043E\u043A\u0430\u0436\u0435\u043C\u043E, \u0449\u043E \u043F\u0440\u043E \u043D\u044C\u043E\u0433\u043E \u0454 \u0432 \u0431\u0430\u0437\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438 \u0442\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456.</p>
+<p class="sub">\u041A\u043E\u0434 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u0430 \u2014 \u043F\u043E\u043A\u0430\u0436\u0435\u043C\u043E \u0432\u0441\u0435, \u0449\u043E \u043F\u0440\u043E \u043D\u044C\u043E\u0433\u043E \u0454 \u0432 \u0431\u0430\u0437\u0456.</p>
 
 <form class="filters" method="get" action="/lookup">
   <div class="filter-row">
