@@ -411,6 +411,7 @@ form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
 .filters-more[open] summary{border-bottom:1px solid var(--line-soft)}
 .filters-more summary:hover{background:var(--surface-3)}
 .filters-more .inner{padding:.9rem;display:flex;flex-direction:column;gap:.6rem}
+.block-head{font-family:var(--f-display);font-weight:700;font-size:1.1rem;margin:1.75rem 0 .35rem}
 .badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:600;min-width:1.3rem;height:1.3rem;border-radius:1rem;display:inline-flex;align-items:center;justify-content:center;padding:0 .4rem}
 /* star toggle \u2014 a form so the site still needs no scripts */
 .star-form{display:inline;margin:0}
@@ -1009,6 +1010,83 @@ function favouritesCookie(favourites, secure) {
   return value.length === 0 ? `${FAVOURITES_COOKIE}=; ${attrs}; Max-Age=0` : `${FAVOURITES_COOKIE}=${value}; ${attrs}; Max-Age=${TTL_SECONDS}`;
 }
 
+// server/controls.ts
+function readControls(url) {
+  const rawGroup = url.searchParams.get("group") ?? "";
+  const rawThen = url.searchParams.get("then") ?? "";
+  return {
+    q: (url.searchParams.get("q") ?? "").trim().toLowerCase(),
+    risk: url.searchParams.get("risk") ?? "",
+    sort: url.searchParams.get("sort") ?? "value",
+    railOnly: url.searchParams.get("rail") === "1",
+    soloOnly: url.searchParams.get("solo") === "1",
+    priceOnly: url.searchParams.get("price") === "1",
+    dateFrom: (url.searchParams.get("from") ?? "").trim(),
+    dateTo: (url.searchParams.get("to") ?? "").trim(),
+    min: Number(url.searchParams.get("min") ?? "") || 0,
+    max: Number(url.searchParams.get("max") ?? "") || 0,
+    group: isDimension(rawGroup) ? rawGroup : "",
+    then: isDimension(rawThen) ? rawThen : "",
+    page: Math.max(1, Number(url.searchParams.get("page") ?? 1))
+  };
+}
+function activeCount(c) {
+  return [
+    c.risk,
+    c.railOnly,
+    c.soloOnly,
+    c.priceOnly,
+    c.dateFrom,
+    c.dateTo,
+    c.min > 0,
+    c.max > 0,
+    c.group,
+    c.sort !== "value"
+  ].filter(Boolean).length;
+}
+function isFiltered(c) {
+  return Boolean(
+    c.q || c.risk || c.railOnly || c.soloOnly || c.priceOnly || c.dateFrom || c.dateTo || c.min > 0 || c.max > 0
+  );
+}
+function applyControls(cases, c, railwayCodes, opts = {}) {
+  let list = cases;
+  if (c.q) {
+    list = list.filter(
+      (x) => (x.entity_name ?? "").toLowerCase().includes(c.q) || (x.title ?? "").toLowerCase().includes(c.q) || (x.officer_name ?? "").toLowerCase().includes(c.q) || (x.winner_name ?? "").toLowerCase().includes(c.q) || (x.entity_edrpou ?? "").includes(c.q) || (x.winner_edrpou ?? "").includes(c.q) || x.tender_ref.toLowerCase().includes(c.q)
+    );
+  }
+  if (c.risk) list = list.filter((x) => x.risks.includes(c.risk));
+  if (c.railOnly && !opts.hideRail) list = list.filter((x) => railwayCodes.has(x.entity_edrpou ?? ""));
+  if (c.soloOnly) list = list.filter((x) => x.bidders === 1);
+  if (c.priceOnly && !opts.hidePrice) list = list.filter((x) => x.findings.length > 0);
+  if (c.dateFrom) list = list.filter((x) => (x.date_assessed ?? "") >= c.dateFrom);
+  if (c.dateTo) list = list.filter((x) => (x.date_assessed ?? "").slice(0, 10) <= c.dateTo);
+  if (c.min > 0) list = list.filter((x) => (x.value_amount ?? 0) >= c.min);
+  if (c.max > 0) list = list.filter((x) => (x.value_amount ?? 0) <= c.max);
+  return [...list].sort(
+    (a, b) => c.sort === "date" ? String(b.date_assessed ?? "").localeCompare(String(a.date_assessed ?? "")) : c.sort === "date-asc" ? String(a.date_assessed ?? "").localeCompare(String(b.date_assessed ?? "")) : c.sort === "value-asc" ? (a.value_amount ?? 0) - (b.value_amount ?? 0) : c.sort === "risks" ? b.risks.length - a.risks.length || (b.value_amount ?? 0) - (a.value_amount ?? 0) : (b.value_amount ?? 0) - (a.value_amount ?? 0)
+  );
+}
+function keepControls(action, c, over = {}) {
+  const p = new URLSearchParams();
+  if (c.q) p.set("q", c.q);
+  if (c.risk) p.set("risk", c.risk);
+  if (c.sort !== "value") p.set("sort", c.sort);
+  if (c.railOnly) p.set("rail", "1");
+  if (c.soloOnly) p.set("solo", "1");
+  if (c.priceOnly) p.set("price", "1");
+  if (c.dateFrom) p.set("from", c.dateFrom);
+  if (c.dateTo) p.set("to", c.dateTo);
+  if (c.min > 0) p.set("min", String(c.min));
+  if (c.max > 0) p.set("max", String(c.max));
+  if (c.group) p.set("group", c.group);
+  if (c.then) p.set("then", c.then);
+  for (const [k, v] of Object.entries(over)) p.set(k, v);
+  const query = p.toString();
+  return query ? `${action}?${query}` : action;
+}
+
 // server/app.ts
 var PAGE_SIZE = 30;
 var db = await loadDataset();
@@ -1154,70 +1232,100 @@ function groupBlock(group, depth) {
   </div>
 </details>`;
 }
-function feedPage(url) {
-  const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
-  const risk = url.searchParams.get("risk") ?? "";
-  const sort = url.searchParams.get("sort") ?? "value";
-  const railOnly = url.searchParams.get("rail") === "1";
-  const soloOnly = url.searchParams.get("solo") === "1";
-  const priceOnly = url.searchParams.get("price") === "1";
-  const dateFrom = (url.searchParams.get("from") ?? "").trim();
-  const dateTo = (url.searchParams.get("to") ?? "").trim();
-  const min = Number(url.searchParams.get("min") ?? "") || 0;
-  const max = Number(url.searchParams.get("max") ?? "") || 0;
-  const rawGroup = url.searchParams.get("group") ?? "";
-  const rawThen = url.searchParams.get("then") ?? "";
-  const group = isDimension(rawGroup) ? rawGroup : "";
-  const then = isDimension(rawThen) ? rawThen : "";
-  const page2 = Math.max(1, Number(url.searchParams.get("page") ?? 1));
-  const stamps = db.cases.map((c) => (c.date_assessed ?? "").slice(0, 10)).filter(Boolean).sort();
+function filterPanel(action, c, opts = {}) {
+  const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
+  const stamps = db.cases.map((x) => (x.date_assessed ?? "").slice(0, 10)).filter(Boolean).sort();
   const earliest = stamps[0] ?? "";
   const latest = stamps[stamps.length - 1] ?? "";
-  const amounts = db.cases.map((c) => c.value_amount ?? 0).filter((n) => n > 0);
+  const amounts = db.cases.map((x) => x.value_amount ?? 0).filter((n) => n > 0);
   const rangeHint = amounts.length ? `\u0443 \u0431\u0430\u0437\u0456 \u0432\u0456\u0434 ${shortMoney(Math.min(...amounts))} \u0434\u043E ${shortMoney(Math.max(...amounts))}` : "";
-  let list = db.cases;
-  if (q) {
-    list = list.filter(
-      (c) => (c.entity_name ?? "").toLowerCase().includes(q) || (c.title ?? "").toLowerCase().includes(q) || (c.officer_name ?? "").toLowerCase().includes(q) || (c.winner_name ?? "").toLowerCase().includes(q) || (c.entity_edrpou ?? "").includes(q) || (c.winner_edrpou ?? "").includes(q) || c.tender_ref.toLowerCase().includes(q)
-    );
+  const active = activeCount(c);
+  const anything = isFiltered(c) || Boolean(c.group);
+  return `<form class="filters" method="get" action="${esc(action)}">
+  <div class="filter-row">
+    <input type="search" name="q" value="${esc(c.q)}" placeholder="\u041D\u0430\u0437\u0432\u0430, \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A, \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0435\u0446\u044C, \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0435\u0446\u044C, \u0404\u0414\u0420\u041F\u041E\u0423 \u0430\u0431\u043E \u043D\u043E\u043C\u0435\u0440 \u0442\u0435\u043D\u0434\u0435\u0440\u0430" aria-label="\u041F\u043E\u0448\u0443\u043A">
+    <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
+    ${anything ? `<a class="reset" href="${esc(action)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0435</a>` : ""}
+  </div>
+
+  <details class="filters-more"${anything ? " open" : ""}>
+    <summary>\u0424\u0456\u043B\u044C\u0442\u0440\u0438 \u0442\u0430 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F${active > 0 ? ` <span class="badge">${active}</span>` : ""}</summary>
+    <div class="inner">
+      <div class="filter-row">
+        <select name="risk" aria-label="\u041E\u0437\u043D\u0430\u043A\u0430">
+          <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0430 \u043E\u0437\u043D\u0430\u043A\u0430</option>
+          ${db.rules.map(
+    (r) => `<option value="${esc(r.risk_id)}"${r.risk_id === c.risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`
+  ).join("")}
+        </select>
+        <select name="sort" aria-label="\u0421\u043E\u0440\u0442\u0443\u0432\u0430\u043D\u043D\u044F">
+          <option value="value"${c.sort === "value" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0456</option>
+          <option value="value-asc"${c.sort === "value-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u0435\u0448\u0435\u0432\u0448\u0456</option>
+          <option value="date"${c.sort === "date" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u043D\u043E\u0432\u0456\u0448\u0456</option>
+          <option value="date-asc"${c.sort === "date-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0441\u0442\u0430\u0440\u0456\u0448\u0456</option>
+          <option value="risks"${c.sort === "risks" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0437 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u043E\u044E \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044E \u043E\u0437\u043D\u0430\u043A</option>
+        </select>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">\u0414\u0430\u0442\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438</span>
+        <input type="date" name="from" value="${esc(c.dateFrom)}" aria-label="\u0414\u0430\u0442\u0430 \u0432\u0456\u0434" min="${esc(earliest)}" max="${esc(latest)}">
+        <span class="filter-label">\u043F\u043E</span>
+        <input type="date" name="to" value="${esc(c.dateTo)}" aria-label="\u0414\u0430\u0442\u0430 \u043F\u043E" min="${esc(earliest)}" max="${esc(latest)}">
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">\u0421\u0443\u043C\u0430, \u20B4</span>
+        <input type="number" name="min" value="${c.min > 0 ? c.min : ""}" placeholder="\u0432\u0456\u0434" aria-label="\u0421\u0443\u043C\u0430 \u0432\u0456\u0434" min="0" step="100000" class="num">
+        <span class="filter-label">\u043F\u043E</span>
+        <input type="number" name="max" value="${c.max > 0 ? c.max : ""}" placeholder="\u0434\u043E" aria-label="\u0421\u0443\u043C\u0430 \u0434\u043E" min="0" step="100000" class="num">
+        <span class="filter-label faint">${esc(rangeHint)}</span>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u0442\u0438</span>
+        <select name="group" aria-label="\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F">${dimensionOptions(c.group)}</select>
+        <span class="filter-label">\u043F\u043E\u0442\u0456\u043C</span>
+        <select name="then" aria-label="\u0414\u0440\u0443\u0433\u0435 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F"${c.group ? "" : " disabled"}>${dimensionOptions(c.then, c.group || void 0)}</select>
+      </div>
+
+      <div class="filter-row">
+        ${opts.hideRail ? "" : `<label class="check"><input type="checkbox" name="rail" value="1"${c.railOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</label>`}
+        <label class="check"><input type="checkbox" name="solo" value="1"${c.soloOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432</label>
+        ${opts.hidePrice ? "" : `<label class="check"><input type="checkbox" name="price" value="1"${c.priceOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0434\u0435 \u0446\u0456\u043D\u0430 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u0430</label>`}
+        <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
+      </div>
+    </div>
+  </details>
+</form>`;
+}
+function resultLine(list, c, groupCount) {
+  const value = list.reduce((sum2, x) => sum2 + (x.value_amount ?? 0), 0);
+  const base = isFiltered(c) ? `\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(value)}.` : `\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(value)}.`;
+  return `<p class="hint">${base}${c.group ? ` \u0417\u0433\u0440\u0443\u043F\u043E\u0432\u0430\u043D\u043E \u0443 <strong>${groupCount}</strong> ${plural(groupCount, "\u0433\u0440\u0443\u043F\u0443", "\u0433\u0440\u0443\u043F\u0438", "\u0433\u0440\u0443\u043F")}.` : ""}</p>`;
+}
+function listBody(list, c, action) {
+  if (list.length === 0) {
+    return '<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0447\u0430\u0441\u0442\u0438\u043D\u0443 \u0444\u0456\u043B\u044C\u0442\u0440\u0456\u0432.</div>';
   }
-  if (risk) list = list.filter((c) => c.risks.includes(risk));
-  if (railOnly) list = list.filter((c) => RAILWAY_EDRPOU.has(c.entity_edrpou ?? ""));
-  if (soloOnly) list = list.filter((c) => c.bidders === 1);
-  if (priceOnly) list = list.filter((c) => c.findings.length > 0);
-  if (dateFrom) list = list.filter((c) => (c.date_assessed ?? "") >= dateFrom);
-  if (dateTo) list = list.filter((c) => (c.date_assessed ?? "").slice(0, 10) <= dateTo);
-  if (min > 0) list = list.filter((c) => (c.value_amount ?? 0) >= min);
-  if (max > 0) list = list.filter((c) => (c.value_amount ?? 0) <= max);
-  list = [...list].sort(
-    (a, b) => sort === "date" ? String(b.date_assessed ?? "").localeCompare(String(a.date_assessed ?? "")) : sort === "date-asc" ? String(a.date_assessed ?? "").localeCompare(String(b.date_assessed ?? "")) : sort === "value-asc" ? (a.value_amount ?? 0) - (b.value_amount ?? 0) : sort === "risks" ? b.risks.length - a.risks.length || (b.value_amount ?? 0) - (a.value_amount ?? 0) : (b.value_amount ?? 0) - (a.value_amount ?? 0)
-  );
-  const shownValue = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
-  const groups = group ? buildGroups(list, group, then, shortRisk) : [];
+  if (c.group) {
+    const groups = buildGroups(list, c.group, c.then, shortRisk);
+    return `${resultLine(list, c, groups.length)}${groups.map((g) => groupBlock(g, 0)).join("")}`;
+  }
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const page2 = Math.min(c.page, pages);
   const slice = list.slice((page2 - 1) * PAGE_SIZE, page2 * PAGE_SIZE);
-  const keep = (over) => {
-    const p = new URLSearchParams();
-    if (q) p.set("q", q);
-    if (risk) p.set("risk", risk);
-    if (sort !== "value") p.set("sort", sort);
-    if (railOnly) p.set("rail", "1");
-    if (soloOnly) p.set("solo", "1");
-    if (priceOnly) p.set("price", "1");
-    if (dateFrom) p.set("from", dateFrom);
-    if (dateTo) p.set("to", dateTo);
-    if (min > 0) p.set("min", String(min));
-    if (max > 0) p.set("max", String(max));
-    if (group) p.set("group", group);
-    if (then) p.set("then", then);
-    for (const [k, v] of Object.entries(over)) p.set(k, v);
-    return `/?${p.toString()}`;
-  };
-  const filtered = Boolean(q || risk || railOnly || soloOnly || priceOnly || dateFrom || dateTo || min > 0 || max > 0);
-  const activeCount = [risk, railOnly, soloOnly, priceOnly, dateFrom, dateTo, min > 0, max > 0, group, sort !== "value"].filter(
-    Boolean
-  ).length;
-  const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
+  return `${resultLine(list, c, 0)}
+<div class="rows">${slice.map((x) => caseRow(x)).join("")}</div>
+${pages > 1 ? `<div class="pager">
+  ${page2 > 1 ? `<a href="${keepControls(action, c, { page: String(page2 - 1) })}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
+  <span>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 ${page2} \u0437 ${pages}</span>
+  ${page2 < pages ? `<a href="${keepControls(action, c, { page: String(page2 + 1) })}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a>` : ""}
+</div>` : ""}`;
+}
+function feedPage(url) {
+  const c = readControls(url);
+  const list = applyControls(db.cases, c, RAILWAY_EDRPOU);
   return layout({
     title: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
     nav: "feed",
@@ -1234,75 +1342,11 @@ function feedPage(url) {
 
 ${HELP}
 
-<form class="filters" method="get" action="/">
-  <div class="filter-row">
-    <input type="search" name="q" value="${esc(q)}" placeholder="\u041D\u0430\u0437\u0432\u0430, \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A, \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0435\u0446\u044C, \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0435\u0446\u044C, \u0404\u0414\u0420\u041F\u041E\u0423 \u0430\u0431\u043E \u043D\u043E\u043C\u0435\u0440 \u0442\u0435\u043D\u0434\u0435\u0440\u0430" aria-label="\u041F\u043E\u0448\u0443\u043A">
-    <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
-    ${filtered || group ? `<a class="reset" href="/">\u0441\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0435</a>` : ""}
-  </div>
+${filterPanel("/", c)}
 
-  <details class="filters-more"${filtered || group ? " open" : ""}>
-    <summary>\u0424\u0456\u043B\u044C\u0442\u0440\u0438 \u0442\u0430 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F${activeCount > 0 ? ` <span class="badge">${activeCount}</span>` : ""}</summary>
-    <div class="inner">
-      <div class="filter-row">
-        <select name="risk" aria-label="\u041E\u0437\u043D\u0430\u043A\u0430">
-          <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0430 \u043E\u0437\u043D\u0430\u043A\u0430</option>
-          ${db.rules.map(
-      (r) => `<option value="${esc(r.risk_id)}"${r.risk_id === risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`
-    ).join("")}
-        </select>
-        <select name="sort" aria-label="\u0421\u043E\u0440\u0442\u0443\u0432\u0430\u043D\u043D\u044F">
-          <option value="value"${sort === "value" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0456</option>
-          <option value="value-asc"${sort === "value-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u0435\u0448\u0435\u0432\u0448\u0456</option>
-          <option value="date"${sort === "date" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u043D\u043E\u0432\u0456\u0448\u0456</option>
-          <option value="date-asc"${sort === "date-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0441\u0442\u0430\u0440\u0456\u0448\u0456</option>
-          <option value="risks"${sort === "risks" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0437 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u043E\u044E \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044E \u043E\u0437\u043D\u0430\u043A</option>
-        </select>
-      </div>
+${c.risk ? riskCard(c.risk) : ""}
 
-      <div class="filter-row">
-        <span class="filter-label">\u0414\u0430\u0442\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438</span>
-        <input type="date" name="from" value="${esc(dateFrom)}" aria-label="\u0414\u0430\u0442\u0430 \u0432\u0456\u0434" min="${esc(earliest)}" max="${esc(latest)}">
-        <span class="filter-label">\u043F\u043E</span>
-        <input type="date" name="to" value="${esc(dateTo)}" aria-label="\u0414\u0430\u0442\u0430 \u043F\u043E" min="${esc(earliest)}" max="${esc(latest)}">
-      </div>
-
-      <div class="filter-row">
-        <span class="filter-label">\u0421\u0443\u043C\u0430, \u20B4</span>
-        <input type="number" name="min" value="${min > 0 ? min : ""}" placeholder="\u0432\u0456\u0434" aria-label="\u0421\u0443\u043C\u0430 \u0432\u0456\u0434" min="0" step="100000" class="num">
-        <span class="filter-label">\u043F\u043E</span>
-        <input type="number" name="max" value="${max > 0 ? max : ""}" placeholder="\u0434\u043E" aria-label="\u0421\u0443\u043C\u0430 \u0434\u043E" min="0" step="100000" class="num">
-        <span class="filter-label faint">${esc(rangeHint)}</span>
-      </div>
-
-      <div class="filter-row">
-        <span class="filter-label">\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u0442\u0438</span>
-        <select name="group" aria-label="\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F">${dimensionOptions(group)}</select>
-        <span class="filter-label">\u043F\u043E\u0442\u0456\u043C</span>
-        <select name="then" aria-label="\u0414\u0440\u0443\u0433\u0435 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F"${group ? "" : " disabled"}>${dimensionOptions(then, group || void 0)}</select>
-      </div>
-
-      <div class="filter-row">
-        <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</label>
-        <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432</label>
-        <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0434\u0435 \u0446\u0456\u043D\u0430 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u0430</label>
-        <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
-      </div>
-    </div>
-  </details>
-</form>
-
-<p class="hint">${filtered ? `\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(shownValue)}.` : "\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E \u0432\u0441\u0456, \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0456 \u0437\u0433\u043E\u0440\u0438."}${group ? ` \u0417\u0433\u0440\u0443\u043F\u043E\u0432\u0430\u043D\u043E \u0443 <strong>${groups.length}</strong> ${plural(groups.length, "\u0433\u0440\u0443\u043F\u0443", "\u0433\u0440\u0443\u043F\u0438", "\u0433\u0440\u0443\u043F")}.` : ""}</p>
-
-${risk ? riskCard(risk) : ""}
-
-${list.length === 0 ? `<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0447\u0430\u0441\u0442\u0438\u043D\u0443 \u0444\u0456\u043B\u044C\u0442\u0440\u0456\u0432.</div>` : group ? groups.map((g) => groupBlock(g, 0)).join("") : `<div class="rows">${slice.map((c) => caseRow(c)).join("")}</div>`}
-
-${!group && pages > 1 ? `<div class="pager">
-  ${page2 > 1 ? `<a href="${keep({ page: String(page2 - 1) })}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
-  <span>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 ${page2} \u0437 ${pages}</span>
-  ${page2 < pages ? `<a href="${keep({ page: String(page2 + 1) })}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a>` : ""}
-</div>` : ""}
+${listBody(list, c, "/")}
 
 <p class="note">\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0426\u0435 \u043E\u0437\u043D\u0430\u043A\u0430 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0430 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0430 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0439 \u0444\u0430\u043A\u0442 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
 `
@@ -1670,12 +1714,14 @@ function railwayBlocks() {
   ];
   return blocks.filter((b) => b.list.length > 0);
 }
-function railwayPage() {
+function railwayPage(url) {
   const blocks = railwayBlocks();
   const all = blocks.flatMap((b) => b.list);
-  const value = all.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
-  const solo = all.filter((c) => c.bidders === 1).length;
+  const value = all.reduce((sum2, c2) => sum2 + (c2.value_amount ?? 0), 0);
+  const solo = all.filter((c2) => c2.bidders === 1).length;
   const southern = blocks.find((b) => b.scope === "southern")?.list ?? [];
+  const c = readControls(url);
+  const filtered = applyControls(all, c, RAILWAY_EDRPOU, { hideRail: true });
   const suppliers = /* @__PURE__ */ new Map();
   for (const entry of all) {
     const key = entry.winner_edrpou ?? "";
@@ -1695,8 +1741,8 @@ function railwayPage() {
 <p class="sub">\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u043E\u0457 \u0433\u0430\u043B\u0443\u0437\u0456 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0442\u0440\u0438 \u0440\u0456\u0437\u043D\u0456 \u0437\u0430 \u043F\u0440\u0438\u0440\u043E\u0434\u043E\u044E \u0433\u0440\u0443\u043F\u0438, \u0456 \u043C\u0438 \u0457\u0445 \u043D\u0435 \u0437\u043C\u0456\u0448\u0443\u0454\u043C\u043E.</p>
 
 <p class="statline">
-  <b>${all.length.toLocaleString("uk-UA")}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043F\u0456\u0434 \u043F\u0438\u0442\u0430\u043D\u043D\u044F\u043C \xB7
-  <b>${shortMoney(value)}</b> \u0437\u0430\u0433\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430 \xB7
+  <b>${all.length.toLocaleString("uk-UA")}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \xB7
+  <b>${shortMoney(value)}</b> \u043D\u0430 \u0442\u0430\u043A\u0443 \u0441\u0443\u043C\u0443 \xB7
   <b>${solo}</b> \u0437 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
   <b>${southern.length}</b> \u0443 \xAB\u041F\u0456\u0432\u0434\u0435\u043D\u043D\u043E\u0457 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456\xBB
 </p>
@@ -1711,8 +1757,9 @@ function railwayPage() {
   </div>
 </details>
 
+<h2>\u0425\u0442\u043E \u0437\u0430\u043A\u0443\u043F\u043E\u0432\u0443\u0454</h2>
 ${blocks.map((block) => {
-      const blockValue = block.list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+      const blockValue = block.list.reduce((sum2, x) => sum2 + (x.value_amount ?? 0), 0);
       const entities = /* @__PURE__ */ new Map();
       for (const entry of block.list) {
         const key = entry.entity_edrpou ?? "";
@@ -1721,26 +1768,26 @@ ${blocks.map((block) => {
         acc.value += entry.value_amount ?? 0;
         entities.set(key, acc);
       }
-      const sorted = [...block.list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
       return `
-<h2>${esc(block.heading)}</h2>
+<h3 class="block-head">${esc(block.heading)}</h3>
 <p class="hint">${esc(block.note)}</p>
 <p class="hint"><strong>${block.list.length}</strong> ${plural(block.list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(blockValue)}, ${entities.size} ${plural(entities.size, "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A", "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438", "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432")}.</p>
 <div class="rows">
 ${[...entities.entries()].sort((a, b) => b[1].value - a[1].value).map(
         ([edrpou, acc]) => `<div class="row">
   <div class="who">
-    <div class="name"><a href="/entity/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
+    <div class="name">${star("entity", edrpou, "/railway")}<a href="/entity/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
     <div class="meta">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438</div>
   </div>
   <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
 </div>`
       ).join("")}
-</div>
-<div class="rows" style="margin-top:1rem">${sorted.slice(0, 20).map((c) => caseRow(c)).join("")}</div>
-${sorted.length > 20 ? `<p class="hint" style="margin-top:.8rem">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 20 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${sorted.length}.</p>` : ""}
-`;
+</div>`;
     }).join("")}
+
+<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456</h2>
+${filterPanel("/railway", c, { hideRail: true })}
+${listBody(filtered, c, "/railway")}
 
 <h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
 ${groupedRiskCards(rankRisks(all))}
@@ -1751,7 +1798,7 @@ ${groupedRiskCards(rankRisks(all))}
 ${topSuppliers.map(
       ([edrpou, acc]) => `<div class="row">
   <div class="who">
-    <div class="name"><a href="/supplier/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
+    <div class="name">${star("supplier", edrpou, "/railway")}<a href="/supplier/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
     <div class="meta">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433")}${acc.solo ? ` \xB7 ${acc.solo} \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432` : ""}</div>
   </div>
   <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
@@ -1874,16 +1921,17 @@ ${runs.slice(0, 30).map(
 `
   });
 }
-function pricesPage() {
-  const withFindings = db.cases.filter((c) => c.findings.length > 0);
-  const sum2 = (c) => c.findings.reduce((total, f) => {
+function pricesPage(url) {
+  const withFindings = db.cases.filter((c2) => c2.findings.length > 0);
+  const gapOf = (c2) => c2.findings.reduce((total, f) => {
     const e = f.evidence;
     return total + (e.overpayment ?? e.extra_cost ?? 0);
   }, 0);
-  const sorted = [...withFindings].sort((a, b) => sum2(b) - sum2(a));
-  const totalGap = withFindings.reduce((t, c) => t + sum2(c), 0);
-  const peer = withFindings.filter((c) => c.findings.some((f) => f.detector_key === "peer_price")).length;
-  const growth = withFindings.filter((c) => c.findings.some((f) => f.detector_key === "own_price_growth")).length;
+  const totalGap = withFindings.reduce((t, c2) => t + gapOf(c2), 0);
+  const peer = withFindings.filter((c2) => c2.findings.some((f) => f.detector_key === "peer_price")).length;
+  const growth = withFindings.filter((c2) => c2.findings.some((f) => f.detector_key === "own_price_growth")).length;
+  const c = readControls(url);
+  const list = applyControls(withFindings, c, RAILWAY_EDRPOU, { hidePrice: true });
   return layout({
     title: "\u0417\u0430\u0432\u0438\u0449\u0435\u043D\u0456 \u0446\u0456\u043D\u0438",
     nav: "prices",
@@ -1908,7 +1956,9 @@ function pricesPage() {
   </div>
 </details>
 
-${sorted.length === 0 ? '<div class="empty">\u041F\u043E\u043A\u0438 \u0449\u043E \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u0438\u0445 \u0446\u0456\u043D \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E.</div>' : `<div class="rows">${sorted.map((c) => caseRow(c)).join("")}</div>`}
+${filterPanel("/prices", c, { hidePrice: true })}
+
+${listBody(list, c, "/prices")}
 
 <p class="note">\u0420\u0456\u0437\u043D\u0438\u0446\u044F \u0432 \u0446\u0456\u043D\u0456 \u2014 \u0446\u0435 \u0449\u0435 \u043D\u0435 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F. \u0412\u043E\u043D\u0430 \u043C\u043E\u0436\u0435 \u043C\u0430\u0442\u0438 \u043F\u043E\u044F\u0441\u043D\u0435\u043D\u043D\u044F: \u0456\u043D\u0448\u0456 \u0443\u043C\u043E\u0432\u0438 \u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043D\u043D\u044F, \u0456\u043D\u0448\u0438\u0439 \u0447\u0430\u0441, \u0456\u043D\u0448\u0430 \u044F\u043A\u0456\u0441\u0442\u044C. \u041D\u0430\u0448\u0435 \u0437\u0430\u0432\u0434\u0430\u043D\u043D\u044F \u2014 \u043F\u043E\u043A\u0430\u0437\u0430\u0442\u0438, \u0434\u0435 \u0446\u0435 \u043F\u043E\u044F\u0441\u043D\u0435\u043D\u043D\u044F \u0432\u0430\u0440\u0442\u043E \u0437\u0430\u043F\u0438\u0442\u0430\u0442\u0438.</p>
 `
@@ -1959,30 +2009,32 @@ ${found && profile ? `${star("entity", code, "/lookup?edrpou=" + encodeURICompon
 `
   });
 }
-function starredPage(saved) {
-  const tenders = saved.filter((f) => f.kind === "tender").map((f) => db.byTender.get(f.id)).filter((c) => Boolean(c));
+function starredPage(saved, url) {
+  const tenders = saved.filter((f) => f.kind === "tender").map((f) => db.byTender.get(f.id)).filter((c2) => Boolean(c2));
   const missingTenders = saved.filter((f) => f.kind === "tender").length - tenders.length;
+  const c = readControls(url);
+  const filteredTenders = applyControls(tenders, c, RAILWAY_EDRPOU);
   const companyRows = saved.filter((f) => f.kind === "entity" || f.kind === "supplier").map((f) => {
-    const list = f.kind === "entity" ? db.cases.filter((c) => c.entity_edrpou === f.id) : db.cases.filter((c) => c.winner_edrpou === f.id);
-    const name = f.kind === "entity" ? list.find((c) => c.entity_name)?.entity_name : list.find((c) => c.winner_name)?.winner_name;
+    const list = f.kind === "entity" ? db.cases.filter((c2) => c2.entity_edrpou === f.id) : db.cases.filter((c2) => c2.winner_edrpou === f.id);
+    const name = f.kind === "entity" ? list.find((c2) => c2.entity_name)?.entity_name : list.find((c2) => c2.winner_name)?.winner_name;
     return {
       fav: f,
       href: `/${f.kind === "entity" ? "entity" : "supplier"}/${encodeURIComponent(f.id)}`,
       name: readableName(name ?? "") || f.id,
       role: f.kind === "entity" ? "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A" : "\u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A",
       count: list.length,
-      value: list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0)
+      value: list.reduce((sum2, c2) => sum2 + (c2.value_amount ?? 0), 0)
     };
   });
   const officerRows = saved.filter((f) => f.kind === "officer").map((f) => {
-    const list = db.cases.filter((c) => c.officer_key === f.id);
+    const list = db.cases.filter((c2) => c2.officer_key === f.id);
     return {
       fav: f,
       href: `/officer/${encodeURIComponent(f.id)}`,
-      name: list.find((c) => c.officer_name)?.officer_name ?? f.id,
-      entity: readableName(list.find((c) => c.entity_name)?.entity_name ?? ""),
+      name: list.find((c2) => c2.officer_name)?.officer_name ?? f.id,
+      entity: readableName(list.find((c2) => c2.entity_name)?.entity_name ?? ""),
       count: list.length,
-      value: list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0)
+      value: list.reduce((sum2, c2) => sum2 + (c2.value_amount ?? 0), 0)
     };
   });
   const section = (title, count, inner) => count === 0 ? "" : `<h2>${esc(title)} \u2014 ${count}</h2>${inner}`;
@@ -2005,7 +2057,7 @@ ${saved.length === 0 ? `<div class="empty">\u041F\u043E\u043A\u0438 \u043D\u0456
 ${section(
       "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
       tenders.length,
-      `<div class="rows">${tenders.map((c) => caseRow(c)).join("")}</div>${missingTenders > 0 ? `<p class="note">${missingTenders} ${plural(missingTenders, "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0430", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0456", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E")} \u0432 \u0431\u0430\u0437\u0456.</p>` : ""}`
+      `${filterPanel("/starred", c)}${listBody(filteredTenders, c, "/starred")}${missingTenders > 0 ? `<p class="note">${missingTenders} ${plural(missingTenders, "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0430", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0456", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E")} \u0432 \u0431\u0430\u0437\u0456.</p>` : ""}`
     )}
 
 ${section(
@@ -2106,14 +2158,14 @@ function render(url, saved = []) {
     if (!code) return { status: 200, body: lookupPage(null, url.searchParams.get("edrpou") ?? "") };
     return { status: 200, body: lookupPage(code, code) };
   }
-  if (path === "/starred") return { status: 200, body: starredPage(saved) };
+  if (path === "/starred") return { status: 200, body: starredPage(saved, url) };
   if (path === "/") return { status: 200, body: feedPage(url) };
   if (path === "/entities") return { status: 200, body: entitiesPage() };
   if (path === "/officers") return { status: 200, body: officersPage() };
   if (path === "/suppliers") return { status: 200, body: suppliersPage() };
-  if (path === "/railway") return { status: 200, body: railwayPage() };
+  if (path === "/railway") return { status: 200, body: railwayPage(url) };
   if (path === "/updates") return { status: 200, body: updatesPage() };
-  if (path === "/prices") return { status: 200, body: pricesPage() };
+  if (path === "/prices") return { status: 200, body: pricesPage(url) };
   if (path === "/indicators") return { status: 200, body: indicatorsPage() };
   if (path === "/about") return { status: 200, body: aboutPage() };
   if (path.startsWith("/article/")) return { status: 200, body: articlePage(path.slice("/article/".length), url) };

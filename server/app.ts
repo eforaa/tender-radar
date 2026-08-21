@@ -6,6 +6,10 @@ import { ARTICLES, INDICATOR_LEGAL, isJointStock } from "../src/legal.ts";
 import { loadDataset, type Case, type Dataset } from "./data.ts";
 import { DIMENSIONS, buildGroups, isDimension, type Dimension, type Group } from "./grouping.ts";
 import { normaliseEdrpou, isStarred, type Favourite, type FavKind } from "./favourites.ts";
+import {
+  readControls, applyControls, activeCount, isFiltered, keepControls,
+  type Controls, type ControlOptions,
+} from "./controls.ts";
 
 const PAGE_SIZE = 30;
 
@@ -203,103 +207,131 @@ function groupBlock(group: Group, depth: number): string {
 </details>`;
 }
 
-function feedPage(url: URL): string {
-  const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
-  const risk = url.searchParams.get("risk") ?? "";
-  const sort = url.searchParams.get("sort") ?? "value";
-  const railOnly = url.searchParams.get("rail") === "1";
-  const soloOnly = url.searchParams.get("solo") === "1";
-  const priceOnly = url.searchParams.get("price") === "1";
-  const dateFrom = (url.searchParams.get("from") ?? "").trim();
-  const dateTo = (url.searchParams.get("to") ?? "").trim();
-  const min = Number(url.searchParams.get("min") ?? "") || 0;
-  const max = Number(url.searchParams.get("max") ?? "") || 0;
-  const rawGroup = url.searchParams.get("group") ?? "";
-  const rawThen = url.searchParams.get("then") ?? "";
-  const group: Dimension = isDimension(rawGroup) ? rawGroup : "";
-  const then: Dimension = isDimension(rawThen) ? rawThen : "";
-  const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
+/* ---------- shared list controls ---------- */
 
-  // Bounds for the date inputs and the amount hint, taken from the data
-  // itself so the controls never offer a range that returns nothing.
-  const stamps = db.cases.map((c) => (c.date_assessed ?? "").slice(0, 10)).filter(Boolean).sort();
-  const earliest = stamps[0] ?? "";
-  const latest = stamps[stamps.length - 1] ?? "";
-  const amounts = db.cases.map((c) => c.value_amount ?? 0).filter((n) => n > 0);
-  const rangeHint = amounts.length
-    ? `у базі від ${shortMoney(Math.min(...amounts))} до ${shortMoney(Math.max(...amounts))}`
-    : "";
-
-  let list = db.cases;
-  if (q) {
-    list = list.filter(
-      (c) =>
-        (c.entity_name ?? "").toLowerCase().includes(q) ||
-        (c.title ?? "").toLowerCase().includes(q) ||
-        (c.officer_name ?? "").toLowerCase().includes(q) ||
-        (c.winner_name ?? "").toLowerCase().includes(q) ||
-        (c.entity_edrpou ?? "").includes(q) ||
-        (c.winner_edrpou ?? "").includes(q) ||
-        c.tender_ref.toLowerCase().includes(q),
-    );
-  }
-  if (risk) list = list.filter((c) => c.risks.includes(risk));
-  if (railOnly) list = list.filter((c) => RAILWAY_EDRPOU.has(c.entity_edrpou ?? ""));
-  if (soloOnly) list = list.filter((c) => c.bidders === 1);
-  if (priceOnly) list = list.filter((c) => c.findings.length > 0);
-  // Dates compare as ISO strings; the stored value starts with YYYY-MM-DD,
-  // so a plain string comparison is correct and needs no parsing.
-  if (dateFrom) list = list.filter((c) => (c.date_assessed ?? "") >= dateFrom);
-  if (dateTo) list = list.filter((c) => (c.date_assessed ?? "").slice(0, 10) <= dateTo);
-  if (min > 0) list = list.filter((c) => (c.value_amount ?? 0) >= min);
-  if (max > 0) list = list.filter((c) => (c.value_amount ?? 0) <= max);
-
-  list = [...list].sort((a, b) =>
-    sort === "date"
-      ? String(b.date_assessed ?? "").localeCompare(String(a.date_assessed ?? ""))
-      : sort === "date-asc"
-        ? String(a.date_assessed ?? "").localeCompare(String(b.date_assessed ?? ""))
-        : sort === "value-asc"
-          ? (a.value_amount ?? 0) - (b.value_amount ?? 0)
-          : sort === "risks"
-            ? b.risks.length - a.risks.length || (b.value_amount ?? 0) - (a.value_amount ?? 0)
-            : (b.value_amount ?? 0) - (a.value_amount ?? 0),
-  );
-
-  const shownValue = list.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
-  const groups = group ? buildGroups(list, group, then, shortRisk) : [];
-
-  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
-  const slice = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const keep = (over: Record<string, string>) => {
-    const p = new URLSearchParams();
-    if (q) p.set("q", q);
-    if (risk) p.set("risk", risk);
-    if (sort !== "value") p.set("sort", sort);
-    if (railOnly) p.set("rail", "1");
-    if (soloOnly) p.set("solo", "1");
-    if (priceOnly) p.set("price", "1");
-    if (dateFrom) p.set("from", dateFrom);
-    if (dateTo) p.set("to", dateTo);
-    if (min > 0) p.set("min", String(min));
-    if (max > 0) p.set("max", String(max));
-    if (group) p.set("group", group);
-    if (then) p.set("then", then);
-    for (const [k, v] of Object.entries(over)) p.set(k, v);
-    return `/?${p.toString()}`;
-  };
-
-  const filtered = Boolean(q || risk || railOnly || soloOnly || priceOnly || dateFrom || dateTo || min > 0 || max > 0);
-  // Shown on the collapsed summary, so a folded panel never hides the fact
-  // that the list is filtered.
-  const activeCount = [risk, railOnly, soloOnly, priceOnly, dateFrom, dateTo, min > 0, max > 0, group, sort !== "value"].filter(
-    Boolean,
-  ).length;
+/**
+ * The filter panel. Identical on every page that shows tenders; `action` is
+ * where it submits, so each tab filters its own scope.
+ */
+function filterPanel(action: string, c: Controls, opts: ControlOptions = {}): string {
   const dimensionOptions = (selected: Dimension, skip?: Dimension) =>
     DIMENSIONS.filter((d) => d.value !== skip || d.value === "")
       .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
       .join("");
+
+  const stamps = db.cases.map((x) => (x.date_assessed ?? "").slice(0, 10)).filter(Boolean).sort();
+  const earliest = stamps[0] ?? "";
+  const latest = stamps[stamps.length - 1] ?? "";
+  const amounts = db.cases.map((x) => x.value_amount ?? 0).filter((n) => n > 0);
+  const rangeHint = amounts.length
+    ? `у базі від ${shortMoney(Math.min(...amounts))} до ${shortMoney(Math.max(...amounts))}`
+    : "";
+
+  const active = activeCount(c);
+  const anything = isFiltered(c) || Boolean(c.group);
+
+  return `<form class="filters" method="get" action="${esc(action)}">
+  <div class="filter-row">
+    <input type="search" name="q" value="${esc(c.q)}" placeholder="Назва, замовник, посадовець, переможець, ЄДРПОУ або номер тендера" aria-label="Пошук">
+    <button type="submit">Показати</button>
+    ${anything ? `<a class="reset" href="${esc(action)}">скинути все</a>` : ""}
+  </div>
+
+  <details class="filters-more"${anything ? " open" : ""}>
+    <summary>Фільтри та групування${active > 0 ? ` <span class="badge">${active}</span>` : ""}</summary>
+    <div class="inner">
+      <div class="filter-row">
+        <select name="risk" aria-label="Ознака">
+          <option value="">Будь-яка ознака</option>
+          ${db.rules
+            .map(
+              (r) =>
+                `<option value="${esc(r.risk_id)}"${r.risk_id === c.risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`,
+            )
+            .join("")}
+        </select>
+        <select name="sort" aria-label="Сортування">
+          <option value="value"${c.sort === "value" ? " selected" : ""}>Спочатку найдорожчі</option>
+          <option value="value-asc"${c.sort === "value-asc" ? " selected" : ""}>Спочатку найдешевші</option>
+          <option value="date"${c.sort === "date" ? " selected" : ""}>Спочатку найновіші</option>
+          <option value="date-asc"${c.sort === "date-asc" ? " selected" : ""}>Спочатку найстаріші</option>
+          <option value="risks"${c.sort === "risks" ? " selected" : ""}>Спочатку з найбільшою кількістю ознак</option>
+        </select>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">Дата позначки</span>
+        <input type="date" name="from" value="${esc(c.dateFrom)}" aria-label="Дата від" min="${esc(earliest)}" max="${esc(latest)}">
+        <span class="filter-label">по</span>
+        <input type="date" name="to" value="${esc(c.dateTo)}" aria-label="Дата по" min="${esc(earliest)}" max="${esc(latest)}">
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">Сума, ₴</span>
+        <input type="number" name="min" value="${c.min > 0 ? c.min : ""}" placeholder="від" aria-label="Сума від" min="0" step="100000" class="num">
+        <span class="filter-label">по</span>
+        <input type="number" name="max" value="${c.max > 0 ? c.max : ""}" placeholder="до" aria-label="Сума до" min="0" step="100000" class="num">
+        <span class="filter-label faint">${esc(rangeHint)}</span>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">Групувати</span>
+        <select name="group" aria-label="Групування">${dimensionOptions(c.group)}</select>
+        <span class="filter-label">потім</span>
+        <select name="then" aria-label="Друге групування"${c.group ? "" : " disabled"}>${dimensionOptions(c.then, c.group || undefined)}</select>
+      </div>
+
+      <div class="filter-row">
+        ${opts.hideRail ? "" : `<label class="check"><input type="checkbox" name="rail" value="1"${c.railOnly ? " checked" : ""}> лише залізниця</label>`}
+        <label class="check"><input type="checkbox" name="solo" value="1"${c.soloOnly ? " checked" : ""}> лише без конкурентів</label>
+        ${opts.hidePrice ? "" : `<label class="check"><input type="checkbox" name="price" value="1"${c.priceOnly ? " checked" : ""}> лише де ціна завищена</label>`}
+        <button type="submit">Показати</button>
+      </div>
+    </div>
+  </details>
+</form>`;
+}
+
+/** The result count line, so a folded panel never hides what was applied. */
+function resultLine(list: Case[], c: Controls, groupCount: number): string {
+  const value = list.reduce((sum, x) => sum + (x.value_amount ?? 0), 0);
+  const base = isFiltered(c)
+    ? `Знайдено <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "закупівлю", "закупівлі", "закупівель")} на ${shortMoney(value)}.`
+    : `Показано <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "закупівлю", "закупівлі", "закупівель")} на ${shortMoney(value)}.`;
+  return `<p class="hint">${base}${c.group ? ` Згруповано у <strong>${groupCount}</strong> ${plural(groupCount, "групу", "групи", "груп")}.` : ""}</p>`;
+}
+
+/** Rows, or collapsible groups, plus the pager. Shared by every list page. */
+function listBody(list: Case[], c: Controls, action: string): string {
+  if (list.length === 0) {
+    return '<div class="empty">За цими умовами нічого не знайшлося. Спробуйте прибрати частину фільтрів.</div>';
+  }
+
+  if (c.group) {
+    const groups = buildGroups(list, c.group, c.then, shortRisk);
+    return `${resultLine(list, c, groups.length)}${groups.map((g) => groupBlock(g, 0)).join("")}`;
+  }
+
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const page = Math.min(c.page, pages);
+  const slice = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  return `${resultLine(list, c, 0)}
+<div class="rows">${slice.map((x) => caseRow(x)).join("")}</div>
+${
+  pages > 1
+    ? `<div class="pager">
+  ${page > 1 ? `<a href="${keepControls(action, c, { page: String(page - 1) })}">← попередні</a>` : ""}
+  <span>сторінка ${page} з ${pages}</span>
+  ${page < pages ? `<a href="${keepControls(action, c, { page: String(page + 1) })}">наступні →</a>` : ""}
+</div>`
+    : ""
+}`;
+}
+
+function feedPage(url: URL): string {
+  const c = readControls(url);
+  const list = applyControls(db.cases, c, RAILWAY_EDRPOU);
 
   return layout({
     title: "Закупівлі",
@@ -317,92 +349,11 @@ function feedPage(url: URL): string {
 
 ${HELP}
 
-<form class="filters" method="get" action="/">
-  <div class="filter-row">
-    <input type="search" name="q" value="${esc(q)}" placeholder="Назва, замовник, посадовець, переможець, ЄДРПОУ або номер тендера" aria-label="Пошук">
-    <button type="submit">Показати</button>
-    ${filtered || group ? `<a class="reset" href="/">скинути все</a>` : ""}
-  </div>
+${filterPanel("/", c)}
 
-  <details class="filters-more"${filtered || group ? " open" : ""}>
-    <summary>Фільтри та групування${activeCount > 0 ? ` <span class="badge">${activeCount}</span>` : ""}</summary>
-    <div class="inner">
-      <div class="filter-row">
-        <select name="risk" aria-label="Ознака">
-          <option value="">Будь-яка ознака</option>
-          ${db.rules
-            .map(
-              (r) =>
-                `<option value="${esc(r.risk_id)}"${r.risk_id === risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`,
-            )
-            .join("")}
-        </select>
-        <select name="sort" aria-label="Сортування">
-          <option value="value"${sort === "value" ? " selected" : ""}>Спочатку найдорожчі</option>
-          <option value="value-asc"${sort === "value-asc" ? " selected" : ""}>Спочатку найдешевші</option>
-          <option value="date"${sort === "date" ? " selected" : ""}>Спочатку найновіші</option>
-          <option value="date-asc"${sort === "date-asc" ? " selected" : ""}>Спочатку найстаріші</option>
-          <option value="risks"${sort === "risks" ? " selected" : ""}>Спочатку з найбільшою кількістю ознак</option>
-        </select>
-      </div>
+${c.risk ? riskCard(c.risk) : ""}
 
-      <div class="filter-row">
-        <span class="filter-label">Дата позначки</span>
-        <input type="date" name="from" value="${esc(dateFrom)}" aria-label="Дата від" min="${esc(earliest)}" max="${esc(latest)}">
-        <span class="filter-label">по</span>
-        <input type="date" name="to" value="${esc(dateTo)}" aria-label="Дата по" min="${esc(earliest)}" max="${esc(latest)}">
-      </div>
-
-      <div class="filter-row">
-        <span class="filter-label">Сума, ₴</span>
-        <input type="number" name="min" value="${min > 0 ? min : ""}" placeholder="від" aria-label="Сума від" min="0" step="100000" class="num">
-        <span class="filter-label">по</span>
-        <input type="number" name="max" value="${max > 0 ? max : ""}" placeholder="до" aria-label="Сума до" min="0" step="100000" class="num">
-        <span class="filter-label faint">${esc(rangeHint)}</span>
-      </div>
-
-      <div class="filter-row">
-        <span class="filter-label">Групувати</span>
-        <select name="group" aria-label="Групування">${dimensionOptions(group)}</select>
-        <span class="filter-label">потім</span>
-        <select name="then" aria-label="Друге групування"${group ? "" : " disabled"}>${dimensionOptions(then, group || undefined)}</select>
-      </div>
-
-      <div class="filter-row">
-        <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> лише залізниця</label>
-        <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> лише без конкурентів</label>
-        <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> лише де ціна завищена</label>
-        <button type="submit">Показати</button>
-      </div>
-    </div>
-  </details>
-</form>
-
-<p class="hint">${
-      filtered
-        ? `Знайдено <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "закупівлю", "закупівлі", "закупівель")} на ${shortMoney(shownValue)}.`
-        : "Показано всі, найдорожчі згори."
-    }${group ? ` Згруповано у <strong>${groups.length}</strong> ${plural(groups.length, "групу", "групи", "груп")}.` : ""}</p>
-
-${risk ? riskCard(risk) : ""}
-
-${
-  list.length === 0
-    ? `<div class="empty">За цими умовами нічого не знайшлося. Спробуйте прибрати частину фільтрів.</div>`
-    : group
-      ? groups.map((g) => groupBlock(g, 0)).join("")
-      : `<div class="rows">${slice.map((c) => caseRow(c)).join("")}</div>`
-}
-
-${
-  !group && pages > 1
-    ? `<div class="pager">
-  ${page > 1 ? `<a href="${keep({ page: String(page - 1) })}">← попередні</a>` : ""}
-  <span>сторінка ${page} з ${pages}</span>
-  ${page < pages ? `<a href="${keep({ page: String(page + 1) })}">наступні →</a>` : ""}
-</div>`
-    : ""
-}
+${listBody(list, c, "/")}
 
 <p class="note">Позначка означає, що спрацював індикатор державної системи моніторингу закупівель. Це ознака ризику, яка потребує перевірки, а не встановлений факт порушення.</p>
 `,
@@ -842,12 +793,16 @@ function railwayBlocks(): RailwayBlock[] {
   return blocks.filter((b) => b.list.length > 0);
 }
 
-function railwayPage(): string {
+function railwayPage(url: URL): string {
   const blocks = railwayBlocks();
   const all = blocks.flatMap((b) => b.list);
   const value = all.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
   const solo = all.filter((c) => c.bidders === 1).length;
   const southern = blocks.find((b) => b.scope === "southern")?.list ?? [];
+
+  // The whole page is railway already, so that checkbox would do nothing.
+  const c = readControls(url);
+  const filtered = applyControls(all, c, RAILWAY_EDRPOU, { hideRail: true });
 
   const suppliers = new Map<string, { name: string; count: number; value: number; solo: number }>();
   for (const entry of all) {
@@ -869,8 +824,8 @@ function railwayPage(): string {
 <p class="sub">Закупівлі залізничної галузі з позначками державної системи моніторингу. Нижче — три різні за природою групи, і ми їх не змішуємо.</p>
 
 <p class="statline">
-  <b>${all.length.toLocaleString("uk-UA")}</b> закупівель під питанням ·
-  <b>${shortMoney(value)}</b> загальна сума ·
+  <b>${all.length.toLocaleString("uk-UA")}</b> закупівель із позначками ·
+  <b>${shortMoney(value)}</b> на таку суму ·
   <b>${solo}</b> з єдиним учасником ·
   <b>${southern.length}</b> у «Південної залізниці»
 </p>
@@ -885,9 +840,10 @@ function railwayPage(): string {
   </div>
 </details>
 
+<h2>Хто закуповує</h2>
 ${blocks
   .map((block) => {
-    const blockValue = block.list.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
+    const blockValue = block.list.reduce((sum, x) => sum + (x.value_amount ?? 0), 0);
     const entities = new Map<string, { name: string; count: number; value: number }>();
     for (const entry of block.list) {
       const key = entry.entity_edrpou ?? "";
@@ -896,10 +852,9 @@ ${blocks
       acc.value += entry.value_amount ?? 0;
       entities.set(key, acc);
     }
-    const sorted = [...block.list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
 
     return `
-<h2>${esc(block.heading)}</h2>
+<h3 class="block-head">${esc(block.heading)}</h3>
 <p class="hint">${esc(block.note)}</p>
 <p class="hint"><strong>${block.list.length}</strong> ${plural(block.list.length, "закупівля", "закупівлі", "закупівель")} на ${shortMoney(blockValue)}, ${entities.size} ${plural(entities.size, "замовник", "замовники", "замовників")}.</p>
 <div class="rows">
@@ -908,19 +863,20 @@ ${[...entities.entries()]
   .map(
     ([edrpou, acc]) => `<div class="row">
   <div class="who">
-    <div class="name"><a href="/entity/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
+    <div class="name">${star("entity", edrpou, "/railway")}<a href="/entity/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
     <div class="meta">ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "закупівля", "закупівлі", "закупівель")} із позначками</div>
   </div>
   <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
 </div>`,
   )
   .join("")}
-</div>
-<div class="rows" style="margin-top:1rem">${sorted.slice(0, 20).map((c) => caseRow(c)).join("")}</div>
-${sorted.length > 20 ? `<p class="hint" style="margin-top:.8rem">Показано 20 найдорожчих із ${sorted.length}.</p>` : ""}
-`;
+</div>`;
   })
   .join("")}
+
+<h2>Закупівлі залізниці</h2>
+${filterPanel("/railway", c, { hideRail: true })}
+${listBody(filtered, c, "/railway")}
 
 <h2>Що держава запідозрила в залізничних закупівлях</h2>
 ${groupedRiskCards(rankRisks(all))}
@@ -932,7 +888,7 @@ ${topSuppliers
   .map(
     ([edrpou, acc]) => `<div class="row">
   <div class="who">
-    <div class="name"><a href="/supplier/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
+    <div class="name">${star("supplier", edrpou, "/railway")}<a href="/supplier/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
     <div class="meta">ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "перемога", "перемоги", "перемог")}${acc.solo ? ` · ${acc.solo} без конкурентів` : ""}</div>
   </div>
   <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
@@ -945,7 +901,6 @@ ${topSuppliers
 `,
   });
 }
-
 
 /* ---------- criminal-code screening ---------- */
 
@@ -1090,18 +1045,21 @@ ${runs
 
 /* ---------- our own price findings ---------- */
 
-function pricesPage(): string {
+function pricesPage(url: URL): string {
   const withFindings = db.cases.filter((c) => c.findings.length > 0);
-  const sum = (c: (typeof withFindings)[number]) =>
+  const gapOf = (c: Case) =>
     c.findings.reduce((total, f) => {
       const e = f.evidence as { overpayment?: number; extra_cost?: number };
       return total + (e.overpayment ?? e.extra_cost ?? 0);
     }, 0);
 
-  const sorted = [...withFindings].sort((a, b) => sum(b) - sum(a));
-  const totalGap = withFindings.reduce((t, c) => t + sum(c), 0);
+  const totalGap = withFindings.reduce((t, c) => t + gapOf(c), 0);
   const peer = withFindings.filter((c) => c.findings.some((f) => f.detector_key === "peer_price")).length;
   const growth = withFindings.filter((c) => c.findings.some((f) => f.detector_key === "own_price_growth")).length;
+
+  // Every tender here already has a price finding, so that checkbox is moot.
+  const c = readControls(url);
+  const list = applyControls(withFindings, c, RAILWAY_EDRPOU, { hidePrice: true });
 
   return layout({
     title: "Завищені ціни",
@@ -1127,17 +1085,14 @@ function pricesPage(): string {
   </div>
 </details>
 
-${
-  sorted.length === 0
-    ? '<div class="empty">Поки що завищених цін не знайдено.</div>'
-    : `<div class="rows">${sorted.map((c) => caseRow(c)).join("")}</div>`
-}
+${filterPanel("/prices", c, { hidePrice: true })}
+
+${listBody(list, c, "/prices")}
 
 <p class="note">Різниця в ціні — це ще не порушення. Вона може мати пояснення: інші умови постачання, інший час, інша якість. Наше завдання — показати, де це пояснення варто запитати.</p>
 `,
   });
 }
-
 
 /* ---------- saved companies and EDRPOU lookup ---------- */
 
@@ -1217,9 +1172,11 @@ ${
   });
 }
 
-function starredPage(saved: Favourite[]): string {
+function starredPage(saved: Favourite[], url: URL): string {
   const tenders = saved.filter((f) => f.kind === "tender").map((f) => db.byTender.get(f.id)).filter((c): c is Case => Boolean(c));
   const missingTenders = saved.filter((f) => f.kind === "tender").length - tenders.length;
+  const c = readControls(url);
+  const filteredTenders = applyControls(tenders, c, RAILWAY_EDRPOU);
 
   const companyRows = saved
     .filter((f) => f.kind === "entity" || f.kind === "supplier")
@@ -1282,7 +1239,7 @@ ${
 ${section(
   "Закупівлі",
   tenders.length,
-  `<div class="rows">${tenders.map((c) => caseRow(c)).join("")}</div>${
+  `${filterPanel("/starred", c)}${listBody(filteredTenders, c, "/starred")}${
     missingTenders > 0
       ? `<p class="note">${missingTenders} ${plural(missingTenders, "позначена закупівля більше не знайдена", "позначені закупівлі більше не знайдені", "позначених закупівель більше не знайдено")} в базі.</p>`
       : ""
@@ -1416,15 +1373,15 @@ export function render(url: URL, saved: Favourite[] = []): Rendered {
     if (!code) return { status: 200, body: lookupPage(null, url.searchParams.get("edrpou") ?? "") };
     return { status: 200, body: lookupPage(code, code) };
   }
-  if (path === "/starred") return { status: 200, body: starredPage(saved) };
+  if (path === "/starred") return { status: 200, body: starredPage(saved, url) };
 
   if (path === "/") return { status: 200, body: feedPage(url) };
   if (path === "/entities") return { status: 200, body: entitiesPage() };
   if (path === "/officers") return { status: 200, body: officersPage() };
   if (path === "/suppliers") return { status: 200, body: suppliersPage() };
-  if (path === "/railway") return { status: 200, body: railwayPage() };
+  if (path === "/railway") return { status: 200, body: railwayPage(url) };
   if (path === "/updates") return { status: 200, body: updatesPage() };
-  if (path === "/prices") return { status: 200, body: pricesPage() };
+  if (path === "/prices") return { status: 200, body: pricesPage(url) };
   if (path === "/indicators") return { status: 200, body: indicatorsPage() };
   if (path === "/about") return { status: 200, body: aboutPage() };
   if (path.startsWith("/article/")) return { status: 200, body: articlePage(path.slice("/article/".length), url) };
