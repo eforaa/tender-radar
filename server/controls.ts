@@ -13,6 +13,8 @@ export type Controls = {
   railOnly: boolean;
   soloOnly: boolean;
   priceOnly: boolean;
+  /** "" any · "violation" auditors found something · "clear" they did not. */
+  audit: string;
   dateFrom: string;
   dateTo: string;
   min: number;
@@ -33,6 +35,9 @@ export function readControls(url: URL): Controls {
     railOnly: url.searchParams.get("rail") === "1",
     soloOnly: url.searchParams.get("solo") === "1",
     priceOnly: url.searchParams.get("price") === "1",
+    audit: ["violation", "clear"].includes(url.searchParams.get("audit") ?? "")
+      ? (url.searchParams.get("audit") as string)
+      : "",
     dateFrom: (url.searchParams.get("from") ?? "").trim(),
     dateTo: (url.searchParams.get("to") ?? "").trim(),
     min: Number(url.searchParams.get("min") ?? "") || 0,
@@ -51,6 +56,7 @@ export function activeCount(c: Controls): number {
     c.railOnly,
     c.soloOnly,
     c.priceOnly,
+    c.audit,
     c.dateFrom,
     c.dateTo,
     c.min > 0,
@@ -93,6 +99,8 @@ export function applyControls(cases: Case[], c: Controls, railwayCodes: Set<stri
   if (c.railOnly && !opts.hideRail) list = list.filter((x) => railwayCodes.has(x.entity_edrpou ?? ""));
   if (c.soloOnly) list = list.filter((x) => x.bidders === 1);
   if (c.priceOnly && !opts.hidePrice) list = list.filter((x) => x.findings.length > 0);
+  if (c.audit === "violation") list = list.filter((x) => x.audit?.violation === true);
+  if (c.audit === "clear") list = list.filter((x) => x.audit !== null && !x.audit.violation);
 
   // The date range is the tender's own publication date, not the date the
   // state assessed it: assessments are nearly all recent, so filtering by them
@@ -128,6 +136,7 @@ export function keepControls(action: string, c: Controls, over: Record<string, s
   if (c.railOnly) p.set("rail", "1");
   if (c.soloOnly) p.set("solo", "1");
   if (c.priceOnly) p.set("price", "1");
+  if (c.audit) p.set("audit", c.audit);
   if (c.dateFrom) p.set("from", c.dateFrom);
   if (c.dateTo) p.set("to", c.dateTo);
   if (c.min > 0) p.set("min", String(c.min));

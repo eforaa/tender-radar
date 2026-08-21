@@ -2,8 +2,30 @@
 import { openStore } from "../src/config.ts";
 import { officerKey } from "../src/normalize/tender.ts";
 import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow, RunRow, FindingRow } from "../src/store/types.ts";
+import { violationEstablished, conclusionText, conclusionPublished } from "../src/normalize/monitoring.ts";
 
 /** One entry per tender: the flags that fired plus whatever the card added. */
+/**
+ * What the State Audit Service concluded about this tender.
+ *
+ * Absent means nobody has looked, which is the common case and says nothing.
+ * `violation: false` means they looked and found nothing — worth printing,
+ * because it is the one thing on this site that clears a name rather than
+ * raising a question about it.
+ */
+export type AuditVerdict = {
+  violation: boolean;
+  text: string;
+  published: string | null;
+  monitoring_id: string;
+  /** Monitorings with a published conclusion on this tender. */
+  count: number;
+  /** Why the monitoring was opened, as the API's codes. */
+  reasons: string[];
+  /** What kind of violation was established, when one was. */
+  types: string[];
+};
+
 export type Case = {
   tender_id: string;
   tender_ref: string;
@@ -28,6 +50,7 @@ export type Case = {
   bidders: number;
   detailed: boolean;
   findings: FindingRow[];
+  audit: AuditVerdict | null;
 };
 
 export type Dataset = {
@@ -55,6 +78,13 @@ function activeAward(awards: AwardRow[]): AwardRow | undefined {
   return awards.find((a) => a.status === "active") ?? awards[0];
 }
 
+/** The conclusion's violationType list, which the store keeps as unknown. */
+function violationTypes(row: { conclusion: unknown }): string[] {
+  const conclusion = row.conclusion as { violationType?: unknown } | null;
+  const types = conclusion?.violationType;
+  return Array.isArray(types) ? types.filter((t): t is string => typeof t === "string") : [];
+}
+
 export async function loadDataset(): Promise<Dataset> {
   const store = openStore();
   const flags: RiskFlagRow[] = await store.allRiskFlags();
@@ -64,6 +94,32 @@ export async function loadDataset(): Promise<Dataset> {
   const bids = await store.allBids();
   const runs: RunRow[] = await store.allRuns();
   const findings: FindingRow[] = await store.allFindings();
+  const monitorings = await store.allMonitorings();
+
+  const monitoringsByTender = new Map<string, typeof monitorings>();
+  for (const row of monitorings) {
+    const list = monitoringsByTender.get(row.tender_id) ?? [];
+    list.push(row);
+    monitoringsByTender.set(row.tender_id, list);
+  }
+
+  const auditByTender = new Map<string, AuditVerdict>();
+  for (const [tenderId, list] of monitoringsByTender) {
+    const decided = list.filter((row) => violationEstablished(row) !== null);
+    if (decided.length === 0) continue;
+    // A tender can be monitored more than once. One clean pass does not undo
+    // another that established a violation, so the violation is what shows.
+    const pick = decided.find((row) => violationEstablished(row) === true) ?? decided[0];
+    auditByTender.set(tenderId, {
+      violation: violationEstablished(pick) === true,
+      text: conclusionText(pick),
+      published: conclusionPublished(pick),
+      monitoring_id: pick.monitoring_id,
+      count: decided.length,
+      reasons: Array.isArray(pick.reasons) ? (pick.reasons as string[]) : [],
+      types: violationTypes(pick),
+    });
+  }
 
   const findingsByTender = new Map<string, FindingRow[]>();
   for (const finding of findings) {
@@ -113,6 +169,7 @@ export async function loadDataset(): Promise<Dataset> {
         bidders: bidCount.get(flag.tender_id) ?? 0,
         detailed: Boolean(detail),
         findings: findingsByTender.get(flag.tender_id) ?? [],
+        audit: auditByTender.get(flag.tender_id) ?? null,
       };
       byTender.set(flag.tender_id, entry);
     }

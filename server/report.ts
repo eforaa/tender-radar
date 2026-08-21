@@ -7,7 +7,7 @@
 // is a genuine PDF, selectable and searchable, with no library to keep alive.
 import type { Case } from "./data.ts";
 import type { RiskRuleRow } from "../src/store/types.ts";
-import { RISK_LABELS, procedureLabel, readableName } from "../src/labels.ts";
+import { RISK_LABELS, procedureLabel, readableName, MONITORING_REASONS, VIOLATION_TYPES } from "../src/labels.ts";
 import { INDICATOR_LEGAL, ARTICLES } from "../src/legal.ts";
 import { esc, shortDate } from "./html.ts";
 import { buildConclusion, type Conclusion } from "./conclusion.ts";
@@ -162,6 +162,42 @@ function sections(ctx: ReportContext): { heading: string; lines: string[] }[] {
       indicatorLines.push(wrap(`Стаття ${direction.code} ККУ — ${article?.title ?? ""}: ${direction.why}`));
     }
     indicatorLines.push("");
+  }
+
+  if (entry.audit) {
+    const audit = entry.audit;
+    const lines: string[] = [];
+    lines.push(
+      audit.violation
+        ? "Орган державного фінансового контролю провів моніторинг цієї закупівлі та ВСТАНОВИВ ПОРУШЕННЯ законодавства про закупівлі."
+        : "Орган державного фінансового контролю провів моніторинг цієї закупівлі та порушень НЕ ВСТАНОВИВ.",
+    );
+    lines.push("");
+    if (audit.reasons.length > 0) {
+      lines.push(`Підстава перевірки: ${audit.reasons.map((r) => MONITORING_REASONS[r] ?? r).join(", ")}`);
+    }
+    if (audit.types.length > 0) {
+      lines.push(`Тип порушення: ${audit.types.map((t) => VIOLATION_TYPES[t] ?? t).join(", ")}`);
+    }
+    if (audit.published) lines.push(`Висновок оприлюднено: ${shortDate(audit.published)}`);
+    if (audit.count > 1) lines.push(`Моніторингів за цією закупівлею: ${audit.count}`);
+    if (audit.text) {
+      lines.push("");
+      lines.push("Формулювання висновку:");
+      lines.push(wrap(audit.text));
+    }
+    lines.push("");
+    lines.push(
+      wrap(
+        "Моніторинг перевіряє дотримання процедури закупівлі. Він не встановлює, чи ціна відповідає ринковій — це окреме питання.",
+      ),
+    );
+    lines.push(`Першоджерело: https://audit-api.prozorro.gov.ua/api/2.5/monitorings/${audit.monitoring_id}`);
+
+    out.push({
+      heading: audit.violation ? "ВИСНОВОК ДЕРЖАУДИТСЛУЖБИ — ПОРУШЕННЯ ВСТАНОВЛЕНО" : "ВИСНОВОК ДЕРЖАУДИТСЛУЖБИ — ПОРУШЕНЬ НЕ ВСТАНОВЛЕНО",
+      lines,
+    });
   }
 
   out.push({

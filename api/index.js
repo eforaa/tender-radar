@@ -237,6 +237,30 @@ function procedureLabel(code) {
   if (!code) return null;
   return PROCEDURES[code] ?? code;
 }
+var MONITORING_REASONS = {
+  indicator: "\u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u0438\u0439 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0440\u0438\u0437\u0438\u043A\u0443",
+  fiscal: "\u0437\u0432\u0435\u0440\u043D\u0435\u043D\u043D\u044F \u043E\u0440\u0433\u0430\u043D\u0456\u0432 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0433\u043E \u0444\u0456\u043D\u0430\u043D\u0441\u043E\u0432\u043E\u0433\u043E \u043A\u043E\u043D\u0442\u0440\u043E\u043B\u044E",
+  authorities: "\u0437\u0432\u0435\u0440\u043D\u0435\u043D\u043D\u044F \u043F\u0440\u0430\u0432\u043E\u043E\u0445\u043E\u0440\u043E\u043D\u043D\u0438\u0445 \u043E\u0440\u0433\u0430\u043D\u0456\u0432",
+  media: "\u043F\u0443\u0431\u043B\u0456\u043A\u0430\u0446\u0456\u044F \u0443 \u0437\u0430\u0441\u043E\u0431\u0430\u0445 \u043C\u0430\u0441\u043E\u0432\u043E\u0457 \u0456\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0456\u0457",
+  public: "\u0437\u0432\u0435\u0440\u043D\u0435\u043D\u043D\u044F \u0433\u0440\u043E\u043C\u0430\u0434\u0441\u044C\u043A\u043E\u0441\u0442\u0456"
+};
+var VIOLATION_TYPES = {
+  other: "\u0456\u043D\u0448\u0435 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0437\u0430\u043A\u043E\u043D\u043E\u0434\u0430\u0432\u0441\u0442\u0432\u0430 \u043F\u0440\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
+  corruptionBiddingDocuments: "\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0432 \u0442\u0435\u043D\u0434\u0435\u0440\u043D\u0456\u0439 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0456\u0457",
+  corruptionChanges: "\u043D\u0435\u043F\u0440\u0430\u0432\u043E\u043C\u0456\u0440\u043D\u0456 \u0437\u043C\u0456\u043D\u0438 \u0434\u043E \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443",
+  corruptionAwarded: "\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u043F\u0440\u0438 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043D\u0456 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F",
+  corruptionUntimely: "\u043D\u0435\u0441\u0432\u043E\u0454\u0447\u0430\u0441\u043D\u0435 \u043E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043D\u044F \u0456\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0456\u0457",
+  corruptionFailureDocuments: "\u043D\u0435\u043D\u0430\u0434\u0430\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432",
+  corruptionPublicDisclosure: "\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0432\u0438\u043C\u043E\u0433 \u043E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043D\u044F",
+  corruptionCancelled: "\u043D\u0435\u043F\u0440\u0430\u0432\u043E\u043C\u0456\u0440\u043D\u0435 \u0441\u043A\u0430\u0441\u0443\u0432\u0430\u043D\u043D\u044F \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
+  corruptionContracting: "\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u043F\u0440\u0438 \u0443\u043A\u043B\u0430\u0434\u0435\u043D\u043D\u0456 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443",
+  corruptionProcurementMethodType: "\u043D\u0435\u043F\u0440\u0430\u0432\u043E\u043C\u0456\u0440\u043D\u0438\u0439 \u0432\u0438\u0431\u0456\u0440 \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
+  corruptionDescription: "\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0432 \u043E\u043F\u0438\u0441\u0456 \u043F\u0440\u0435\u0434\u043C\u0435\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
+  documentsForm: "\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0444\u043E\u0440\u043C\u0438 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432",
+  deadlineForThePublicationDocumentation: "\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0441\u0442\u0440\u043E\u043A\u0443 \u043E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0456\u0457",
+  rejectionOfBidsNotByLaw: "\u043D\u0435\u043F\u0440\u0430\u0432\u043E\u043C\u0456\u0440\u043D\u0435 \u0432\u0456\u0434\u0445\u0438\u043B\u0435\u043D\u043D\u044F \u043F\u0440\u043E\u043F\u043E\u0437\u0438\u0446\u0456\u0439",
+  notComplyDecisionACU: "\u043D\u0435\u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F \u0440\u0456\u0448\u0435\u043D\u043D\u044F \u0410\u043D\u0442\u0438\u043C\u043E\u043D\u043E\u043F\u043E\u043B\u044C\u043D\u043E\u0433\u043E \u043A\u043E\u043C\u0456\u0442\u0435\u0442\u0443"
+};
 function readableName(name) {
   if (!name) return "";
   const clean = name.replace(/\s+/gu, " ").trim();
@@ -524,8 +548,10 @@ select:disabled{opacity:.5;cursor:not-allowed}
 
 /* severity, readable at a glance and on hover */
 .dot{grid-row:1 / span 2;width:.55rem;height:.55rem;border-radius:50%;margin-top:.5rem;flex:none;background:var(--line)}
+.sev-proven .dot{background:var(--alarm);box-shadow:0 0 0 3px var(--alarm-bg)}
 .sev-high .dot{background:var(--alarm)}
 .sev-medium .dot{background:var(--warn)}
+.sev-clear .dot{background:var(--calm)}
 .sev-low .dot{background:#C4D0D6}
 
 .row .who{min-width:0}
@@ -544,6 +570,8 @@ a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .flag.alarm{border-color:var(--alarm);background:var(--alarm-bg);color:var(--alarm);font-weight:500}
 .flag.warn{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
 .flag.more{color:var(--ink-faint);border-style:dashed}
+.flag.proven{border-color:var(--alarm);background:var(--alarm);color:#fff;font-weight:600}
+.flag.clear{border-color:var(--calm);background:var(--calm-bg);color:var(--calm);font-weight:500}
 .tier{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:.24rem .55rem;border:1px solid currentColor;white-space:nowrap;border-radius:2px}
 .tier.confirmed{color:var(--calm);background:var(--calm-bg)}
 .tier.state{color:var(--warn);background:var(--warn-bg)}
@@ -1015,6 +1043,30 @@ function officerKey(row) {
   return null;
 }
 
+// src/normalize/monitoring.ts
+function asRecord(value) {
+  return value && typeof value === "object" ? value : {};
+}
+function asString(value) {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+function violationEstablished(row) {
+  const conclusion = asRecord(row.conclusion);
+  return typeof conclusion.violationOccurred === "boolean" ? conclusion.violationOccurred : null;
+}
+function conclusionText(row, max = 600) {
+  const conclusion = asRecord(row.conclusion);
+  const text = (conclusion.description ?? "").replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const stop = cut.lastIndexOf(" ");
+  return (stop > max * 0.6 ? cut.slice(0, stop) : cut) + "\u2026";
+}
+function conclusionPublished(row) {
+  const conclusion = asRecord(row.conclusion);
+  return asString(conclusion.datePublished) ?? asString(conclusion.dateCreated) ?? row.date_modified;
+}
+
 // server/data.ts
 function tenderDateOf(tenderRef) {
   const m = /^UA-(\d{4}-\d{2}-\d{2})-/.exec(tenderRef);
@@ -1022,6 +1074,11 @@ function tenderDateOf(tenderRef) {
 }
 function activeAward(awards) {
   return awards.find((a) => a.status === "active") ?? awards[0];
+}
+function violationTypes(row) {
+  const conclusion = row.conclusion;
+  const types = conclusion?.violationType;
+  return Array.isArray(types) ? types.filter((t) => typeof t === "string") : [];
 }
 async function loadDataset() {
   const store = openStore();
@@ -1032,6 +1089,28 @@ async function loadDataset() {
   const bids = await store.allBids();
   const runs = await store.allRuns();
   const findings = await store.allFindings();
+  const monitorings = await store.allMonitorings();
+  const monitoringsByTender = /* @__PURE__ */ new Map();
+  for (const row of monitorings) {
+    const list = monitoringsByTender.get(row.tender_id) ?? [];
+    list.push(row);
+    monitoringsByTender.set(row.tender_id, list);
+  }
+  const auditByTender = /* @__PURE__ */ new Map();
+  for (const [tenderId, list] of monitoringsByTender) {
+    const decided = list.filter((row) => violationEstablished(row) !== null);
+    if (decided.length === 0) continue;
+    const pick = decided.find((row) => violationEstablished(row) === true) ?? decided[0];
+    auditByTender.set(tenderId, {
+      violation: violationEstablished(pick) === true,
+      text: conclusionText(pick),
+      published: conclusionPublished(pick),
+      monitoring_id: pick.monitoring_id,
+      count: decided.length,
+      reasons: Array.isArray(pick.reasons) ? pick.reasons : [],
+      types: violationTypes(pick)
+    });
+  }
   const findingsByTender = /* @__PURE__ */ new Map();
   for (const finding of findings) {
     const list = findingsByTender.get(finding.tender_id) ?? [];
@@ -1075,7 +1154,8 @@ async function loadDataset() {
         winner_amount: won?.amount ?? null,
         bidders: bidCount.get(flag.tender_id) ?? 0,
         detailed: Boolean(detail),
-        findings: findingsByTender.get(flag.tender_id) ?? []
+        findings: findingsByTender.get(flag.tender_id) ?? [],
+        audit: auditByTender.get(flag.tender_id) ?? null
       };
       byTender.set(flag.tender_id, entry);
     }
@@ -1273,6 +1353,22 @@ function buildConclusion(input) {
   const { entry, sameEntity, sameOfficer, sameWinner } = input;
   const observations = [];
   const nextSteps = [];
+  if (entry.audit?.violation) {
+    observations.push({
+      weight: "high",
+      aboutThisTender: true,
+      title: "\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F",
+      detail: `\u041C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E \u0432\u0438\u0441\u043D\u043E\u0432\u043A\u043E\u043C \u043F\u0440\u043E \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F${entry.audit.published ? ` (${entry.audit.published.slice(0, 10)})` : ""}. \u0426\u0435 \u043D\u0435 \u043D\u0430\u0448\u0430 \u043E\u0446\u0456\u043D\u043A\u0430 \u0439 \u043D\u0435 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u043D\u044F \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0430 \u2014 \u0446\u0435 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u043E\u0440\u0433\u0430\u043D\u0443 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0433\u043E \u0444\u0456\u043D\u0430\u043D\u0441\u043E\u0432\u043E\u0433\u043E \u043A\u043E\u043D\u0442\u0440\u043E\u043B\u044E. ` + (entry.audit.text ? `\u0424\u043E\u0440\u043C\u0443\u043B\u044E\u0432\u0430\u043D\u043D\u044F \u0432\u0438\u0441\u043D\u043E\u0432\u043A\u0443: \xAB${entry.audit.text}\xBB` : "")
+    });
+    nextSteps.push("\u041F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u0438 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0432 \u043E\u0440\u0438\u0433\u0456\u043D\u0430\u043B\u0456 \u0442\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438, \u0447\u0438 \u0443\u0441\u0443\u043D\u0443\u0442\u043E \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.");
+  } else if (entry.audit) {
+    observations.push({
+      weight: "low",
+      aboutThisTender: true,
+      title: "\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u043B\u0430 \u0456 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430",
+      detail: `\u0417\u0430 \u0446\u0456\u0454\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0435\u044E \u043F\u0440\u043E\u0432\u0435\u0434\u0435\u043D\u043E \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433${entry.audit.count > 1 ? ` (${entry.audit.count})` : ""}, \u0456 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u0437\u0430\u043A\u043E\u043D\u043E\u0434\u0430\u0432\u0441\u0442\u0432\u0430 \u043F\u0440\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E. \u041C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u0434\u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0438, \u0430 \u043D\u0435 \u0442\u0435, \u0447\u0438 \u0446\u0456\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0454 \u0440\u0438\u043D\u043A\u043E\u0432\u0456\u0439.`
+    });
+  }
   for (const finding of entry.findings) {
     const e = finding.evidence;
     const gap = typeof e.overpayment === "number" ? e.overpayment : typeof e.extra_cost === "number" ? e.extra_cost : null;
@@ -1356,9 +1452,13 @@ function buildConclusion(input) {
   const own = observations.filter((o) => o.aboutThisTender);
   const highs = own.filter((o) => o.weight === "high").length;
   const mediums = own.filter((o) => o.weight === "medium").length;
-  const level = highs >= 1 ? "high" : mediums >= 2 ? "medium" : mediums === 1 ? "medium" : "low";
-  const headline = own.length === 0 ? observations.length === 0 ? "\u041A\u0440\u0456\u043C \u0441\u0430\u043C\u043E\u0457 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438, \u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u0438" : "\u0423 \u0441\u0430\u043C\u0456\u0439 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u0438, \u0430\u043B\u0435 \u043D\u0430\u0432\u043A\u043E\u043B\u043E \u043D\u0435\u0457 \u0454 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442" : level === "high" ? "\u0404 \u0449\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0442\u0438: \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u043D\u0456 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456" : "\u0412\u0430\u0440\u0442\u043E \u043F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F \u0443\u0432\u0430\u0436\u043D\u0456\u0448\u0435";
-  if (own.length === 0) {
+  const level = highs >= 1 ? "high" : mediums >= 1 ? "medium" : "low";
+  const proven = Boolean(entry.audit?.violation);
+  const clearedAndQuiet = Boolean(entry.audit) && !proven && own.every((o) => o.weight === "low");
+  const headline = proven ? "\u041F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430, \u0430 \u043D\u0435 \u043C\u0438" : clearedAndQuiet ? "\u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u043B\u0430 \u0446\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u0456 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430" : own.length === 0 ? observations.length === 0 ? "\u041A\u0440\u0456\u043C \u0441\u0430\u043C\u043E\u0457 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438, \u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u0438" : "\u0423 \u0441\u0430\u043C\u0456\u0439 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u0438, \u0430\u043B\u0435 \u043D\u0430\u0432\u043A\u043E\u043B\u043E \u043D\u0435\u0457 \u0454 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442" : level === "high" ? "\u0404 \u0449\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0442\u0438: \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u043D\u0456 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456" : "\u0412\u0430\u0440\u0442\u043E \u043F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F \u0443\u0432\u0430\u0436\u043D\u0456\u0448\u0435";
+  if (clearedAndQuiet) {
+    nextSteps.push("\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438, \u0447\u0438 \u0441\u0442\u043E\u0441\u0443\u0432\u0430\u0432\u0441\u044F \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u0441\u0430\u043C\u0435 \u0442\u043E\u0433\u043E \u043F\u0438\u0442\u0430\u043D\u043D\u044F, \u044F\u043A\u0435 \u0432\u0430\u0441 \u0446\u0456\u043A\u0430\u0432\u0438\u0442\u044C \u2014 \u0439\u043E\u0433\u043E \u043F\u0440\u0435\u0434\u043C\u0435\u0442 \u0432\u0443\u0436\u0447\u0438\u0439 \u0437\u0430 \u0432\u0441\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E.");
+  } else if (own.length === 0) {
     nextSteps.push("\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E \u0432 Prozorro \u0456 \u0437\u0432\u0456\u0440\u0438\u0442\u0438 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u043F\u0438\u0441\u043E\u043C \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0430.");
   } else {
     nextSteps.push("\u0412\u0438\u0442\u0440\u0435\u0431\u0443\u0432\u0430\u0442\u0438 \u0434\u043E\u0433\u043E\u0432\u0456\u0440 \u0456 \u0432\u0441\u0456 \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0456 \u0443\u0433\u043E\u0434\u0438 \u0434\u043E \u043D\u044C\u043E\u0433\u043E.");
@@ -1575,6 +1675,38 @@ function sections(ctx) {
     }
     indicatorLines.push("");
   }
+  if (entry.audit) {
+    const audit = entry.audit;
+    const lines = [];
+    lines.push(
+      audit.violation ? "\u041E\u0440\u0433\u0430\u043D \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0433\u043E \u0444\u0456\u043D\u0430\u043D\u0441\u043E\u0432\u043E\u0433\u043E \u043A\u043E\u043D\u0442\u0440\u043E\u043B\u044E \u043F\u0440\u043E\u0432\u0456\u0432 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u0446\u0456\u0454\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0442\u0430 \u0412\u0421\u0422\u0410\u041D\u041E\u0412\u0418\u0412 \u041F\u041E\u0420\u0423\u0428\u0415\u041D\u041D\u042F \u0437\u0430\u043A\u043E\u043D\u043E\u0434\u0430\u0432\u0441\u0442\u0432\u0430 \u043F\u0440\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456." : "\u041E\u0440\u0433\u0430\u043D \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0433\u043E \u0444\u0456\u043D\u0430\u043D\u0441\u043E\u0432\u043E\u0433\u043E \u043A\u043E\u043D\u0442\u0440\u043E\u043B\u044E \u043F\u0440\u043E\u0432\u0456\u0432 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u0446\u0456\u0454\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0442\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u041D\u0415 \u0412\u0421\u0422\u0410\u041D\u041E\u0412\u0418\u0412."
+    );
+    lines.push("");
+    if (audit.reasons.length > 0) {
+      lines.push(`\u041F\u0456\u0434\u0441\u0442\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438: ${audit.reasons.map((r) => MONITORING_REASONS[r] ?? r).join(", ")}`);
+    }
+    if (audit.types.length > 0) {
+      lines.push(`\u0422\u0438\u043F \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F: ${audit.types.map((t) => VIOLATION_TYPES[t] ?? t).join(", ")}`);
+    }
+    if (audit.published) lines.push(`\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u043E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043E: ${shortDate(audit.published)}`);
+    if (audit.count > 1) lines.push(`\u041C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0456\u0432 \u0437\u0430 \u0446\u0456\u0454\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0435\u044E: ${audit.count}`);
+    if (audit.text) {
+      lines.push("");
+      lines.push("\u0424\u043E\u0440\u043C\u0443\u043B\u044E\u0432\u0430\u043D\u043D\u044F \u0432\u0438\u0441\u043D\u043E\u0432\u043A\u0443:");
+      lines.push(wrap(audit.text));
+    }
+    lines.push("");
+    lines.push(
+      wrap(
+        "\u041C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u0434\u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456. \u0412\u0456\u043D \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454, \u0447\u0438 \u0446\u0456\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0454 \u0440\u0438\u043D\u043A\u043E\u0432\u0456\u0439 \u2014 \u0446\u0435 \u043E\u043A\u0440\u0435\u043C\u0435 \u043F\u0438\u0442\u0430\u043D\u043D\u044F."
+      )
+    );
+    lines.push(`\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E: https://audit-api.prozorro.gov.ua/api/2.5/monitorings/${audit.monitoring_id}`);
+    out.push({
+      heading: audit.violation ? "\u0412\u0418\u0421\u041D\u041E\u0412\u041E\u041A \u0414\u0415\u0420\u0416\u0410\u0423\u0414\u0418\u0422\u0421\u041B\u0423\u0416\u0411\u0418 \u2014 \u041F\u041E\u0420\u0423\u0428\u0415\u041D\u041D\u042F \u0412\u0421\u0422\u0410\u041D\u041E\u0412\u041B\u0415\u041D\u041E" : "\u0412\u0418\u0421\u041D\u041E\u0412\u041E\u041A \u0414\u0415\u0420\u0416\u0410\u0423\u0414\u0418\u0422\u0421\u041B\u0423\u0416\u0411\u0418 \u2014 \u041F\u041E\u0420\u0423\u0428\u0415\u041D\u042C \u041D\u0415 \u0412\u0421\u0422\u0410\u041D\u041E\u0412\u041B\u0415\u041D\u041E",
+      lines
+    });
+  }
   out.push({
     heading: `\u0429\u041E \u0417\u0410\u041F\u0406\u0414\u041E\u0417\u0420\u0418\u041B\u0410 \u0414\u0415\u0420\u0416\u0410\u0412\u0410 \u2014 ${entry.risks.length} ${entry.risks.length === 1 ? "\u0406\u041D\u0414\u0418\u041A\u0410\u0422\u041E\u0420" : "\u0406\u041D\u0414\u0418\u041A\u0410\u0422\u041E\u0420\u0418"}`,
     lines: indicatorLines
@@ -1737,6 +1869,7 @@ function readControls(url) {
     railOnly: url.searchParams.get("rail") === "1",
     soloOnly: url.searchParams.get("solo") === "1",
     priceOnly: url.searchParams.get("price") === "1",
+    audit: ["violation", "clear"].includes(url.searchParams.get("audit") ?? "") ? url.searchParams.get("audit") : "",
     dateFrom: (url.searchParams.get("from") ?? "").trim(),
     dateTo: (url.searchParams.get("to") ?? "").trim(),
     min: Number(url.searchParams.get("min") ?? "") || 0,
@@ -1753,6 +1886,7 @@ function activeCount(c) {
     c.railOnly,
     c.soloOnly,
     c.priceOnly,
+    c.audit,
     c.dateFrom,
     c.dateTo,
     c.min > 0,
@@ -1778,6 +1912,8 @@ function applyControls(cases, c, railwayCodes, opts = {}) {
   if (c.railOnly && !opts.hideRail) list = list.filter((x) => railwayCodes.has(x.entity_edrpou ?? ""));
   if (c.soloOnly) list = list.filter((x) => x.bidders === 1);
   if (c.priceOnly && !opts.hidePrice) list = list.filter((x) => x.findings.length > 0);
+  if (c.audit === "violation") list = list.filter((x) => x.audit?.violation === true);
+  if (c.audit === "clear") list = list.filter((x) => x.audit !== null && !x.audit.violation);
   if (c.dateFrom) list = list.filter((x) => (x.tender_date ?? "") >= c.dateFrom);
   if (c.dateTo) list = list.filter((x) => (x.tender_date ?? "") <= c.dateTo);
   if (c.min > 0) list = list.filter((x) => (x.value_amount ?? 0) >= c.min);
@@ -1795,6 +1931,7 @@ function keepControls(action, c, over = {}) {
   if (c.railOnly) p.set("rail", "1");
   if (c.soloOnly) p.set("solo", "1");
   if (c.priceOnly) p.set("price", "1");
+  if (c.audit) p.set("audit", c.audit);
   if (c.dateFrom) p.set("from", c.dateFrom);
   if (c.dateTo) p.set("to", c.dateTo);
   if (c.min > 0) p.set("min", String(c.min));
@@ -1821,18 +1958,51 @@ function riskFlag(riskId) {
   return `<a class="flag" href="/?risk=${encodeURIComponent(riskId)}">${esc(shortRisk(riskId))}</a>`;
 }
 function rowSeverity(entry) {
+  if (entry.audit?.violation) return "proven";
   if (entry.findings.length > 0) return "high";
+  if (entry.audit && !entry.audit.violation) return "clear";
   if (entry.bidders === 1 || entry.risks.length >= 3) return "medium";
   return "low";
 }
 var SEVERITY_TITLE = {
+  proven: "\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F",
   high: "\u041C\u0438 \u0437\u043D\u0430\u0439\u0448\u043B\u0438 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u0456\u0441\u0442\u044C \u0443 \u0446\u0456\u043D\u0456",
   medium: "\u0404 \u043D\u0430 \u0449\u043E \u043F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F: \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \u0430\u0431\u043E \u043A\u0456\u043B\u044C\u043A\u0430 \u043E\u0437\u043D\u0430\u043A",
+  clear: "\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u043B\u0430 \u0456 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430",
   low: "\u041F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043E\u044E"
 };
+function auditSection(entry) {
+  const audit = entry.audit;
+  if (!audit) return "";
+  const grounds = audit.reasons.map((r) => MONITORING_REASONS[r] ?? r);
+  const kinds = audit.types.map((t) => VIOLATION_TYPES[t] ?? t);
+  const facts = [];
+  if (grounds.length) facts.push(`<dt>\u041F\u0456\u0434\u0441\u0442\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438</dt><dd>${esc(grounds.join(", "))}</dd>`);
+  if (kinds.length) facts.push(`<dt>\u0422\u0438\u043F \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F</dt><dd>${esc(kinds.join(", "))}</dd>`);
+  if (audit.published) facts.push(`<dt>\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u043E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043E</dt><dd>${date(audit.published)}</dd>`);
+  if (audit.count > 1) facts.push(`<dt>\u041C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0456\u0432</dt><dd>${audit.count}</dd>`);
+  return `
+<h2>\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0438</h2>
+<div class="card verdict ${audit.violation ? "high" : "low"}">
+  <span class="verdict-tag">${audit.violation ? "\u041F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E" : "\u041F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E"}</span>
+  <p class="lead">${audit.violation ? "\u041E\u0440\u0433\u0430\u043D \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0433\u043E \u0444\u0456\u043D\u0430\u043D\u0441\u043E\u0432\u043E\u0433\u043E \u043A\u043E\u043D\u0442\u0440\u043E\u043B\u044E \u043F\u0440\u043E\u0432\u0456\u0432 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u0446\u0456\u0454\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0442\u0430 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0432 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0437\u0430\u043A\u043E\u043D\u043E\u0434\u0430\u0432\u0441\u0442\u0432\u0430." : "\u041E\u0440\u0433\u0430\u043D \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0433\u043E \u0444\u0456\u043D\u0430\u043D\u0441\u043E\u0432\u043E\u0433\u043E \u043A\u043E\u043D\u0442\u0440\u043E\u043B\u044E \u043F\u0440\u043E\u0432\u0456\u0432 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u0446\u0456\u0454\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0442\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0432."}</p>
+  ${audit.text ? `<p>\xAB${esc(audit.text)}\xBB</p>` : ""}
+  ${facts.length ? `<dl class="facts">${facts.join("")}</dl>` : ""}
+  <p class="note">\u041C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u0434\u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456. \u0412\u0456\u043D \u043D\u0435 \u043E\u0446\u0456\u043D\u044E\u0454, \u0447\u0438 \u0446\u0456\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0454 \u0440\u0438\u043D\u043A\u043E\u0432\u0456\u0439 \u2014 \u0446\u0435 \u043E\u043A\u0440\u0435\u043C\u0435 \u043F\u0438\u0442\u0430\u043D\u043D\u044F, \u0456 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u044C \u043D\u0430 \u043D\u044C\u043E\u0433\u043E \u043D\u0438\u0436\u0447\u0435.
+  <br><a href="https://audit-api.prozorro.gov.ua/api/2.5/monitorings/${encodeURIComponent(audit.monitoring_id)}">\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E \u0432\u0438\u0441\u043D\u043E\u0432\u043A\u0443</a></p>
+</div>
+`;
+}
+function auditFlag(entry) {
+  if (!entry.audit) return "";
+  return entry.audit.violation ? '<span class="flag proven">\u041F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0434\u043E\u0432\u0435\u0434\u0435\u043D\u043E</span>' : '<span class="flag clear">\u0414\u0410\u0421\u0423: \u0431\u0435\u0437 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C</span>';
+}
 function alarms(entry) {
   const out = [];
-  for (const finding of entry.findings) out.push(finding.title);
+  for (const finding of entry.findings) {
+    if (finding.tier === "confirmed") continue;
+    out.push(finding.title);
+  }
   if (entry.detailed && entry.bidders === 1) out.push("\u0404\u0434\u0438\u043D\u0438\u0439 \u0443\u0447\u0430\u0441\u043D\u0438\u043A");
   if ((entry.value_amount ?? 0) >= 1e9) out.push("\u041F\u043E\u043D\u0430\u0434 \u043C\u0456\u043B\u044C\u044F\u0440\u0434");
   if (entry.risks.length >= 3) out.push(`${entry.risks.length} \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438 \u043E\u0434\u0440\u0430\u0437\u0443`);
@@ -1884,6 +2054,7 @@ function caseRow(entry, opts = {}) {
     <span class="exact">${esc(entry.tender_ref || entry.tender_id)}</span>
   </div>
   <div class="flags">
+    ${auditFlag(entry)}
     ${alarms(entry).map((a) => `<span class="flag alarm">${esc(a)}</span>`).join("")}
     ${entry.risks.slice(0, MAX_ROW_FLAGS).map(riskFlag).join("")}
     ${entry.risks.length > MAX_ROW_FLAGS ? `<a class="flag more" href="/tender/${encodeURIComponent(entry.tender_id)}">\u0449\u0435 ${entry.risks.length - MAX_ROW_FLAGS}</a>` : ""}
@@ -1959,6 +2130,7 @@ var HELP = `<details class="help">
 function presetsFor(action) {
   const base = [
     { label: "\u0423\u0441\u0456", hint: "\u043F\u043E\u0432\u043D\u0438\u0439 \u043F\u0435\u0440\u0435\u043B\u0456\u043A", query: "" },
+    { label: "\u041F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0434\u043E\u0432\u0435\u0434\u0435\u043D\u043E", hint: "\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F", query: "audit=violation" },
     { label: "\u0417\u0430\u0432\u0438\u0449\u0435\u043D\u0430 \u0446\u0456\u043D\u0430", hint: "\u043C\u0438 \u043F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442\u0443", query: "price=1" },
     { label: "\u0411\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432", hint: "\u043F\u043E\u0434\u0430\u0432\u0441\u044F \u043E\u0434\u0438\u043D \u0443\u0447\u0430\u0441\u043D\u0438\u043A", query: "solo=1" },
     { label: "\u0412\u0456\u0434 100 \u043C\u043B\u043D", hint: "\u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0456 \u0441\u0443\u043C\u0438", query: "min=100000000" },
@@ -1969,6 +2141,7 @@ function presetsFor(action) {
 }
 function presetBar(action, url, c) {
   const current = new URLSearchParams();
+  if (c.audit) current.set("audit", c.audit);
   if (c.priceOnly) current.set("price", "1");
   if (c.soloOnly) current.set("solo", "1");
   if (c.min > 0) current.set("min", String(c.min));
@@ -1994,6 +2167,7 @@ function sortBar(action, c, extra = "") {
   ${c.railOnly ? '<input type="hidden" name="rail" value="1">' : ""}
   ${c.soloOnly ? '<input type="hidden" name="solo" value="1">' : ""}
   ${c.priceOnly ? '<input type="hidden" name="price" value="1">' : ""}
+  ${c.audit ? `<input type="hidden" name="audit" value="${esc(c.audit)}">` : ""}
 
   <label>\u0421\u043E\u0440\u0442.
     <select name="sort" onchange="this.form.submit()">
@@ -2062,6 +2236,11 @@ function filterPanel(action, c, opts = {}, extra = "") {
         <select name="region" aria-label="\u041E\u0431\u043B\u0430\u0441\u0442\u044C">
           <option value="">\u0423\u0441\u044F \u0423\u043A\u0440\u0430\u0457\u043D\u0430</option>
           ${regions.map((r) => `<option value="${esc(r)}"${r === c.region ? " selected" : ""}>${esc(r)}</option>`).join("")}
+        </select>
+        <select name="audit" aria-label="\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0438">
+          <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0438\u0439 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0410\u0421\u0423</option>
+          <option value="violation"${c.audit === "violation" ? " selected" : ""}>\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0434\u043E\u0432\u0435\u0434\u0435\u043D\u043E</option>
+          <option value="clear"${c.audit === "clear" ? " selected" : ""}>\u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043D\u043E, \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u043D\u0435\u043C\u0430\u0454</option>
         </select>
         <input type="hidden" name="sort" value="${esc(c.sort)}">
         <input type="hidden" name="group" value="${esc(c.group)}">
@@ -2302,6 +2481,7 @@ ${entry.findings.map((f) => {
 </div>`;
     }).join("")}` : ""}
 
+${auditSection(entry)}
 <h2>\u0429\u043E \u0442\u0443\u0442 \u043D\u0435 \u0442\u0430\u043A</h2>
 <p class="hint">\u0421\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u043E ${entry.risks.length} ${plural(entry.risks.length, "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432")} \u0456\u0437 \u0447\u043E\u0442\u0438\u0440\u043D\u0430\u0434\u0446\u044F\u0442\u0438 \u0447\u0438\u043D\u043D\u0438\u0445.</p>
 ${entry.risks.map((r) => riskCard(r)).join("")}

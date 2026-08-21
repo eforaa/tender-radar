@@ -155,6 +155,23 @@ try {
   await store.upsertFindings(findings);
   log(`price analysis: ${points.length} comparable prices, ${groups.size} groups, ${findings.length} findings`);
 
+  /* ---- 3b. what the auditors concluded ---- */
+
+  // The one source here that reports findings rather than suspicions. It runs
+  // after the cards so it can be matched against the tenders we hold, and its
+  // failure must not cost us the rest of the run.
+  try {
+    const { execFileSync } = await import("node:child_process");
+    const out = execFileSync(process.execPath, [join(import.meta.dirname, "ingest-monitorings.ts")], {
+      encoding: "utf8",
+      env: { ...process.env },
+    });
+    for (const line of out.trim().split("\n").slice(-2)) log(line.trim());
+  } catch (err) {
+    errors++;
+    log(`audit monitorings failed — ${(err as Error).message}`);
+  }
+
   /* ---- 4. record the run ---- */
 
   const run: RunRow = {

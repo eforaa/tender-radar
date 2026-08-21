@@ -1,6 +1,6 @@
 // Server-rendered site over the local store. Zero dependencies.
 import { REGION, RAILWAY_EDRPOU, SOUTHERN_RAILWAY_EDRPOU, railwayScope, dataDir, type RailwayScope } from "../src/config.ts";
-import { RISK_LABELS, GROUP_ORDER, procedureLabel, readableName, type RiskGroup } from "../src/labels.ts";
+import { RISK_LABELS, GROUP_ORDER, procedureLabel, readableName, type RiskGroup, MONITORING_REASONS, VIOLATION_TYPES } from "../src/labels.ts";
 import { layout, esc, money, unitMoney, shortMoney, date, trim, plural } from "./html.ts";
 import { ARTICLES, INDICATOR_LEGAL, isJointStock } from "../src/legal.ts";
 import { loadDataset, type Case, type Dataset } from "./data.ts";
@@ -40,22 +40,81 @@ function riskFlag(riskId: string): string {
  * A cheap severity for list rows. The full conclusion is too heavy to build
  * for 36000 rows, so this uses the same signals it leans on most.
  */
-function rowSeverity(entry: Case): "high" | "medium" | "low" {
+function rowSeverity(entry: Case): "proven" | "high" | "medium" | "clear" | "low" {
+  // An established violation outranks anything we inferred ourselves. A clean
+  // audit does not cancel a price finding: the auditors check the procedure,
+  // not what the thing cost.
+  if (entry.audit?.violation) return "proven";
   if (entry.findings.length > 0) return "high";
+  if (entry.audit && !entry.audit.violation) return "clear";
   if (entry.bidders === 1 || entry.risks.length >= 3) return "medium";
   return "low";
 }
 
 const SEVERITY_TITLE: Record<string, string> = {
+  proven: "Держаудитслужба встановила порушення",
   high: "Ми знайшли розбіжність у ціні",
   medium: "Є на що подивитися: без конкурентів або кілька ознак",
+  clear: "Держаудитслужба перевірила і порушень не встановила",
   low: "Позначено державою",
 };
 
+/**
+ * What the auditors concluded, in full. This is the only block on a tender
+ * page that is not our reading of anything: the wording is theirs and the
+ * link goes to the record it came from.
+ */
+function auditSection(entry: Case): string {
+  const audit = entry.audit;
+  if (!audit) return "";
+
+  const grounds = audit.reasons.map((r) => MONITORING_REASONS[r] ?? r);
+  const kinds = audit.types.map((t) => VIOLATION_TYPES[t] ?? t);
+  const facts: string[] = [];
+  if (grounds.length) facts.push(`<dt>Підстава перевірки</dt><dd>${esc(grounds.join(", "))}</dd>`);
+  if (kinds.length) facts.push(`<dt>Тип порушення</dt><dd>${esc(kinds.join(", "))}</dd>`);
+  if (audit.published) facts.push(`<dt>Висновок оприлюднено</dt><dd>${date(audit.published)}</dd>`);
+  if (audit.count > 1) facts.push(`<dt>Моніторингів</dt><dd>${audit.count}</dd>`);
+
+  return `
+<h2>Висновок Держаудитслужби</h2>
+<div class="card verdict ${audit.violation ? "high" : "low"}">
+  <span class="verdict-tag">${audit.violation ? "Порушення встановлено" : "Порушень не встановлено"}</span>
+  <p class="lead">${
+    audit.violation
+      ? "Орган державного фінансового контролю провів моніторинг цієї закупівлі та встановив порушення законодавства."
+      : "Орган державного фінансового контролю провів моніторинг цієї закупівлі та порушень не встановив."
+  }</p>
+  ${audit.text ? `<p>«${esc(audit.text)}»</p>` : ""}
+  ${facts.length ? `<dl class="facts">${facts.join("")}</dl>` : ""}
+  <p class="note">Моніторинг перевіряє дотримання процедури закупівлі. Він не оцінює, чи ціна відповідає ринковій — це окреме питання, і відповідь на нього нижче.
+  <br><a href="https://audit-api.prozorro.gov.ua/api/2.5/monitorings/${encodeURIComponent(audit.monitoring_id)}">Першоджерело висновку</a></p>
+</div>
+`;
+}
+
 /** The one-glance signals that make a case worth opening. */
+/**
+ * The verdict as a chip. This is the only badge on the site that can lower
+ * suspicion rather than raise it, which is worth as much as the other kind:
+ * a name cleared by the auditors should not sit under the same grey dot as
+ * one nobody has looked at.
+ */
+function auditFlag(entry: Case): string {
+  if (!entry.audit) return "";
+  return entry.audit.violation
+    ? '<span class="flag proven">Порушення доведено</span>'
+    : '<span class="flag clear">ДАСУ: без порушень</span>';
+}
+
 function alarms(entry: Case): string[] {
   const out: string[] = [];
-  for (const finding of entry.findings) out.push(finding.title);
+  // The monitoring already has its own chip; printing its title again would
+  // say the same thing twice in the same row.
+  for (const finding of entry.findings) {
+    if (finding.tier === "confirmed") continue;
+    out.push(finding.title);
+  }
   if (entry.detailed && entry.bidders === 1) out.push("Єдиний учасник");
   if ((entry.value_amount ?? 0) >= 1e9) out.push("Понад мільярд");
   if (entry.risks.length >= 3) out.push(`${entry.risks.length} індикатори одразу`);
@@ -122,6 +181,7 @@ function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?: boolea
     <span class="exact">${esc(entry.tender_ref || entry.tender_id)}</span>
   </div>
   <div class="flags">
+    ${auditFlag(entry)}
     ${alarms(entry).map((a) => `<span class="flag alarm">${esc(a)}</span>`).join("")}
     ${entry.risks.slice(0, MAX_ROW_FLAGS).map(riskFlag).join("")}
     ${
@@ -232,6 +292,7 @@ type Preset = { label: string; hint: string; query: string };
 function presetsFor(action: string): Preset[] {
   const base: Preset[] = [
     { label: "Усі", hint: "повний перелік", query: "" },
+    { label: "Порушення доведено", hint: "Держаудитслужба встановила порушення", query: "audit=violation" },
     { label: "Завищена ціна", hint: "ми порахували переплату", query: "price=1" },
     { label: "Без конкурентів", hint: "подався один учасник", query: "solo=1" },
     { label: "Від 100 млн", hint: "найбільші суми", query: "min=100000000" },
@@ -244,6 +305,7 @@ function presetsFor(action: string): Preset[] {
 /** Marks the preset that matches the current query, so the state is visible. */
 function presetBar(action: string, url: URL, c: Controls): string {
   const current = new URLSearchParams();
+  if (c.audit) current.set("audit", c.audit);
   if (c.priceOnly) current.set("price", "1");
   if (c.soloOnly) current.set("solo", "1");
   if (c.min > 0) current.set("min", String(c.min));
@@ -280,6 +342,7 @@ function sortBar(action: string, c: Controls, extra = ""): string {
   ${c.railOnly ? '<input type="hidden" name="rail" value="1">' : ""}
   ${c.soloOnly ? '<input type="hidden" name="solo" value="1">' : ""}
   ${c.priceOnly ? '<input type="hidden" name="price" value="1">' : ""}
+  ${c.audit ? `<input type="hidden" name="audit" value="${esc(c.audit)}">` : ""}
 
   <label>Сорт.
     <select name="sort" onchange="this.form.submit()">
@@ -385,6 +448,11 @@ function filterPanel(action: string, c: Controls, opts: ControlOptions = {}, ext
           ${regions
             .map((r) => `<option value="${esc(r)}"${r === c.region ? " selected" : ""}>${esc(r)}</option>`)
             .join("")}
+        </select>
+        <select name="audit" aria-label="Висновок Держаудитслужби">
+          <option value="">Будь-який висновок ДАСУ</option>
+          <option value="violation"${c.audit === "violation" ? " selected" : ""}>порушення доведено</option>
+          <option value="clear"${c.audit === "clear" ? " selected" : ""}>перевірено, порушень немає</option>
         </select>
         <input type="hidden" name="sort" value="${esc(c.sort)}">
         <input type="hidden" name="group" value="${esc(c.group)}">
@@ -688,6 +756,7 @@ ${entry.findings
     : ""
 }
 
+${auditSection(entry)}
 <h2>Що тут не так</h2>
 <p class="hint">Спрацювало ${entry.risks.length} ${plural(entry.risks.length, "індикатор", "індикатори", "індикаторів")} із чотирнадцяти чинних.</p>
 ${entry.risks.map((r) => riskCard(r)).join("")}

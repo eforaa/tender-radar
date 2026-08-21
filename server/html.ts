@@ -277,8 +277,10 @@ select:disabled{opacity:.5;cursor:not-allowed}
 
 /* severity, readable at a glance and on hover */
 .dot{grid-row:1 / span 2;width:.55rem;height:.55rem;border-radius:50%;margin-top:.5rem;flex:none;background:var(--line)}
+.sev-proven .dot{background:var(--alarm);box-shadow:0 0 0 3px var(--alarm-bg)}
 .sev-high .dot{background:var(--alarm)}
 .sev-medium .dot{background:var(--warn)}
+.sev-clear .dot{background:var(--calm)}
 .sev-low .dot{background:#C4D0D6}
 
 .row .who{min-width:0}
@@ -297,6 +299,8 @@ a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .flag.alarm{border-color:var(--alarm);background:var(--alarm-bg);color:var(--alarm);font-weight:500}
 .flag.warn{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
 .flag.more{color:var(--ink-faint);border-style:dashed}
+.flag.proven{border-color:var(--alarm);background:var(--alarm);color:#fff;font-weight:600}
+.flag.clear{border-color:var(--calm);background:var(--calm-bg);color:var(--calm);font-weight:500}
 .tier{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:.24rem .55rem;border:1px solid currentColor;white-space:nowrap;border-radius:2px}
 .tier.confirmed{color:var(--calm);background:var(--calm-bg)}
 .tier.state{color:var(--warn);background:var(--warn-bg)}

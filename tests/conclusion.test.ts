@@ -12,7 +12,7 @@ function tenderCase(over: Partial<Case> = {}): Case {
     value_amount: 1_000_000, date_assessed: "2026-05-01", risks: ["ari-1-1"],
     officer_name: "Іваненко І.", officer_email: "i@x.ua", officer_phone: null, officer_key: "i@x.ua",
     winner_name: "ТОВ Переможець", winner_edrpou: "222", winner_amount: 900_000,
-    bidders: 3, detailed: true, findings: [],
+    bidders: 3, detailed: true, findings: [], audit: null,
     ...over,
   };
 }
@@ -159,4 +159,76 @@ test("every observation declares whether it is about this tender", () => {
   for (const o of out.observations) assert.equal(typeof o.aboutThisTender, "boolean");
   assert.ok(out.observations.some((o) => o.aboutThisTender));
   assert.ok(out.observations.some((o) => !o.aboutThisTender));
+});
+
+test("an established violation is the state's finding, not ours", () => {
+  const entry = tenderCase({
+    risks: ["ari-1-1"],
+    findings: [],
+    audit: {
+      violation: true,
+      text: "встановлено порушення частини першої статті 41 Закону",
+      published: "2025-11-20T00:00:00+02:00",
+      monitoring_id: "m1",
+      count: 1,
+      reasons: ["fiscal"],
+      types: ["corruptionAwarded"],
+    },
+  });
+  const c = buildConclusion({ entry, sameEntity: [entry], sameOfficer: [], sameWinner: [] });
+  assert.equal(c.level, "high");
+  assert.match(c.headline, /держава, а не ми/);
+  assert.ok(c.observations.some((o) => o.title.includes("Держаудитслужба встановила порушення")));
+  assert.ok(c.nextSteps.some((s) => s.includes("висновок")));
+});
+
+test("a clean audit says so plainly when nothing else is weighing in", () => {
+  const entry = tenderCase({
+    risks: ["ari-1-1"],
+    findings: [],
+    bidders: 3,
+    audit: {
+      violation: false,
+      text: "Порушень не встановлено.",
+      published: "2025-11-20T00:00:00+02:00",
+      monitoring_id: "m2",
+      count: 1,
+      reasons: ["indicator"],
+      types: [],
+    },
+  });
+  const c = buildConclusion({ entry, sameEntity: [entry], sameOfficer: [], sameWinner: [] });
+  assert.equal(c.level, "low");
+  assert.match(c.headline, /порушень не встановила/);
+});
+
+test("a clean audit does not cancel a price finding", () => {
+  // The auditors check the procedure. Whether the thing cost too much is a
+  // separate question, and a clean monitoring is not an answer to it.
+  const priceFinding = {
+    tender_id: "t1",
+    detector_key: "peer_price",
+    tier: "own_analysis" as const,
+    severity: "high" as const,
+    title: "Ціна за одиницю у 3.4 раза вища за типову",
+    explanation: "x",
+    evidence: { unit_price: 14327, peer_median: 4248, peer_count: 114, overpayment: 6_047_304 },
+    created_at: "2026-08-21T00:00:00Z",
+  };
+  const entry = tenderCase({
+    risks: ["ari-1-1"],
+    findings: [priceFinding],
+    audit: {
+      violation: false,
+      text: "Порушень не встановлено.",
+      published: "2025-11-20T00:00:00+02:00",
+      monitoring_id: "m3",
+      count: 1,
+      reasons: ["indicator"],
+      types: [],
+    },
+  });
+  const c = buildConclusion({ entry, sameEntity: [entry], sameOfficer: [], sameWinner: [] });
+  assert.equal(c.level, "high");
+  assert.doesNotMatch(c.headline, /порушень не встановила/);
 });

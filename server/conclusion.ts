@@ -67,6 +67,31 @@ export function buildConclusion(input: ConclusionInput): Conclusion {
   const observations: Observation[] = [];
   const nextSteps: string[] = [];
 
+  /* ---- what the auditors concluded, which is not an inference at all ---- */
+
+  if (entry.audit?.violation) {
+    observations.push({
+      weight: "high",
+      aboutThisTender: true,
+      title: "Держаудитслужба встановила порушення",
+      detail:
+        `Моніторинг завершено висновком про порушення${entry.audit.published ? ` (${entry.audit.published.slice(0, 10)})` : ""}. ` +
+        `Це не наша оцінка й не спрацювання індикатора — це висновок органу державного фінансового контролю. ` +
+        (entry.audit.text ? `Формулювання висновку: «${entry.audit.text}»` : ""),
+    });
+    nextSteps.push("Прочитати висновок моніторингу в оригіналі та перевірити, чи усунуто порушення.");
+  } else if (entry.audit) {
+    observations.push({
+      weight: "low",
+      aboutThisTender: true,
+      title: "Держаудитслужба перевірила і порушень не встановила",
+      detail:
+        `За цією закупівлею проведено моніторинг${entry.audit.count > 1 ? ` (${entry.audit.count})` : ""}, ` +
+        "і порушень законодавства про закупівлі не встановлено. " +
+        "Моніторинг перевіряє дотримання процедури, а не те, чи ціна відповідає ринковій.",
+    });
+  }
+
   /* ---- our own price arithmetic carries the most weight ---- */
   for (const finding of entry.findings) {
     const e = finding.evidence as Record<string, number | string | undefined>;
@@ -188,18 +213,28 @@ export function buildConclusion(input: ConclusionInput): Conclusion {
   const own = observations.filter((o) => o.aboutThisTender);
   const highs = own.filter((o) => o.weight === "high").length;
   const mediums = own.filter((o) => o.weight === "medium").length;
-  const level: Weight = highs >= 1 ? "high" : mediums >= 2 ? "medium" : mediums === 1 ? "medium" : "low";
+  const level: Weight = highs >= 1 ? "high" : mediums >= 1 ? "medium" : "low";
 
-  const headline =
-    own.length === 0
-      ? observations.length === 0
-        ? "Крім самої державної позначки, ми нічого не знайшли"
-        : "У самій закупівлі нічого не знайшли, але навколо неї є контекст"
-      : level === "high"
-        ? "Є що перевіряти: знайдено кількісні розбіжності"
-        : "Варто подивитися уважніше";
+  const proven = Boolean(entry.audit?.violation);
+  // A clean audit only speaks for itself when nothing else about the tender
+  // is weighing in. It clears the procedure, not the price.
+  const clearedAndQuiet = Boolean(entry.audit) && !proven && own.every((o) => o.weight === "low");
 
-  if (own.length === 0) {
+  const headline = proven
+    ? "Порушення встановила держава, а не ми"
+    : clearedAndQuiet
+      ? "Держава перевіряла цю закупівлю і порушень не встановила"
+      : own.length === 0
+        ? observations.length === 0
+          ? "Крім самої державної позначки, ми нічого не знайшли"
+          : "У самій закупівлі нічого не знайшли, але навколо неї є контекст"
+        : level === "high"
+          ? "Є що перевіряти: знайдено кількісні розбіжності"
+          : "Варто подивитися уважніше";
+
+  if (clearedAndQuiet) {
+    nextSteps.push("Перевірити, чи стосувався моніторинг саме того питання, яке вас цікавить — його предмет вужчий за всю закупівлю.");
+  } else if (own.length === 0) {
     nextSteps.push("Відкрити першоджерело в Prozorro і звірити документи закупівлі з описом індикатора.");
   } else {
     nextSteps.push("Витребувати договір і всі додаткові угоди до нього.");

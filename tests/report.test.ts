@@ -42,7 +42,7 @@ function ctx(over: Partial<Case> = {}): ReportContext {
     risks: ["sas24-3-1", "ari-1-2"],
     officer_name: "Науменко Дмитро", officer_email: "n@x.ua", officer_phone: "380000000000", officer_key: "n@x.ua",
     winner_name: 'ПрАТ "Харківенергозбут"', winner_edrpou: "42206328", winner_amount: 8_500_000,
-    bidders: 1, detailed: true, findings: [finding],
+    bidders: 1, detailed: true, findings: [finding], audit: null,
     ...over,
   };
   return {
@@ -142,4 +142,31 @@ test("the report opens with the system's own conclusion", () => {
   assert.match(flat, /Конкуренції не було/);
   assert.match(flat, /Що перевірити далі/);
   assert.match(flat, /не встановлює порушення/);
+});
+
+test("the report carries the auditors' verdict, in their words", () => {
+  const text = reportText(
+    ctx({
+      audit: {
+        violation: true,
+        text: "встановлено порушення частини першої статті 41 Закону",
+        published: "2025-11-20T00:00:00+02:00",
+        monitoring_id: "m1",
+        count: 1,
+        reasons: ["fiscal"],
+        types: ["corruptionAwarded"],
+      },
+    }),
+  );
+  assert.match(text, /ВИСНОВОК ДЕРЖАУДИТСЛУЖБИ — ПОРУШЕННЯ ВСТАНОВЛЕНО/);
+  assert.match(text, /звернення органів державного фінансового контролю/);
+  assert.match(text, /порушення при визначенні переможця/);
+  assert.match(text, /статті 41 Закону/);
+  assert.match(text, /audit-api\.prozorro\.gov\.ua/);
+  // The distinction the whole tier rests on must survive into the document.
+  assert.match(text, /не встановлює, чи\s+ціна відповідає ринковій/);
+});
+
+test("a tender nobody audited gets no audit section", () => {
+  assert.doesNotMatch(reportText(ctx({})), /ВИСНОВОК ДЕРЖАУДИТСЛУЖБИ/);
 });

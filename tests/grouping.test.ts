@@ -12,7 +12,7 @@ function tenderCase(over: Partial<Case> = {}): Case {
     value_amount: 100, date_assessed: "2026-05-01T00:00:00+03:00", risks: ["ari-1-1"],
     officer_name: "Іваненко І.", officer_email: "i@x.ua", officer_phone: null, officer_key: "i@x.ua",
     winner_name: "ТОВ Переможець", winner_edrpou: "222", winner_amount: 90,
-    bidders: 2, detailed: true, findings: [],
+    bidders: 2, detailed: true, findings: [], audit: null,
     ...over,
   };
 }

@@ -22,7 +22,7 @@ function tenderCase(risks: string[]): Case {
     value_amount: 1_000_000, date_assessed: "2026-05-01", risks,
     officer_name: null, officer_email: null, officer_phone: null, officer_key: null,
     winner_name: null, winner_edrpou: null, winner_amount: null,
-    bidders: 2, detailed: true, findings: [],
+    bidders: 2, detailed: true, findings: [], audit: null,
   };
 }
 

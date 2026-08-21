@@ -15,6 +15,7 @@ const target = join(import.meta.dirname, "..", "web-data");
 /** Tables that go across untouched — they are already small. */
 const COPY = [
   "risk_flags.json",
+  "monitorings.json",
   "risk_rules.json",
   "tender_items.json",
   "bids.json",

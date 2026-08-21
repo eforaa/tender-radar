@@ -137,6 +137,37 @@ const ABBREVIATIONS = new Set([
  * abbreviations left alone. Names that already carry mixed case are returned
  * untouched.
  */
+/**
+ * Why the State Audit Service opened a monitoring. The API gives a code; this
+ * is the same thing in words someone outside the system would use.
+ */
+export const MONITORING_REASONS: Record<string, string> = {
+  indicator: "спрацював автоматичний індикатор ризику",
+  fiscal: "звернення органів державного фінансового контролю",
+  authorities: "звернення правоохоронних органів",
+  media: "публікація у засобах масової інформації",
+  public: "звернення громадськості",
+};
+
+/** What kind of violation the auditors established. */
+export const VIOLATION_TYPES: Record<string, string> = {
+  other: "інше порушення законодавства про закупівлі",
+  corruptionBiddingDocuments: "порушення в тендерній документації",
+  corruptionChanges: "неправомірні зміни до договору",
+  corruptionAwarded: "порушення при визначенні переможця",
+  corruptionUntimely: "несвоєчасне оприлюднення інформації",
+  corruptionFailureDocuments: "ненадання документів",
+  corruptionPublicDisclosure: "порушення вимог оприлюднення",
+  corruptionCancelled: "неправомірне скасування закупівлі",
+  corruptionContracting: "порушення при укладенні договору",
+  corruptionProcurementMethodType: "неправомірний вибір процедури закупівлі",
+  corruptionDescription: "порушення в описі предмета закупівлі",
+  documentsForm: "порушення форми документів",
+  deadlineForThePublicationDocumentation: "порушення строку оприлюднення документації",
+  rejectionOfBidsNotByLaw: "неправомірне відхилення пропозицій",
+  notComplyDecisionACU: "невиконання рішення Антимонопольного комітету",
+};
+
 export function readableName(name: string | null): string {
   if (!name) return "";
   // Registry names carry stray tabs and doubled spaces. Four buyers in the
