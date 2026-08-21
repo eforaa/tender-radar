@@ -390,7 +390,13 @@ ${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_i
 <h1 class="long">${esc(title)}</h1>
 <p class="sub">${esc(readableName(entry.entity_name))} · <span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span></p>
 
-${signals.length ? `<div class="flags" style="margin-bottom:1.5rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
+${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
+
+<div class="actions">
+  <a class="action primary" href="/tender/${encodeURIComponent(entry.tender_id)}/report">Завантажити звіт — PDF або друк</a>
+  <a class="action" href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">Текстовим файлом</a>
+  <a class="action" href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">Першоджерело в Prozorro</a>
+</div>
 
 <div class="card">
   <dl class="facts">
@@ -402,7 +408,6 @@ ${signals.length ? `<div class="flags" style="margin-bottom:1.5rem">${signals.ma
     <dt>Дата закупівлі</dt><dd>${date(entry.tender_date)}</dd>
     <dt>Позначено державою</dt><dd>${date(entry.date_assessed)}</dd>
     <dt>Першоджерело</dt><dd><a href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">Відкрити картку в Prozorro →</a></dd>
-    <dt>Звіт</dt><dd><a href="/tender/${encodeURIComponent(entry.tender_id)}/report">Повний звіт для друку та PDF →</a> · <a href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">завантажити текстом</a></dd>
   </dl>
 </div>
 

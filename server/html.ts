@@ -192,6 +192,12 @@ form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
 .filters-more[open] summary{border-bottom:1px solid var(--line-soft)}
 .filters-more summary:hover{background:var(--surface-3)}
 .filters-more .inner{padding:.9rem;display:flex;flex-direction:column;gap:.6rem}
+.actions{display:flex;flex-wrap:wrap;gap:.55rem;margin:0 0 1.75rem}
+.action{display:inline-flex;align-items:center;gap:.45rem;text-decoration:none;font-size:.95rem;color:var(--accent);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:.55rem 1rem}
+.action:hover{border-color:var(--accent);background:var(--accent-bg)}
+.action.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+.action.primary:hover{filter:brightness(1.08);background:var(--accent)}
+.action.primary::before{content:"⤓";font-size:1.05rem}
 .block-head{font-family:var(--f-display);font-weight:700;font-size:1.1rem;margin:1.75rem 0 .35rem}
 .badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:600;min-width:1.3rem;height:1.3rem;border-radius:1rem;display:inline-flex;align-items:center;justify-content:center;padding:0 .4rem}
 /* star toggle — a form so the site still needs no scripts */

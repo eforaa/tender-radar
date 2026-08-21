@@ -432,6 +432,12 @@ form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
 .filters-more[open] summary{border-bottom:1px solid var(--line-soft)}
 .filters-more summary:hover{background:var(--surface-3)}
 .filters-more .inner{padding:.9rem;display:flex;flex-direction:column;gap:.6rem}
+.actions{display:flex;flex-wrap:wrap;gap:.55rem;margin:0 0 1.75rem}
+.action{display:inline-flex;align-items:center;gap:.45rem;text-decoration:none;font-size:.95rem;color:var(--accent);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:.55rem 1rem}
+.action:hover{border-color:var(--accent);background:var(--accent-bg)}
+.action.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+.action.primary:hover{filter:brightness(1.08);background:var(--accent)}
+.action.primary::before{content:"\u2913";font-size:1.05rem}
 .block-head{font-family:var(--f-display);font-weight:700;font-size:1.1rem;margin:1.75rem 0 .35rem}
 .badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:600;min-width:1.3rem;height:1.3rem;border-radius:1rem;display:inline-flex;align-items:center;justify-content:center;padding:0 .4rem}
 /* star toggle \u2014 a form so the site still needs no scripts */
@@ -1614,7 +1620,13 @@ ${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_i
 <h1 class="long">${esc(title)}</h1>
 <p class="sub">${esc(readableName(entry.entity_name))} \xB7 <span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span></p>
 
-${signals.length ? `<div class="flags" style="margin-bottom:1.5rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
+${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
+
+<div class="actions">
+  <a class="action primary" href="/tender/${encodeURIComponent(entry.tender_id)}/report">\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0438\u0442\u0438 \u0437\u0432\u0456\u0442 \u2014 PDF \u0430\u0431\u043E \u0434\u0440\u0443\u043A</a>
+  <a class="action" href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">\u0422\u0435\u043A\u0441\u0442\u043E\u0432\u0438\u043C \u0444\u0430\u0439\u043B\u043E\u043C</a>
+  <a class="action" href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E \u0432 Prozorro</a>
+</div>
 
 <div class="card">
   <dl class="facts">
@@ -1626,7 +1638,6 @@ ${signals.length ? `<div class="flags" style="margin-bottom:1.5rem">${signals.ma
     <dt>\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</dt><dd>${date(entry.tender_date)}</dd>
     <dt>\u041F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043E\u044E</dt><dd>${date(entry.date_assessed)}</dd>
     <dt>\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E</dt><dd><a href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u043A\u0430\u0440\u0442\u043A\u0443 \u0432 Prozorro \u2192</a></dd>
-    <dt>\u0417\u0432\u0456\u0442</dt><dd><a href="/tender/${encodeURIComponent(entry.tender_id)}/report">\u041F\u043E\u0432\u043D\u0438\u0439 \u0437\u0432\u0456\u0442 \u0434\u043B\u044F \u0434\u0440\u0443\u043A\u0443 \u0442\u0430 PDF \u2192</a> \xB7 <a href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0438\u0442\u0438 \u0442\u0435\u043A\u0441\u0442\u043E\u043C</a></dd>
   </dl>
 </div>
 
