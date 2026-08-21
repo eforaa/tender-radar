@@ -8,6 +8,7 @@ import { isDimension, type Dimension } from "./grouping.ts";
 export type Controls = {
   q: string;
   risk: string;
+  region: string;
   sort: string;
   railOnly: boolean;
   soloOnly: boolean;
@@ -27,6 +28,7 @@ export function readControls(url: URL): Controls {
   return {
     q: (url.searchParams.get("q") ?? "").trim().toLowerCase(),
     risk: url.searchParams.get("risk") ?? "",
+    region: url.searchParams.get("region") ?? "",
     sort: url.searchParams.get("sort") ?? "value",
     railOnly: url.searchParams.get("rail") === "1",
     soloOnly: url.searchParams.get("solo") === "1",
@@ -45,6 +47,7 @@ export function readControls(url: URL): Controls {
 export function activeCount(c: Controls): number {
   return [
     c.risk,
+    c.region,
     c.railOnly,
     c.soloOnly,
     c.priceOnly,
@@ -59,7 +62,7 @@ export function activeCount(c: Controls): number {
 
 export function isFiltered(c: Controls): boolean {
   return Boolean(
-    c.q || c.risk || c.railOnly || c.soloOnly || c.priceOnly || c.dateFrom || c.dateTo || c.min > 0 || c.max > 0,
+    c.q || c.risk || c.region || c.railOnly || c.soloOnly || c.priceOnly || c.dateFrom || c.dateTo || c.min > 0 || c.max > 0,
   );
 }
 
@@ -86,22 +89,27 @@ export function applyControls(cases: Case[], c: Controls, railwayCodes: Set<stri
     );
   }
   if (c.risk) list = list.filter((x) => x.risks.includes(c.risk));
+  if (c.region) list = list.filter((x) => x.region === c.region);
   if (c.railOnly && !opts.hideRail) list = list.filter((x) => railwayCodes.has(x.entity_edrpou ?? ""));
   if (c.soloOnly) list = list.filter((x) => x.bidders === 1);
   if (c.priceOnly && !opts.hidePrice) list = list.filter((x) => x.findings.length > 0);
 
-  // Dates compare as ISO strings; the stored value starts with YYYY-MM-DD,
-  // so a plain string comparison is correct and needs no parsing.
-  if (c.dateFrom) list = list.filter((x) => (x.date_assessed ?? "") >= c.dateFrom);
-  if (c.dateTo) list = list.filter((x) => (x.date_assessed ?? "").slice(0, 10) <= c.dateTo);
+  // The date range is the tender's own publication date, not the date the
+  // state assessed it: assessments are nearly all recent, so filtering by them
+  // would hide every older procurement. Both are plain YYYY-MM-DD strings, so
+  // a string comparison is correct and needs no parsing.
+  if (c.dateFrom) list = list.filter((x) => (x.tender_date ?? "") >= c.dateFrom);
+  if (c.dateTo) list = list.filter((x) => (x.tender_date ?? "") <= c.dateTo);
   if (c.min > 0) list = list.filter((x) => (x.value_amount ?? 0) >= c.min);
   if (c.max > 0) list = list.filter((x) => (x.value_amount ?? 0) <= c.max);
 
   return [...list].sort((a, b) =>
     c.sort === "date"
-      ? String(b.date_assessed ?? "").localeCompare(String(a.date_assessed ?? ""))
+      ? String(b.tender_date ?? "").localeCompare(String(a.tender_date ?? ""))
       : c.sort === "date-asc"
-        ? String(a.date_assessed ?? "").localeCompare(String(b.date_assessed ?? ""))
+        ? String(a.tender_date ?? "").localeCompare(String(b.tender_date ?? ""))
+        : c.sort === "assessed"
+          ? String(b.date_assessed ?? "").localeCompare(String(a.date_assessed ?? ""))
         : c.sort === "value-asc"
           ? (a.value_amount ?? 0) - (b.value_amount ?? 0)
           : c.sort === "risks"
@@ -115,6 +123,7 @@ export function keepControls(action: string, c: Controls, over: Record<string, s
   const p = new URLSearchParams();
   if (c.q) p.set("q", c.q);
   if (c.risk) p.set("risk", c.risk);
+  if (c.region) p.set("region", c.region);
   if (c.sort !== "value") p.set("sort", c.sort);
   if (c.railOnly) p.set("rail", "1");
   if (c.soloOnly) p.set("solo", "1");

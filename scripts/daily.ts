@@ -23,8 +23,12 @@ function log(message: string): void {
   console.log(`[${new Date().toISOString().slice(11, 19)}] ${message}`);
 }
 
-/** Kharkiv oblast, plus every Ukrainian Railways branch wherever registered. */
-function inScope(row: RiskFlagRow): boolean {
+/**
+ * Flags are kept for the whole country — the main list shows all of Ukraine.
+ * Full tender cards are a different matter: fetching one per tender for every
+ * region would be tens of thousands of requests, so those stay scoped.
+ */
+function wantsFullCard(row: RiskFlagRow): boolean {
   return row.region === REGION || RAILWAY_EDRPOU.has(row.entity_edrpou ?? "");
 }
 
@@ -46,10 +50,10 @@ try {
   const freshFlags: RiskFlagRow[] = [];
   for (const riskId of ruleIds) {
     try {
-      const rows = normalizeRiskReport(await fetchRiskReportCsv(riskId)).filter(inScope);
+      const rows = normalizeRiskReport(await fetchRiskReportCsv(riskId));
       freshFlags.push(...rows);
       const added = rows.filter((r) => !knownFlagKeys.has(`${r.tender_id}|${r.risk_id}`)).length;
-      log(`${riskId}: ${rows.length} in scope${added ? `, ${added} new` : ""}`);
+      log(`${riskId}: ${rows.length} nationwide${added ? `, ${added} new` : ""}`);
     } catch (err) {
       errors++;
       log(`${riskId}: export failed — ${(err as Error).message}`);
@@ -73,9 +77,10 @@ try {
   /* ---- 2. full cards for anything still missing one ---- */
 
   const haveCards = new Set((await store.allTenders()).map((t) => t.id));
-  const allWanted = [...new Set((await store.allRiskFlags()).map((f) => f.tender_id))];
-  const missing = allWanted.filter((id) => !haveCards.has(id));
-  log(`tender cards missing: ${missing.length}`);
+  const storedFlags = await store.allRiskFlags();
+  const wanted = [...new Set(storedFlags.filter(wantsFullCard).map((f) => f.tender_id))];
+  const missing = wanted.filter((id) => !haveCards.has(id));
+  log(`tender cards wanted ${wanted.length}, missing ${missing.length}`);
 
   const tenders: TenderRow[] = [];
   const items: TenderItemRow[] = [];

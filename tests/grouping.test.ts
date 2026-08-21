@@ -7,7 +7,7 @@ const label = (id: string) => `ознака ${id}`;
 
 function tenderCase(over: Partial<Case> = {}): Case {
   return {
-    tender_id: "t1", tender_ref: "UA-2026-01-01-000001-a", title: "Закупівля", status: "active",
+    tender_id: "t1", tender_ref: "UA-2026-01-01-000001-a", tender_date: "2026-01-01", title: "Закупівля", status: "active",
     method: "aboveThreshold", entity_edrpou: "111", entity_name: "КП Тест", region: "Харківська область",
     value_amount: 100, date_assessed: "2026-05-01T00:00:00+03:00", risks: ["ari-1-1"],
     officer_name: "Іваненко І.", officer_email: "i@x.ua", officer_phone: null, officer_key: "i@x.ua",

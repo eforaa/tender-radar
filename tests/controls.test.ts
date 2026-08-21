@@ -7,7 +7,7 @@ const RAIL = new Set(["40081216"]);
 
 function tenderCase(over: Partial<Case> = {}): Case {
   return {
-    tender_id: "t1", tender_ref: "UA-2026-01-01-000001-a", title: "Електрична енергія", status: "active",
+    tender_id: "t1", tender_ref: "UA-2026-01-01-000001-a", tender_date: "2026-01-01", title: "Електрична енергія", status: "active",
     method: "aboveThreshold", entity_edrpou: "111", entity_name: "КП Тест", region: "Харківська область",
     value_amount: 1_000_000, date_assessed: "2026-05-01T00:00:00+03:00", risks: ["ari-1-1"],
     officer_name: "Іваненко І.", officer_email: "i@x.ua", officer_phone: null, officer_key: "i@x.ua",
@@ -55,13 +55,37 @@ test("the amount range includes its own bounds", () => {
   assert.equal(applyControls(list, controlsFrom("?max=1000"), RAIL).length, 2);
 });
 
-test("the date range compares only the day part", () => {
-  const list = [tenderCase({ date_assessed: "2026-05-01T23:59:00+03:00" })];
-  // A naive full-string comparison would drop this row, because the stored
-  // value is longer than the date typed into the box.
-  assert.equal(applyControls(list, controlsFrom("?to=2026-05-01"), RAIL).length, 1);
-  assert.equal(applyControls(list, controlsFrom("?from=2026-05-01"), RAIL).length, 1);
-  assert.equal(applyControls(list, controlsFrom("?to=2026-04-30"), RAIL).length, 0);
+test("the date range filters on the tender's own date, not the assessment", () => {
+  // A 2024 tender assessed in 2026 must still be found by a 2024 date range.
+  const old = tenderCase({ tender_date: "2024-07-11", date_assessed: "2026-04-14T00:00:00+03:00" });
+  assert.equal(applyControls([old], controlsFrom("?from=2024-01-01&to=2024-12-31"), RAIL).length, 1);
+  assert.equal(applyControls([old], controlsFrom("?from=2026-01-01"), RAIL).length, 0);
+  assert.equal(applyControls([old], controlsFrom("?to=2024-07-11"), RAIL).length, 1);
+});
+
+test("sorting by date uses the tender date, and assessed order is separate", () => {
+  const older = tenderCase({ tender_id: "old", tender_date: "2024-01-01", date_assessed: "2026-08-01" });
+  const newer = tenderCase({ tender_id: "new", tender_date: "2026-01-01", date_assessed: "2026-01-01" });
+  const order = (q: string) => applyControls([older, newer], controlsFrom(q), RAIL).map((x) => x.tender_id);
+  assert.deepEqual(order("?sort=date"), ["new", "old"]);
+  assert.deepEqual(order("?sort=date-asc"), ["old", "new"]);
+  assert.deepEqual(order("?sort=assessed"), ["old", "new"]);
+});
+
+test("the region filter narrows to one oblast", () => {
+  const list = [
+    tenderCase({ tender_id: "kh", region: "Харківська область" }),
+    tenderCase({ tender_id: "kyiv", region: "Київська область" }),
+  ];
+  const out = applyControls(list, controlsFrom("?region=" + encodeURIComponent("Київська область")), RAIL);
+  assert.deepEqual(out.map((x) => x.tender_id), ["kyiv"]);
+  assert.equal(applyControls(list, controlsFrom(""), RAIL).length, 2);
+});
+
+test("the region survives paging links", () => {
+  const c = controlsFrom("?region=" + encodeURIComponent("Львівська область"));
+  const url = new URL("https://x.example" + keepControls("/", c, { page: "2" }));
+  assert.equal(url.searchParams.get("region"), "Львівська область");
 });
 
 test("the railway filter can be switched off where the page is already railway", () => {
@@ -78,8 +102,8 @@ test("the price filter can be switched off where the page is already price findi
 
 test("every sort order is honoured", () => {
   const list = [
-    tenderCase({ tender_id: "a", value_amount: 10, date_assessed: "2026-01-01", risks: ["x"] }),
-    tenderCase({ tender_id: "b", value_amount: 100, date_assessed: "2025-01-01", risks: ["x", "y", "z"] }),
+    tenderCase({ tender_id: "a", value_amount: 10, tender_date: "2026-01-01", risks: ["x"] }),
+    tenderCase({ tender_id: "b", value_amount: 100, tender_date: "2025-01-01", risks: ["x", "y", "z"] }),
   ];
   const order = (query: string) => applyControls(list, controlsFrom(query), RAIL).map((x) => x.tender_id);
   assert.deepEqual(order(""), ["b", "a"]);

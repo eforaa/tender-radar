@@ -6,6 +6,7 @@ import { ARTICLES, INDICATOR_LEGAL, isJointStock } from "../src/legal.ts";
 import { loadDataset, type Case, type Dataset } from "./data.ts";
 import { DIMENSIONS, buildGroups, isDimension, type Dimension, type Group } from "./grouping.ts";
 import { normaliseEdrpou, isStarred, type Favourite, type FavKind } from "./favourites.ts";
+import { reportText, reportHtml, type ReportContext } from "./report.ts";
 import {
   readControls, applyControls, activeCount, isFiltered, keepControls,
   type Controls, type ControlOptions,
@@ -82,7 +83,7 @@ function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?: boolea
   <div class="who">
     <div class="name">${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
     ${meta.length ? `<div class="meta">${meta.join(" · ")}</div>` : ""}
-    <div class="meta"><span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span> · позначено ${date(entry.date_assessed)}</div>
+    <div class="meta"><span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span>${entry.tender_date ? ` · закупівля від ${date(entry.tender_date)}` : ""}${entry.region ? ` · ${esc(entry.region)}` : ""}</div>
   </div>
   <div class="amount">
     <span class="big">${shortMoney(entry.value_amount)}</span>
@@ -219,9 +220,10 @@ function filterPanel(action: string, c: Controls, opts: ControlOptions = {}): st
       .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
       .join("");
 
-  const stamps = db.cases.map((x) => (x.date_assessed ?? "").slice(0, 10)).filter(Boolean).sort();
+  const stamps = db.cases.map((x) => x.tender_date ?? "").filter(Boolean).sort();
   const earliest = stamps[0] ?? "";
   const latest = stamps[stamps.length - 1] ?? "";
+  const regions = [...new Set(db.cases.map((x) => x.region ?? "").filter(Boolean))].sort();
   const amounts = db.cases.map((x) => x.value_amount ?? 0).filter((n) => n > 0);
   const rangeHint = amounts.length
     ? `у базі від ${shortMoney(Math.min(...amounts))} до ${shortMoney(Math.max(...amounts))}`
@@ -250,17 +252,24 @@ function filterPanel(action: string, c: Controls, opts: ControlOptions = {}): st
             )
             .join("")}
         </select>
+        <select name="region" aria-label="Область">
+          <option value="">Уся Україна</option>
+          ${regions
+            .map((r) => `<option value="${esc(r)}"${r === c.region ? " selected" : ""}>${esc(r)}</option>`)
+            .join("")}
+        </select>
         <select name="sort" aria-label="Сортування">
           <option value="value"${c.sort === "value" ? " selected" : ""}>Спочатку найдорожчі</option>
           <option value="value-asc"${c.sort === "value-asc" ? " selected" : ""}>Спочатку найдешевші</option>
-          <option value="date"${c.sort === "date" ? " selected" : ""}>Спочатку найновіші</option>
-          <option value="date-asc"${c.sort === "date-asc" ? " selected" : ""}>Спочатку найстаріші</option>
+          <option value="date"${c.sort === "date" ? " selected" : ""}>Спочатку найновіші закупівлі</option>
+          <option value="date-asc"${c.sort === "date-asc" ? " selected" : ""}>Спочатку найстаріші закупівлі</option>
+          <option value="assessed"${c.sort === "assessed" ? " selected" : ""}>Спочатку нещодавно позначені</option>
           <option value="risks"${c.sort === "risks" ? " selected" : ""}>Спочатку з найбільшою кількістю ознак</option>
         </select>
       </div>
 
       <div class="filter-row">
-        <span class="filter-label">Дата позначки</span>
+        <span class="filter-label">Дата закупівлі</span>
         <input type="date" name="from" value="${esc(c.dateFrom)}" aria-label="Дата від" min="${esc(earliest)}" max="${esc(latest)}">
         <span class="filter-label">по</span>
         <input type="date" name="to" value="${esc(c.dateTo)}" aria-label="Дата по" min="${esc(earliest)}" max="${esc(latest)}">
@@ -390,8 +399,10 @@ ${signals.length ? `<div class="flags" style="margin-bottom:1.5rem">${signals.ma
     <dt>Регіон</dt><dd>${esc(entry.region ?? "—")}</dd>
     ${entry.method ? `<dt>Процедура</dt><dd>${esc(procedureLabel(entry.method) ?? "—")}</dd>` : ""}
     ${entry.detailed ? `<dt>Учасників</dt><dd>${entry.bidders === 1 ? "<strong>один</strong> — конкуренції не було" : entry.bidders || "—"}</dd>` : ""}
-    <dt>Позначено</dt><dd>${date(entry.date_assessed)}</dd>
+    <dt>Дата закупівлі</dt><dd>${date(entry.tender_date)}</dd>
+    <dt>Позначено державою</dt><dd>${date(entry.date_assessed)}</dd>
     <dt>Першоджерело</dt><dd><a href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">Відкрити картку в Prozorro →</a></dd>
+    <dt>Звіт</dt><dd><a href="/tender/${encodeURIComponent(entry.tender_id)}/report">Повний звіт для друку та PDF →</a> · <a href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">завантажити текстом</a></dd>
   </dl>
 </div>
 
@@ -1354,7 +1365,7 @@ export async function reload(): Promise<number> {
   return db.cases.length;
 }
 
-export type Rendered = { status: number; body: string };
+export type Rendered = { status: number; body: string; contentType?: string; filename?: string };
 
 /**
  * Resolves one URL to a page. Pure with respect to I/O, so the same code
@@ -1385,7 +1396,32 @@ export function render(url: URL, saved: Favourite[] = []): Rendered {
   if (path === "/indicators") return { status: 200, body: indicatorsPage() };
   if (path === "/about") return { status: 200, body: aboutPage() };
   if (path.startsWith("/article/")) return { status: 200, body: articlePage(path.slice("/article/".length), url) };
-  if (path.startsWith("/tender/")) return { status: 200, body: tenderPage(path.slice("/tender/".length)) };
+  if (path.startsWith("/tender/")) {
+    const rest = path.slice("/tender/".length);
+    if (rest.endsWith("/report") || rest.endsWith("/report.txt")) {
+      const asText = rest.endsWith(".txt");
+      const id = rest.slice(0, rest.lastIndexOf("/report"));
+      const entry = db.byTender.get(id);
+      if (!entry) return { status: 404, body: notFound() };
+      const ctx: ReportContext = {
+        entry,
+        rules: db.ruleById,
+        sameEntity: db.cases.filter((x) => x.entity_edrpou && x.entity_edrpou === entry.entity_edrpou).length,
+        sameOfficer: entry.officer_key ? db.cases.filter((x) => x.officer_key === entry.officer_key).length : 0,
+        sameWinner: entry.winner_edrpou ? db.cases.filter((x) => x.winner_edrpou === entry.winner_edrpou).length : 0,
+        generatedAt: new Date().toISOString(),
+      };
+      return asText
+        ? {
+            status: 200,
+            body: reportText(ctx),
+            contentType: "text/plain; charset=utf-8",
+            filename: `${entry.tender_ref || entry.tender_id}.txt`,
+          }
+        : { status: 200, body: reportHtml(ctx) };
+    }
+    return { status: 200, body: tenderPage(rest) };
+  }
   if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length)) };
   if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length)) };
   if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length)) };

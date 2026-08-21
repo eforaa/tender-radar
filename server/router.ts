@@ -72,8 +72,20 @@ export async function handle(req: HttpRequest): Promise<HttpResponse> {
       return redirect(back, favouritesCookie(toggleFavourite(saved, kind, id), secure));
     }
 
-    const { status, body } = render(req.url, saved);
-    return page(status, body);
+    const rendered = render(req.url, saved);
+    if (rendered.contentType) {
+      return {
+        status: rendered.status,
+        body: rendered.body,
+        headers: {
+          "content-type": rendered.contentType,
+          ...(rendered.filename
+            ? { "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(rendered.filename)}` }
+            : {}),
+        },
+      };
+    }
+    return page(rendered.status, rendered.body);
   }
 
   if (!config) return serve();

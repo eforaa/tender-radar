@@ -31,11 +31,33 @@ export function shortMoney(amount: number | null): string {
   return Math.round(amount) + " ₴";
 }
 
+const MONTHS = [
+  "січня", "лютого", "березня", "квітня", "травня", "червня",
+  "липня", "серпня", "вересня", "жовтня", "листопада", "грудня",
+];
+
+/**
+ * Formats the calendar day the source published, without touching timezones.
+ *
+ * Parsing "2026-04-14T00:00:00+03:00" into a Date and formatting it renders
+ * the previous day wherever the server does not sit in Kyiv — and Vercel runs
+ * in UTC. These are Ukrainian dates published by Ukrainian systems, so the
+ * date part of the string is the answer; converting it can only be wrong.
+ */
 export function date(value: string | null): string {
   if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("uk-UA", { day: "2-digit", month: "long", year: "numeric" });
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!m) return "—";
+  const [, year, month, day] = m;
+  const name = MONTHS[Number(month) - 1];
+  return name ? `${Number(day)} ${name} ${year} р.` : `${day}.${month}.${year}`;
+}
+
+/** The same day, in the short numeric form used in documents. */
+export function shortDate(value: string | null): string {
+  if (!value) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : "—";
 }
 
 /**

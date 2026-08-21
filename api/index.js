@@ -280,11 +280,32 @@ function shortMoney(amount) {
   if (amount >= 1e3) return Math.round(amount / 1e3).toLocaleString("uk-UA") + " \u0442\u0438\u0441 \u20B4";
   return Math.round(amount) + " \u20B4";
 }
+var MONTHS = [
+  "\u0441\u0456\u0447\u043D\u044F",
+  "\u043B\u044E\u0442\u043E\u0433\u043E",
+  "\u0431\u0435\u0440\u0435\u0437\u043D\u044F",
+  "\u043A\u0432\u0456\u0442\u043D\u044F",
+  "\u0442\u0440\u0430\u0432\u043D\u044F",
+  "\u0447\u0435\u0440\u0432\u043D\u044F",
+  "\u043B\u0438\u043F\u043D\u044F",
+  "\u0441\u0435\u0440\u043F\u043D\u044F",
+  "\u0432\u0435\u0440\u0435\u0441\u043D\u044F",
+  "\u0436\u043E\u0432\u0442\u043D\u044F",
+  "\u043B\u0438\u0441\u0442\u043E\u043F\u0430\u0434\u0430",
+  "\u0433\u0440\u0443\u0434\u043D\u044F"
+];
 function date(value) {
   if (!value) return "\u2014";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "\u2014";
-  return d.toLocaleDateString("uk-UA", { day: "2-digit", month: "long", year: "numeric" });
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!m) return "\u2014";
+  const [, year, month, day2] = m;
+  const name = MONTHS[Number(month) - 1];
+  return name ? `${Number(day2)} ${name} ${year} \u0440.` : `${day2}.${month}.${year}`;
+}
+function shortDate(value) {
+  if (!value) return "\u2014";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : "\u2014";
 }
 function plural(n, one, few, many) {
   const mod100 = Math.abs(n) % 100;
@@ -785,6 +806,10 @@ function officerKey(row) {
 }
 
 // server/data.ts
+function tenderDateOf(tenderRef) {
+  const m = /^UA-(\d{4}-\d{2}-\d{2})-/.exec(tenderRef);
+  return m ? m[1] : null;
+}
 function activeAward(awards) {
   return awards.find((a) => a.status === "active") ?? awards[0];
 }
@@ -821,6 +846,7 @@ async function loadDataset() {
       entry = {
         tender_id: flag.tender_id,
         tender_ref: flag.tender_ref || detail?.tender_id || "",
+        tender_date: tenderDateOf(flag.tender_ref || detail?.tender_id || ""),
         title: detail?.title ?? null,
         status: detail?.status ?? null,
         method: detail?.method ?? null,
@@ -843,7 +869,10 @@ async function loadDataset() {
       };
       byTender.set(flag.tender_id, entry);
     }
-    if (!entry.tender_ref && flag.tender_ref) entry.tender_ref = flag.tender_ref;
+    if (!entry.tender_ref && flag.tender_ref) {
+      entry.tender_ref = flag.tender_ref;
+      entry.tender_date = tenderDateOf(flag.tender_ref);
+    }
     if (entry.value_amount === null) entry.value_amount = flag.value_amount;
     if (!entry.risks.includes(flag.risk_id)) entry.risks.push(flag.risk_id);
   }
@@ -1010,6 +1039,211 @@ function favouritesCookie(favourites, secure) {
   return value.length === 0 ? `${FAVOURITES_COOKIE}=; ${attrs}; Max-Age=0` : `${FAVOURITES_COOKIE}=${value}; ${attrs}; Max-Age=${TTL_SECONDS}`;
 }
 
+// server/report.ts
+function plainNumber(n, digits = 2) {
+  return new Intl.NumberFormat("uk-UA", { maximumFractionDigits: digits }).format(n).replace(/ /g, " ");
+}
+function money2(amount) {
+  if (amount === null || !Number.isFinite(amount)) return "\u2014";
+  return plainNumber(amount) + " \u0433\u0440\u043D";
+}
+var day = shortDate;
+function wrap(text, width = 78, indent = "  ") {
+  const words = text.replace(/\s+/g, " ").trim().split(" ");
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    if ((line + " " + word).trim().length > width) {
+      lines.push(indent + line.trim());
+      line = word;
+    } else {
+      line += " " + word;
+    }
+  }
+  if (line.trim()) lines.push(indent + line.trim());
+  return lines.join("\n");
+}
+function sections(ctx) {
+  const { entry, rules } = ctx;
+  const out = [];
+  out.push({
+    heading: "\u0417\u0410\u041A\u0423\u041F\u0406\u0412\u041B\u042F",
+    lines: [
+      `\u041D\u0430\u0437\u0432\u0430: ${entry.title ?? "\u2014"}`,
+      `\u041D\u043E\u043C\u0435\u0440: ${entry.tender_ref || entry.tender_id}`,
+      `\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456: ${day(entry.tender_date)}`,
+      `\u0414\u0430\u0442\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u0438: ${day(entry.date_assessed)}`,
+      `\u0421\u0443\u043C\u0430: ${money2(entry.value_amount)}`,
+      `\u0420\u0435\u0433\u0456\u043E\u043D: ${entry.region ?? "\u2014"}`,
+      entry.method ? `\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0430: ${procedureLabel(entry.method) ?? entry.method}` : "",
+      entry.detailed ? `\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432: ${entry.bidders === 1 ? "\u043E\u0434\u0438\u043D \u2014 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u0457 \u043D\u0435 \u0431\u0443\u043B\u043E" : entry.bidders || "\u2014"}` : "",
+      `\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E: https://prozorro.gov.ua/tender/${entry.tender_ref}`
+    ].filter(Boolean)
+  });
+  out.push({
+    heading: "\u0417\u0410\u041C\u041E\u0412\u041D\u0418\u041A",
+    lines: [
+      `\u041D\u0430\u0437\u0432\u0430: ${readableName(entry.entity_name)}`,
+      `\u0404\u0414\u0420\u041F\u041E\u0423: ${entry.entity_edrpou ?? "\u2014"}`,
+      `\u0423\u0441\u044C\u043E\u0433\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438: ${ctx.sameEntity}`
+    ]
+  });
+  if (entry.officer_name) {
+    out.push({
+      heading: "\u0412\u0406\u0414\u041F\u041E\u0412\u0406\u0414\u0410\u041B\u042C\u041D\u0410 \u041E\u0421\u041E\u0411\u0410",
+      lines: [
+        `\u0406\u043C'\u044F: ${entry.officer_name}`,
+        `\u041F\u043E\u0448\u0442\u0430: ${entry.officer_email ?? "\u2014"}`,
+        `\u0422\u0435\u043B\u0435\u0444\u043E\u043D: ${entry.officer_phone ?? "\u2014"}`,
+        `\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0434\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E: ${ctx.sameOfficer}`,
+        "",
+        wrap(
+          "\u0414\u0430\u043D\u0456 \u0432\u0437\u044F\u0442\u043E \u0437 \u043A\u0430\u0440\u0442\u043A\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432 Prozorro, \u0434\u0435 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0441\u0430\u043C \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0443 \u043E\u0441\u043E\u0431\u0443. \u0426\u0435 \u043D\u0435 \u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F \u043F\u0440\u043E \u043F\u0440\u0430\u0432\u043E\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0437 \u0431\u043E\u043A\u0443 \u043D\u0430\u0437\u0432\u0430\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438."
+        )
+      ]
+    });
+  }
+  if (entry.winner_name) {
+    out.push({
+      heading: "\u041F\u0415\u0420\u0415\u041C\u041E\u0416\u0415\u0426\u042C",
+      lines: [
+        `\u041D\u0430\u0437\u0432\u0430: ${readableName(entry.winner_name)}`,
+        `\u0404\u0414\u0420\u041F\u041E\u0423: ${entry.winner_edrpou ?? "\u2014"}`,
+        `\u0421\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443: ${money2(entry.winner_amount)}`,
+        `\u041F\u0435\u0440\u0435\u043C\u043E\u0433 \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438: ${ctx.sameWinner}`
+      ]
+    });
+  }
+  const indicatorLines = [];
+  for (const riskId of entry.risks) {
+    const rule = rules.get(riskId);
+    const label = RISK_LABELS[riskId];
+    const legal = INDICATOR_LEGAL[riskId];
+    indicatorLines.push(`[${riskId}] ${label?.short ?? rule?.name ?? riskId}`);
+    if (label) indicatorLines.push(wrap(label.means));
+    if (rule?.name) indicatorLines.push(wrap(`\u041E\u0444\u0456\u0446\u0456\u0439\u043D\u0435 \u0444\u043E\u0440\u043C\u0443\u043B\u044E\u0432\u0430\u043D\u043D\u044F: ${rule.name}`));
+    const stateNorm = rule?.legitimateness?.trim();
+    if (stateNorm) {
+      indicatorLines.push(wrap(`\u041D\u043E\u0440\u043C\u0430, \u044F\u043A\u0443 \u043D\u0430\u0432\u043E\u0434\u0438\u0442\u044C \u0434\u0435\u0440\u0436\u0430\u0432\u0430: ${stateNorm}`));
+    } else if (legal?.norm) {
+      indicatorLines.push(wrap(`\u041D\u043E\u0440\u043C\u0430 \u2014 \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043D\u044F \u0446\u0456\u0454\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438: ${legal.norm}`));
+      if (legal.normNote) indicatorLines.push(wrap(legal.normNote));
+    } else {
+      indicatorLines.push(wrap("\u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u043D\u0435 \u043D\u0430\u0432\u043E\u0434\u0438\u0442\u044C \u043D\u043E\u0440\u043C\u0443 \u0434\u043B\u044F \u0446\u044C\u043E\u0433\u043E \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0430."));
+    }
+    for (const direction of legal?.criminal ?? []) {
+      const article = ARTICLES[direction.code];
+      indicatorLines.push(wrap(`\u0421\u0442\u0430\u0442\u0442\u044F ${direction.code} \u041A\u041A\u0423 \u2014 ${article?.title ?? ""}: ${direction.why}`));
+    }
+    indicatorLines.push("");
+  }
+  out.push({
+    heading: `\u0429\u041E \u0417\u0410\u041F\u0406\u0414\u041E\u0417\u0420\u0418\u041B\u0410 \u0414\u0415\u0420\u0416\u0410\u0412\u0410 \u2014 ${entry.risks.length} ${entry.risks.length === 1 ? "\u0406\u041D\u0414\u0418\u041A\u0410\u0422\u041E\u0420" : "\u0406\u041D\u0414\u0418\u041A\u0410\u0422\u041E\u0420\u0418"}`,
+    lines: indicatorLines
+  });
+  if (entry.findings.length > 0) {
+    const lines = [];
+    for (const finding of entry.findings) {
+      lines.push(`${finding.title}`);
+      lines.push(wrap(finding.explanation));
+      const e = finding.evidence;
+      for (const [key, caption] of [
+        ["unit_price", "\u0426\u0456\u043D\u0430 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E"],
+        ["peer_median", "\u0422\u0438\u043F\u043E\u0432\u0430 \u0446\u0456\u043D\u0430 (\u043C\u0435\u0434\u0456\u0430\u043D\u0430)"],
+        ["peer_count", "\u041F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043E \u0456\u0437 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438"],
+        ["previous_price", "\u041F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u044F \u0446\u0456\u043D\u0430 \u0446\u044C\u043E\u0433\u043E \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430"],
+        ["quantity", "\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C"],
+        ["overpayment", "\u0420\u0456\u0437\u043D\u0438\u0446\u044F \u043D\u0430 \u0432\u0441\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E"],
+        ["extra_cost", "\u0420\u0456\u0437\u043D\u0438\u0446\u044F \u043D\u0430 \u0432\u0441\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E"]
+      ]) {
+        if (typeof e[key] === "number") lines.push(`  ${caption}: ${plainNumber(e[key], 2)}`);
+      }
+      lines.push("");
+    }
+    out.push({ heading: "\u0420\u041E\u0417\u0420\u0410\u0425\u0423\u041D\u041E\u041A \u0426\u0406\u041D\u0418 \u0426\u0406\u0404\u042E \u0421\u0418\u0421\u0422\u0415\u041C\u041E\u042E", lines });
+  }
+  out.push({
+    heading: "\u041C\u0415\u0416\u0406 \u0426\u042C\u041E\u0413\u041E \u0417\u0412\u0406\u0422\u0423",
+    lines: [
+      wrap(
+        "\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0426\u0435 \u043E\u0437\u043D\u0430\u043A\u0430 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0430 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0430 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0439 \u0444\u0430\u043A\u0442 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F."
+      ),
+      "",
+      wrap(
+        "\u041F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u043D\u0430 \u0441\u0442\u0430\u0442\u0442\u0456 \u041A\u0440\u0438\u043C\u0456\u043D\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u043A\u043E\u0434\u0435\u043A\u0441\u0443 \u043D\u0430\u0432\u0435\u0434\u0435\u043D\u0456 \u044F\u043A \u043D\u0430\u043F\u0440\u044F\u043C\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u0434\u043B\u044F \u044E\u0440\u0438\u0441\u0442\u0430. \u0426\u0435 \u043D\u0435 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F \u0434\u0456\u0439 \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u043E\u0441\u043E\u0431\u0438. \u0423\u043C\u0438\u0441\u0435\u043B \u0456 \u0437\u0430\u0432\u0456\u0434\u043E\u043C\u0456\u0441\u0442\u044C \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u0432\u0438\u043A\u043B\u044E\u0447\u043D\u043E \u0441\u0443\u0434."
+      ),
+      "",
+      wrap("\u041D\u0430\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u043A\u0440\u043E\u043A \u2014 \u0432\u0438\u0442\u0440\u0435\u0431\u0443\u0432\u0430\u0442\u0438 \u0441\u0430\u043C\u0456 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0442\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0457\u0445.")
+    ]
+  });
+  return out;
+}
+function reportText(ctx) {
+  const title = ctx.entry.title ?? ctx.entry.tender_ref;
+  const head = [
+    "TENDER RADAR \u2014 \u0417\u0412\u0406\u0422 \u041F\u041E \u0417\u0410\u041A\u0423\u041F\u0406\u0412\u041B\u0406",
+    "=".repeat(78),
+    wrap(title, 78, ""),
+    `\u0421\u0444\u043E\u0440\u043C\u043E\u0432\u0430\u043D\u043E: ${day(ctx.generatedAt)}`,
+    "=".repeat(78),
+    ""
+  ];
+  const body = sections(ctx).flatMap((section) => [section.heading, "-".repeat(78), ...section.lines, ""]);
+  return [...head, ...body].join("\n");
+}
+function reportHtml(ctx) {
+  const { entry } = ctx;
+  const title = entry.title ?? entry.tender_ref;
+  const body = sections(ctx).map(
+    (section) => `<section>
+  <h2>${esc(section.heading)}</h2>
+  ${section.lines.filter((l) => l.trim()).map((line) => `<p>${esc(line.trim())}</p>`).join("")}
+</section>`
+  ).join("");
+  return `<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>\u0417\u0432\u0456\u0442 \u2014 ${esc(entry.tender_ref)}</title>
+<style>
+  :root{color-scheme:light;--ink:#17222B;--soft:#4A5966;--line:#DDE4E8;--accent:#17607F}
+  *{box-sizing:border-box}
+  body{margin:0;background:#F6F8F9;color:var(--ink);font-family:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;font-size:15px;line-height:1.6}
+  .sheet{max-width:52rem;margin:0 auto;background:#fff;padding:2.5rem 3rem 4rem;min-height:100vh}
+  .toolbar{max-width:52rem;margin:1rem auto 0;padding:0 3rem;display:flex;gap:.75rem;flex-wrap:wrap}
+  .toolbar a,.toolbar button{font:inherit;font-size:.92rem;text-decoration:none;color:var(--accent);background:#fff;border:1px solid var(--line);border-radius:5px;padding:.5rem 1rem;cursor:pointer}
+  .toolbar a:hover,.toolbar button:hover{border-color:var(--accent)}
+  h1{font-family:Literata,Georgia,serif;font-size:1.5rem;line-height:1.25;margin:0 0 .4rem}
+  .ref{font-family:"IBM Plex Mono",Consolas,monospace;font-size:.85rem;color:var(--soft)}
+  .made{color:var(--soft);font-size:.85rem;margin:.2rem 0 1.5rem;padding-bottom:1.2rem;border-bottom:2px solid var(--ink)}
+  section{margin:0 0 1.6rem;break-inside:avoid}
+  h2{font-family:Literata,Georgia,serif;font-size:1rem;letter-spacing:.04em;margin:0 0 .5rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
+  p{margin:0 0 .4rem;max-width:64ch}
+  @media print{
+    body{background:#fff;font-size:11pt}
+    .toolbar{display:none}
+    .sheet{max-width:none;padding:0;min-height:0}
+    @page{margin:18mm}
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <a href="/tender/${encodeURIComponent(entry.tender_id)}">\u2190 \u0434\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
+  <button type="button" onclick="window.print()">\u0414\u0440\u0443\u043A \u0430\u0431\u043E \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u043D\u044F \u0443 PDF</button>
+  <a href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0438\u0442\u0438 \u0442\u0435\u043A\u0441\u0442\u043E\u043C</a>
+</div>
+<div class="sheet">
+  <h1>${esc(title)}</h1>
+  <div class="ref">${esc(entry.tender_ref || entry.tender_id)}</div>
+  <div class="made">Tender Radar \xB7 \u0437\u0432\u0456\u0442 \u0441\u0444\u043E\u0440\u043C\u043E\u0432\u0430\u043D\u043E ${esc(day(ctx.generatedAt))}</div>
+  ${body}
+</div>
+</body>
+</html>`;
+}
+
 // server/controls.ts
 function readControls(url) {
   const rawGroup = url.searchParams.get("group") ?? "";
@@ -1017,6 +1251,7 @@ function readControls(url) {
   return {
     q: (url.searchParams.get("q") ?? "").trim().toLowerCase(),
     risk: url.searchParams.get("risk") ?? "",
+    region: url.searchParams.get("region") ?? "",
     sort: url.searchParams.get("sort") ?? "value",
     railOnly: url.searchParams.get("rail") === "1",
     soloOnly: url.searchParams.get("solo") === "1",
@@ -1033,6 +1268,7 @@ function readControls(url) {
 function activeCount(c) {
   return [
     c.risk,
+    c.region,
     c.railOnly,
     c.soloOnly,
     c.priceOnly,
@@ -1046,7 +1282,7 @@ function activeCount(c) {
 }
 function isFiltered(c) {
   return Boolean(
-    c.q || c.risk || c.railOnly || c.soloOnly || c.priceOnly || c.dateFrom || c.dateTo || c.min > 0 || c.max > 0
+    c.q || c.risk || c.region || c.railOnly || c.soloOnly || c.priceOnly || c.dateFrom || c.dateTo || c.min > 0 || c.max > 0
   );
 }
 function applyControls(cases, c, railwayCodes, opts = {}) {
@@ -1057,21 +1293,23 @@ function applyControls(cases, c, railwayCodes, opts = {}) {
     );
   }
   if (c.risk) list = list.filter((x) => x.risks.includes(c.risk));
+  if (c.region) list = list.filter((x) => x.region === c.region);
   if (c.railOnly && !opts.hideRail) list = list.filter((x) => railwayCodes.has(x.entity_edrpou ?? ""));
   if (c.soloOnly) list = list.filter((x) => x.bidders === 1);
   if (c.priceOnly && !opts.hidePrice) list = list.filter((x) => x.findings.length > 0);
-  if (c.dateFrom) list = list.filter((x) => (x.date_assessed ?? "") >= c.dateFrom);
-  if (c.dateTo) list = list.filter((x) => (x.date_assessed ?? "").slice(0, 10) <= c.dateTo);
+  if (c.dateFrom) list = list.filter((x) => (x.tender_date ?? "") >= c.dateFrom);
+  if (c.dateTo) list = list.filter((x) => (x.tender_date ?? "") <= c.dateTo);
   if (c.min > 0) list = list.filter((x) => (x.value_amount ?? 0) >= c.min);
   if (c.max > 0) list = list.filter((x) => (x.value_amount ?? 0) <= c.max);
   return [...list].sort(
-    (a, b) => c.sort === "date" ? String(b.date_assessed ?? "").localeCompare(String(a.date_assessed ?? "")) : c.sort === "date-asc" ? String(a.date_assessed ?? "").localeCompare(String(b.date_assessed ?? "")) : c.sort === "value-asc" ? (a.value_amount ?? 0) - (b.value_amount ?? 0) : c.sort === "risks" ? b.risks.length - a.risks.length || (b.value_amount ?? 0) - (a.value_amount ?? 0) : (b.value_amount ?? 0) - (a.value_amount ?? 0)
+    (a, b) => c.sort === "date" ? String(b.tender_date ?? "").localeCompare(String(a.tender_date ?? "")) : c.sort === "date-asc" ? String(a.tender_date ?? "").localeCompare(String(b.tender_date ?? "")) : c.sort === "assessed" ? String(b.date_assessed ?? "").localeCompare(String(a.date_assessed ?? "")) : c.sort === "value-asc" ? (a.value_amount ?? 0) - (b.value_amount ?? 0) : c.sort === "risks" ? b.risks.length - a.risks.length || (b.value_amount ?? 0) - (a.value_amount ?? 0) : (b.value_amount ?? 0) - (a.value_amount ?? 0)
   );
 }
 function keepControls(action, c, over = {}) {
   const p = new URLSearchParams();
   if (c.q) p.set("q", c.q);
   if (c.risk) p.set("risk", c.risk);
+  if (c.region) p.set("region", c.region);
   if (c.sort !== "value") p.set("sort", c.sort);
   if (c.railOnly) p.set("rail", "1");
   if (c.soloOnly) p.set("solo", "1");
@@ -1141,7 +1379,7 @@ function caseRow(entry, opts = {}) {
   <div class="who">
     <div class="name">${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
     ${meta.length ? `<div class="meta">${meta.join(" \xB7 ")}</div>` : ""}
-    <div class="meta"><span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span> \xB7 \u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E ${date(entry.date_assessed)}</div>
+    <div class="meta"><span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span>${entry.tender_date ? ` \xB7 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0432\u0456\u0434 ${date(entry.tender_date)}` : ""}${entry.region ? ` \xB7 ${esc(entry.region)}` : ""}</div>
   </div>
   <div class="amount">
     <span class="big">${shortMoney(entry.value_amount)}</span>
@@ -1234,9 +1472,10 @@ function groupBlock(group, depth) {
 }
 function filterPanel(action, c, opts = {}) {
   const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
-  const stamps = db.cases.map((x) => (x.date_assessed ?? "").slice(0, 10)).filter(Boolean).sort();
+  const stamps = db.cases.map((x) => x.tender_date ?? "").filter(Boolean).sort();
   const earliest = stamps[0] ?? "";
   const latest = stamps[stamps.length - 1] ?? "";
+  const regions = [...new Set(db.cases.map((x) => x.region ?? "").filter(Boolean))].sort();
   const amounts = db.cases.map((x) => x.value_amount ?? 0).filter((n) => n > 0);
   const rangeHint = amounts.length ? `\u0443 \u0431\u0430\u0437\u0456 \u0432\u0456\u0434 ${shortMoney(Math.min(...amounts))} \u0434\u043E ${shortMoney(Math.max(...amounts))}` : "";
   const active = activeCount(c);
@@ -1258,17 +1497,22 @@ function filterPanel(action, c, opts = {}) {
     (r) => `<option value="${esc(r.risk_id)}"${r.risk_id === c.risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`
   ).join("")}
         </select>
+        <select name="region" aria-label="\u041E\u0431\u043B\u0430\u0441\u0442\u044C">
+          <option value="">\u0423\u0441\u044F \u0423\u043A\u0440\u0430\u0457\u043D\u0430</option>
+          ${regions.map((r) => `<option value="${esc(r)}"${r === c.region ? " selected" : ""}>${esc(r)}</option>`).join("")}
+        </select>
         <select name="sort" aria-label="\u0421\u043E\u0440\u0442\u0443\u0432\u0430\u043D\u043D\u044F">
           <option value="value"${c.sort === "value" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0456</option>
           <option value="value-asc"${c.sort === "value-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u0435\u0448\u0435\u0432\u0448\u0456</option>
-          <option value="date"${c.sort === "date" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u043D\u043E\u0432\u0456\u0448\u0456</option>
-          <option value="date-asc"${c.sort === "date-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0441\u0442\u0430\u0440\u0456\u0448\u0456</option>
+          <option value="date"${c.sort === "date" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u043D\u043E\u0432\u0456\u0448\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</option>
+          <option value="date-asc"${c.sort === "date-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0441\u0442\u0430\u0440\u0456\u0448\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</option>
+          <option value="assessed"${c.sort === "assessed" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0435\u0449\u043E\u0434\u0430\u0432\u043D\u043E \u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0456</option>
           <option value="risks"${c.sort === "risks" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0437 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u043E\u044E \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044E \u043E\u0437\u043D\u0430\u043A</option>
         </select>
       </div>
 
       <div class="filter-row">
-        <span class="filter-label">\u0414\u0430\u0442\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438</span>
+        <span class="filter-label">\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</span>
         <input type="date" name="from" value="${esc(c.dateFrom)}" aria-label="\u0414\u0430\u0442\u0430 \u0432\u0456\u0434" min="${esc(earliest)}" max="${esc(latest)}">
         <span class="filter-label">\u043F\u043E</span>
         <input type="date" name="to" value="${esc(c.dateTo)}" aria-label="\u0414\u0430\u0442\u0430 \u043F\u043E" min="${esc(earliest)}" max="${esc(latest)}">
@@ -1379,8 +1623,10 @@ ${signals.length ? `<div class="flags" style="margin-bottom:1.5rem">${signals.ma
     <dt>\u0420\u0435\u0433\u0456\u043E\u043D</dt><dd>${esc(entry.region ?? "\u2014")}</dd>
     ${entry.method ? `<dt>\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0430</dt><dd>${esc(procedureLabel(entry.method) ?? "\u2014")}</dd>` : ""}
     ${entry.detailed ? `<dt>\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432</dt><dd>${entry.bidders === 1 ? "<strong>\u043E\u0434\u0438\u043D</strong> \u2014 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u0457 \u043D\u0435 \u0431\u0443\u043B\u043E" : entry.bidders || "\u2014"}</dd>` : ""}
-    <dt>\u041F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E</dt><dd>${date(entry.date_assessed)}</dd>
+    <dt>\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</dt><dd>${date(entry.tender_date)}</dd>
+    <dt>\u041F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043E\u044E</dt><dd>${date(entry.date_assessed)}</dd>
     <dt>\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E</dt><dd><a href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u043A\u0430\u0440\u0442\u043A\u0443 \u0432 Prozorro \u2192</a></dd>
+    <dt>\u0417\u0432\u0456\u0442</dt><dd><a href="/tender/${encodeURIComponent(entry.tender_id)}/report">\u041F\u043E\u0432\u043D\u0438\u0439 \u0437\u0432\u0456\u0442 \u0434\u043B\u044F \u0434\u0440\u0443\u043A\u0443 \u0442\u0430 PDF \u2192</a> \xB7 <a href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0438\u0442\u0438 \u0442\u0435\u043A\u0441\u0442\u043E\u043C</a></dd>
   </dl>
 </div>
 
@@ -2169,7 +2415,30 @@ function render(url, saved = []) {
   if (path === "/indicators") return { status: 200, body: indicatorsPage() };
   if (path === "/about") return { status: 200, body: aboutPage() };
   if (path.startsWith("/article/")) return { status: 200, body: articlePage(path.slice("/article/".length), url) };
-  if (path.startsWith("/tender/")) return { status: 200, body: tenderPage(path.slice("/tender/".length)) };
+  if (path.startsWith("/tender/")) {
+    const rest = path.slice("/tender/".length);
+    if (rest.endsWith("/report") || rest.endsWith("/report.txt")) {
+      const asText = rest.endsWith(".txt");
+      const id = rest.slice(0, rest.lastIndexOf("/report"));
+      const entry = db.byTender.get(id);
+      if (!entry) return { status: 404, body: notFound() };
+      const ctx = {
+        entry,
+        rules: db.ruleById,
+        sameEntity: db.cases.filter((x) => x.entity_edrpou && x.entity_edrpou === entry.entity_edrpou).length,
+        sameOfficer: entry.officer_key ? db.cases.filter((x) => x.officer_key === entry.officer_key).length : 0,
+        sameWinner: entry.winner_edrpou ? db.cases.filter((x) => x.winner_edrpou === entry.winner_edrpou).length : 0,
+        generatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      return asText ? {
+        status: 200,
+        body: reportText(ctx),
+        contentType: "text/plain; charset=utf-8",
+        filename: `${entry.tender_ref || entry.tender_id}.txt`
+      } : { status: 200, body: reportHtml(ctx) };
+    }
+    return { status: 200, body: tenderPage(rest) };
+  }
   if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length)) };
   if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length)) };
   if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length)) };
@@ -2340,8 +2609,18 @@ async function handle(req) {
       if (!isFavKind(kind) || !id) return redirect(back);
       return redirect(back, favouritesCookie(toggleFavourite(saved, kind, id), secure));
     }
-    const { status, body } = render(req.url, saved);
-    return page(status, body);
+    const rendered = render(req.url, saved);
+    if (rendered.contentType) {
+      return {
+        status: rendered.status,
+        body: rendered.body,
+        headers: {
+          "content-type": rendered.contentType,
+          ...rendered.filename ? { "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(rendered.filename)}` } : {}
+        }
+      };
+    }
+    return page(rendered.status, rendered.body);
   }
   if (!config) return serve();
   const redirectUri = `${req.url.origin}/auth/callback`;

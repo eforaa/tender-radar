@@ -7,6 +7,8 @@ import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow, RunRow, FindingRow 
 export type Case = {
   tender_id: string;
   tender_ref: string;
+  /** The date the tender was published, taken from its own number. */
+  tender_date: string | null;
   title: string | null;
   status: string | null;
   method: string | null;
@@ -38,6 +40,16 @@ export type Dataset = {
   runs: RunRow[];
   findingCount: number;
 };
+
+/**
+ * A Prozorro number carries its publication date: UA-2024-07-11-005265-a.
+ * That is the date of the procurement itself, which differs from the date the
+ * state assessed it — most assessments are recent even for old tenders.
+ */
+export function tenderDateOf(tenderRef: string): string | null {
+  const m = /^UA-(\d{4}-\d{2}-\d{2})-/.exec(tenderRef);
+  return m ? m[1] : null;
+}
 
 function activeAward(awards: AwardRow[]): AwardRow | undefined {
   return awards.find((a) => a.status === "active") ?? awards[0];
@@ -81,6 +93,7 @@ export async function loadDataset(): Promise<Dataset> {
       entry = {
         tender_id: flag.tender_id,
         tender_ref: flag.tender_ref || detail?.tender_id || "",
+        tender_date: tenderDateOf(flag.tender_ref || detail?.tender_id || ""),
         title: detail?.title ?? null,
         status: detail?.status ?? null,
         method: detail?.method ?? null,
@@ -103,7 +116,10 @@ export async function loadDataset(): Promise<Dataset> {
       };
       byTender.set(flag.tender_id, entry);
     }
-    if (!entry.tender_ref && flag.tender_ref) entry.tender_ref = flag.tender_ref;
+    if (!entry.tender_ref && flag.tender_ref) {
+      entry.tender_ref = flag.tender_ref;
+      entry.tender_date = tenderDateOf(flag.tender_ref);
+    }
     if (entry.value_amount === null) entry.value_amount = flag.value_amount;
     if (!entry.risks.includes(flag.risk_id)) entry.risks.push(flag.risk_id);
   }
