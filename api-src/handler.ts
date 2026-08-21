@@ -24,14 +24,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   res.statusCode = status;
   for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
 
-  // A signed-in visitor sees the same HTML as any other, so a successful
-  // page is safe to cache at the edge; auth redirects, denials and the
-  // login screen itself must always be evaluated fresh.
-  if (status === 200 && !headers["set-cookie"]) {
-    res.setHeader("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=600");
-  } else {
-    res.setHeader("cache-control", "no-store");
-  }
+  // Never cache at the edge. Every page now varies by cookie — stars are
+  // rendered per visitor, and with the auth gate on, a shared copy could be
+  // served to someone who never signed in. The edge caches by URL, not by
+  // cookie, so a public copy is simply wrong here. Rendering is in-memory
+  // and costs milliseconds, so there is nothing to gain by risking it.
+  res.setHeader("cache-control", "private, no-store");
+  res.setHeader("vary", "Cookie");
 
   res.end(body);
 }

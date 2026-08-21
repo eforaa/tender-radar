@@ -401,6 +401,17 @@ form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
 .filter-row input[type=date]{flex:0 0 auto;width:10.5rem}
 .filter-row input.num{flex:0 0 auto;width:9rem;font-variant-numeric:tabular-nums}
 .filter-label.faint{color:var(--ink-faint);font-size:.85rem}
+
+/* the collapsed filter panel */
+.filters-more{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.filters-more summary{cursor:pointer;list-style:none;padding:.6rem .9rem;font-size:.95rem;font-weight:500;color:var(--accent);display:flex;align-items:center;gap:.5rem}
+.filters-more summary::-webkit-details-marker{display:none}
+.filters-more summary::before{content:"\u25B8";color:var(--ink-faint);font-size:.8rem;transition:transform .15s ease;display:inline-block}
+.filters-more[open] summary::before{transform:rotate(90deg)}
+.filters-more[open] summary{border-bottom:1px solid var(--line-soft)}
+.filters-more summary:hover{background:var(--surface-3)}
+.filters-more .inner{padding:.9rem;display:flex;flex-direction:column;gap:.6rem}
+.badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:600;min-width:1.3rem;height:1.3rem;border-radius:1rem;display:inline-flex;align-items:center;justify-content:center;padding:0 .4rem}
 /* star toggle \u2014 a form so the site still needs no scripts */
 .star-form{display:inline;margin:0}
 .star{background:none;border:0;padding:0 .4rem 0 0;margin:0;cursor:pointer;font-size:1.15rem;line-height:1;color:var(--ink-faint);border-radius:var(--radius);vertical-align:baseline}
@@ -1203,6 +1214,9 @@ function feedPage(url) {
     return `/?${p.toString()}`;
   };
   const filtered = Boolean(q || risk || railOnly || soloOnly || priceOnly || dateFrom || dateTo || min > 0 || max > 0);
+  const activeCount = [risk, railOnly, soloOnly, priceOnly, dateFrom, dateTo, min > 0, max > 0, group, sort !== "value"].filter(
+    Boolean
+  ).length;
   const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
   return layout({
     title: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
@@ -1223,53 +1237,59 @@ ${HELP}
 <form class="filters" method="get" action="/">
   <div class="filter-row">
     <input type="search" name="q" value="${esc(q)}" placeholder="\u041D\u0430\u0437\u0432\u0430, \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A, \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0435\u0446\u044C, \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0435\u0446\u044C, \u0404\u0414\u0420\u041F\u041E\u0423 \u0430\u0431\u043E \u043D\u043E\u043C\u0435\u0440 \u0442\u0435\u043D\u0434\u0435\u0440\u0430" aria-label="\u041F\u043E\u0448\u0443\u043A">
-  </div>
-
-  <div class="filter-row">
-    <select name="risk" aria-label="\u041E\u0437\u043D\u0430\u043A\u0430">
-      <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0430 \u043E\u0437\u043D\u0430\u043A\u0430</option>
-      ${db.rules.map(
-      (r) => `<option value="${esc(r.risk_id)}"${r.risk_id === risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`
-    ).join("")}
-    </select>
-    <select name="sort" aria-label="\u0421\u043E\u0440\u0442\u0443\u0432\u0430\u043D\u043D\u044F">
-      <option value="value"${sort === "value" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0456</option>
-      <option value="value-asc"${sort === "value-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u0435\u0448\u0435\u0432\u0448\u0456</option>
-      <option value="date"${sort === "date" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u043D\u043E\u0432\u0456\u0448\u0456</option>
-      <option value="date-asc"${sort === "date-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0441\u0442\u0430\u0440\u0456\u0448\u0456</option>
-      <option value="risks"${sort === "risks" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0437 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u043E\u044E \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044E \u043E\u0437\u043D\u0430\u043A</option>
-    </select>
-  </div>
-
-  <div class="filter-row">
-    <span class="filter-label">\u0414\u0430\u0442\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438</span>
-    <input type="date" name="from" value="${esc(dateFrom)}" aria-label="\u0414\u0430\u0442\u0430 \u0432\u0456\u0434" min="${esc(earliest)}" max="${esc(latest)}">
-    <span class="filter-label">\u043F\u043E</span>
-    <input type="date" name="to" value="${esc(dateTo)}" aria-label="\u0414\u0430\u0442\u0430 \u043F\u043E" min="${esc(earliest)}" max="${esc(latest)}">
-  </div>
-
-  <div class="filter-row">
-    <span class="filter-label">\u0421\u0443\u043C\u0430, \u20B4</span>
-    <input type="number" name="min" value="${min > 0 ? min : ""}" placeholder="\u0432\u0456\u0434" aria-label="\u0421\u0443\u043C\u0430 \u0432\u0456\u0434" min="0" step="100000" class="num">
-    <span class="filter-label">\u043F\u043E</span>
-    <input type="number" name="max" value="${max > 0 ? max : ""}" placeholder="\u0434\u043E" aria-label="\u0421\u0443\u043C\u0430 \u0434\u043E" min="0" step="100000" class="num">
-    <span class="filter-label faint">${esc(rangeHint)}</span>
-  </div>
-
-  <div class="filter-row">
-    <span class="filter-label">\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u0442\u0438</span>
-    <select name="group" aria-label="\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F">${dimensionOptions(group)}</select>
-    <span class="filter-label">\u043F\u043E\u0442\u0456\u043C</span>
-    <select name="then" aria-label="\u0414\u0440\u0443\u0433\u0435 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F"${group ? "" : " disabled"}>${dimensionOptions(then, group || void 0)}</select>
-  </div>
-
-  <div class="filter-row">
-    <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</label>
-    <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432</label>
-    <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0434\u0435 \u0446\u0456\u043D\u0430 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u0430</label>
     <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
     ${filtered || group ? `<a class="reset" href="/">\u0441\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0435</a>` : ""}
   </div>
+
+  <details class="filters-more"${filtered || group ? " open" : ""}>
+    <summary>\u0424\u0456\u043B\u044C\u0442\u0440\u0438 \u0442\u0430 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F${activeCount > 0 ? ` <span class="badge">${activeCount}</span>` : ""}</summary>
+    <div class="inner">
+      <div class="filter-row">
+        <select name="risk" aria-label="\u041E\u0437\u043D\u0430\u043A\u0430">
+          <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0430 \u043E\u0437\u043D\u0430\u043A\u0430</option>
+          ${db.rules.map(
+      (r) => `<option value="${esc(r.risk_id)}"${r.risk_id === risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`
+    ).join("")}
+        </select>
+        <select name="sort" aria-label="\u0421\u043E\u0440\u0442\u0443\u0432\u0430\u043D\u043D\u044F">
+          <option value="value"${sort === "value" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0456</option>
+          <option value="value-asc"${sort === "value-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u0435\u0448\u0435\u0432\u0448\u0456</option>
+          <option value="date"${sort === "date" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u043D\u043E\u0432\u0456\u0448\u0456</option>
+          <option value="date-asc"${sort === "date-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0441\u0442\u0430\u0440\u0456\u0448\u0456</option>
+          <option value="risks"${sort === "risks" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0437 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u043E\u044E \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044E \u043E\u0437\u043D\u0430\u043A</option>
+        </select>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">\u0414\u0430\u0442\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438</span>
+        <input type="date" name="from" value="${esc(dateFrom)}" aria-label="\u0414\u0430\u0442\u0430 \u0432\u0456\u0434" min="${esc(earliest)}" max="${esc(latest)}">
+        <span class="filter-label">\u043F\u043E</span>
+        <input type="date" name="to" value="${esc(dateTo)}" aria-label="\u0414\u0430\u0442\u0430 \u043F\u043E" min="${esc(earliest)}" max="${esc(latest)}">
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">\u0421\u0443\u043C\u0430, \u20B4</span>
+        <input type="number" name="min" value="${min > 0 ? min : ""}" placeholder="\u0432\u0456\u0434" aria-label="\u0421\u0443\u043C\u0430 \u0432\u0456\u0434" min="0" step="100000" class="num">
+        <span class="filter-label">\u043F\u043E</span>
+        <input type="number" name="max" value="${max > 0 ? max : ""}" placeholder="\u0434\u043E" aria-label="\u0421\u0443\u043C\u0430 \u0434\u043E" min="0" step="100000" class="num">
+        <span class="filter-label faint">${esc(rangeHint)}</span>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u0442\u0438</span>
+        <select name="group" aria-label="\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F">${dimensionOptions(group)}</select>
+        <span class="filter-label">\u043F\u043E\u0442\u0456\u043C</span>
+        <select name="then" aria-label="\u0414\u0440\u0443\u0433\u0435 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F"${group ? "" : " disabled"}>${dimensionOptions(then, group || void 0)}</select>
+      </div>
+
+      <div class="filter-row">
+        <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</label>
+        <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432</label>
+        <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0434\u0435 \u0446\u0456\u043D\u0430 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u0430</label>
+        <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
+      </div>
+    </div>
+  </details>
 </form>
 
 <p class="hint">${filtered ? `\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(shownValue)}.` : "\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E \u0432\u0441\u0456, \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0456 \u0437\u0433\u043E\u0440\u0438."}${group ? ` \u0417\u0433\u0440\u0443\u043F\u043E\u0432\u0430\u043D\u043E \u0443 <strong>${groups.length}</strong> ${plural(groups.length, "\u0433\u0440\u0443\u043F\u0443", "\u0433\u0440\u0443\u043F\u0438", "\u0433\u0440\u0443\u043F")}.` : ""}</p>
@@ -2325,11 +2345,8 @@ async function handler(req, res) {
   });
   res.statusCode = status;
   for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
-  if (status === 200 && !headers["set-cookie"]) {
-    res.setHeader("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=600");
-  } else {
-    res.setHeader("cache-control", "no-store");
-  }
+  res.setHeader("cache-control", "private, no-store");
+  res.setHeader("vary", "Cookie");
   res.end(body);
 }
 export {

@@ -160,6 +160,17 @@ form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
 .filter-row input[type=date]{flex:0 0 auto;width:10.5rem}
 .filter-row input.num{flex:0 0 auto;width:9rem;font-variant-numeric:tabular-nums}
 .filter-label.faint{color:var(--ink-faint);font-size:.85rem}
+
+/* the collapsed filter panel */
+.filters-more{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.filters-more summary{cursor:pointer;list-style:none;padding:.6rem .9rem;font-size:.95rem;font-weight:500;color:var(--accent);display:flex;align-items:center;gap:.5rem}
+.filters-more summary::-webkit-details-marker{display:none}
+.filters-more summary::before{content:"▸";color:var(--ink-faint);font-size:.8rem;transition:transform .15s ease;display:inline-block}
+.filters-more[open] summary::before{transform:rotate(90deg)}
+.filters-more[open] summary{border-bottom:1px solid var(--line-soft)}
+.filters-more summary:hover{background:var(--surface-3)}
+.filters-more .inner{padding:.9rem;display:flex;flex-direction:column;gap:.6rem}
+.badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:600;min-width:1.3rem;height:1.3rem;border-radius:1rem;display:inline-flex;align-items:center;justify-content:center;padding:0 .4rem}
 /* star toggle — a form so the site still needs no scripts */
 .star-form{display:inline;margin:0}
 .star{background:none;border:0;padding:0 .4rem 0 0;margin:0;cursor:pointer;font-size:1.15rem;line-height:1;color:var(--ink-faint);border-radius:var(--radius);vertical-align:baseline}

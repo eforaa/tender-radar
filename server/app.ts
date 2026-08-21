@@ -291,6 +291,11 @@ function feedPage(url: URL): string {
   };
 
   const filtered = Boolean(q || risk || railOnly || soloOnly || priceOnly || dateFrom || dateTo || min > 0 || max > 0);
+  // Shown on the collapsed summary, so a folded panel never hides the fact
+  // that the list is filtered.
+  const activeCount = [risk, railOnly, soloOnly, priceOnly, dateFrom, dateTo, min > 0, max > 0, group, sort !== "value"].filter(
+    Boolean,
+  ).length;
   const dimensionOptions = (selected: Dimension, skip?: Dimension) =>
     DIMENSIONS.filter((d) => d.value !== skip || d.value === "")
       .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
@@ -315,56 +320,62 @@ ${HELP}
 <form class="filters" method="get" action="/">
   <div class="filter-row">
     <input type="search" name="q" value="${esc(q)}" placeholder="Назва, замовник, посадовець, переможець, ЄДРПОУ або номер тендера" aria-label="Пошук">
-  </div>
-
-  <div class="filter-row">
-    <select name="risk" aria-label="Ознака">
-      <option value="">Будь-яка ознака</option>
-      ${db.rules
-        .map(
-          (r) =>
-            `<option value="${esc(r.risk_id)}"${r.risk_id === risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`,
-        )
-        .join("")}
-    </select>
-    <select name="sort" aria-label="Сортування">
-      <option value="value"${sort === "value" ? " selected" : ""}>Спочатку найдорожчі</option>
-      <option value="value-asc"${sort === "value-asc" ? " selected" : ""}>Спочатку найдешевші</option>
-      <option value="date"${sort === "date" ? " selected" : ""}>Спочатку найновіші</option>
-      <option value="date-asc"${sort === "date-asc" ? " selected" : ""}>Спочатку найстаріші</option>
-      <option value="risks"${sort === "risks" ? " selected" : ""}>Спочатку з найбільшою кількістю ознак</option>
-    </select>
-  </div>
-
-  <div class="filter-row">
-    <span class="filter-label">Дата позначки</span>
-    <input type="date" name="from" value="${esc(dateFrom)}" aria-label="Дата від" min="${esc(earliest)}" max="${esc(latest)}">
-    <span class="filter-label">по</span>
-    <input type="date" name="to" value="${esc(dateTo)}" aria-label="Дата по" min="${esc(earliest)}" max="${esc(latest)}">
-  </div>
-
-  <div class="filter-row">
-    <span class="filter-label">Сума, ₴</span>
-    <input type="number" name="min" value="${min > 0 ? min : ""}" placeholder="від" aria-label="Сума від" min="0" step="100000" class="num">
-    <span class="filter-label">по</span>
-    <input type="number" name="max" value="${max > 0 ? max : ""}" placeholder="до" aria-label="Сума до" min="0" step="100000" class="num">
-    <span class="filter-label faint">${esc(rangeHint)}</span>
-  </div>
-
-  <div class="filter-row">
-    <span class="filter-label">Групувати</span>
-    <select name="group" aria-label="Групування">${dimensionOptions(group)}</select>
-    <span class="filter-label">потім</span>
-    <select name="then" aria-label="Друге групування"${group ? "" : " disabled"}>${dimensionOptions(then, group || undefined)}</select>
-  </div>
-
-  <div class="filter-row">
-    <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> лише залізниця</label>
-    <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> лише без конкурентів</label>
-    <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> лише де ціна завищена</label>
     <button type="submit">Показати</button>
     ${filtered || group ? `<a class="reset" href="/">скинути все</a>` : ""}
   </div>
+
+  <details class="filters-more"${filtered || group ? " open" : ""}>
+    <summary>Фільтри та групування${activeCount > 0 ? ` <span class="badge">${activeCount}</span>` : ""}</summary>
+    <div class="inner">
+      <div class="filter-row">
+        <select name="risk" aria-label="Ознака">
+          <option value="">Будь-яка ознака</option>
+          ${db.rules
+            .map(
+              (r) =>
+                `<option value="${esc(r.risk_id)}"${r.risk_id === risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`,
+            )
+            .join("")}
+        </select>
+        <select name="sort" aria-label="Сортування">
+          <option value="value"${sort === "value" ? " selected" : ""}>Спочатку найдорожчі</option>
+          <option value="value-asc"${sort === "value-asc" ? " selected" : ""}>Спочатку найдешевші</option>
+          <option value="date"${sort === "date" ? " selected" : ""}>Спочатку найновіші</option>
+          <option value="date-asc"${sort === "date-asc" ? " selected" : ""}>Спочатку найстаріші</option>
+          <option value="risks"${sort === "risks" ? " selected" : ""}>Спочатку з найбільшою кількістю ознак</option>
+        </select>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">Дата позначки</span>
+        <input type="date" name="from" value="${esc(dateFrom)}" aria-label="Дата від" min="${esc(earliest)}" max="${esc(latest)}">
+        <span class="filter-label">по</span>
+        <input type="date" name="to" value="${esc(dateTo)}" aria-label="Дата по" min="${esc(earliest)}" max="${esc(latest)}">
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">Сума, ₴</span>
+        <input type="number" name="min" value="${min > 0 ? min : ""}" placeholder="від" aria-label="Сума від" min="0" step="100000" class="num">
+        <span class="filter-label">по</span>
+        <input type="number" name="max" value="${max > 0 ? max : ""}" placeholder="до" aria-label="Сума до" min="0" step="100000" class="num">
+        <span class="filter-label faint">${esc(rangeHint)}</span>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">Групувати</span>
+        <select name="group" aria-label="Групування">${dimensionOptions(group)}</select>
+        <span class="filter-label">потім</span>
+        <select name="then" aria-label="Друге групування"${group ? "" : " disabled"}>${dimensionOptions(then, group || undefined)}</select>
+      </div>
+
+      <div class="filter-row">
+        <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> лише залізниця</label>
+        <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> лише без конкурентів</label>
+        <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> лише де ціна завищена</label>
+        <button type="submit">Показати</button>
+      </div>
+    </div>
+  </details>
 </form>
 
 <p class="hint">${
