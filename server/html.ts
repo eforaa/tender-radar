@@ -160,11 +160,25 @@ form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
 .filter-row input[type=date]{flex:0 0 auto;width:10.5rem}
 .filter-row input.num{flex:0 0 auto;width:9rem;font-variant-numeric:tabular-nums}
 .filter-label.faint{color:var(--ink-faint);font-size:.85rem}
-.save-form{display:inline-block;margin:0 0 1.5rem}
-.row .save-form{margin:0}
-.save-btn{background:var(--surface);color:var(--accent);border:1px solid var(--line);font-size:.9rem;padding:.45rem .9rem;cursor:pointer;border-radius:var(--radius)}
-.save-btn:hover{border-color:var(--accent);background:var(--accent-bg)}
-.save-btn.on{background:var(--accent-bg);border-color:var(--accent);font-weight:500}
+/* star toggle — a form so the site still needs no scripts */
+.star-form{display:inline;margin:0}
+.star{background:none;border:0;padding:0 .4rem 0 0;margin:0;cursor:pointer;font-size:1.15rem;line-height:1;color:var(--ink-faint);border-radius:var(--radius);vertical-align:baseline}
+.star:hover{color:var(--warn)}
+.star.on{color:#D9A21B}
+.star span{display:none}
+.name .star{float:left}
+
+/* the labelled variant, used at the top of a dossier */
+.star-form:has(.star span){display:inline-block;margin:0 0 1.25rem}
+.star:has(span){display:inline-flex;align-items:center;gap:.5rem;font-size:1rem;border:1px solid var(--line);background:var(--surface);padding:.45rem .9rem;color:var(--accent)}
+.star:has(span) span{display:inline}
+.star.on:has(span){background:var(--accent-bg);border-color:var(--accent);font-weight:500}
+.name .star:has(span){float:none}
+
+.starred-btn{display:inline-flex;align-items:center;gap:.4rem;text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:.3rem .65rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.starred-btn:hover{color:var(--accent);border-color:var(--accent)}
+.starred-btn.on{color:var(--accent);background:var(--accent-bg);border-color:var(--accent);font-weight:500}
+@media (max-width:34rem){.starred-btn span{display:none}}
 .filter-label{font-size:.92rem;color:var(--ink-faint);white-space:nowrap}
 select:disabled{opacity:.5;cursor:not-allowed}
 
@@ -270,7 +284,7 @@ const MENU = [
   { href: "/", nav: "feed", label: "Усі закупівлі", hint: "повний перелік, з пошуком і фільтрами" },
   { href: "/railway", nav: "railway", label: "Залізниця", hint: "закупівлі залізниці Харківщини" },
   { href: "/prices", nav: "prices", label: "Завищені ціни", hint: "де ми самі порахували переплату" },
-  { href: "/saved", nav: "saved", label: "Збережені", hint: "підприємства, які ви відстежуєте" },
+  { href: "/starred", nav: "starred", label: "Обране", hint: "усе, що ви позначили зірочкою" },
   { href: "/lookup", nav: "lookup", label: "Пошук за ЄДРПОУ", hint: "перевірити будь-яке підприємство" },
   { href: "/article/366", nav: "article-366", label: "Підроблення документів", hint: "розбіжності в договорах і звітах" },
   { href: "/entities", nav: "entities", label: "Хто купує", hint: "установи-замовники" },
@@ -302,6 +316,7 @@ export function layout(opts: { title: string; nav?: string; body: string }): str
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>Залізниця</a>
     <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>Про систему</a>
   </nav>
+  <a class="starred-btn${opts.nav === "starred" ? " on" : ""}" href="/starred" title="Обране">★<span>Обране</span></a>
   <label class="burger" for="menu-toggle" role="button" aria-label="Усі розділи" title="Усі розділи"><span></span><span></span><span></span></label>
 </div></header>
 <label class="scrim" for="menu-toggle" aria-hidden="true"></label>

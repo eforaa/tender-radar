@@ -5,7 +5,7 @@ import { layout, esc, money, unitMoney, shortMoney, date, trim, plural } from ".
 import { ARTICLES, INDICATOR_LEGAL, isJointStock } from "../src/legal.ts";
 import { loadDataset, type Case, type Dataset } from "./data.ts";
 import { DIMENSIONS, buildGroups, isDimension, type Dimension, type Group } from "./grouping.ts";
-import { normaliseEdrpou } from "./favourites.ts";
+import { normaliseEdrpou, isStarred, type Favourite, type FavKind } from "./favourites.ts";
 
 const PAGE_SIZE = 30;
 
@@ -35,6 +35,25 @@ function alarms(entry: Case): string[] {
   return out;
 }
 
+/** Star list for the request being rendered. Set once at the top of render(). */
+let starred: Favourite[] = [];
+
+/**
+ * The star toggle. A plain form, so the site still needs no scripts.
+ * `back` is where the visitor returns after the POST.
+ */
+function star(kind: FavKind, id: string, back: string, opts: { label?: boolean } = {}): string {
+  if (!id) return "";
+  const on = isStarred(starred, kind, id);
+  const title = on ? "Прибрати з обраного" : "Додати до обраного";
+  return `<form class="star-form" method="post" action="/starred/toggle">
+  <input type="hidden" name="kind" value="${esc(kind)}">
+  <input type="hidden" name="id" value="${esc(id)}">
+  <input type="hidden" name="back" value="${esc(back)}">
+  <button type="submit" class="star${on ? " on" : ""}" title="${title}" aria-label="${title}" aria-pressed="${on}">${on ? "★" : "☆"}${opts.label ? `<span>${on ? "В обраному" : "До обраного"}</span>` : ""}</button>
+</form>`;
+}
+
 function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?: boolean } = {}): string {
   const showOfficer = opts.showOfficer ?? true;
   const showEntity = opts.showEntity ?? true;
@@ -57,7 +76,7 @@ function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?: boolea
 
   return `<div class="row">
   <div class="who">
-    <div class="name"><a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
+    <div class="name">${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
     ${meta.length ? `<div class="meta">${meta.join(" · ")}</div>` : ""}
     <div class="meta"><span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span> · позначено ${date(entry.date_assessed)}</div>
   </div>
@@ -396,6 +415,7 @@ function tenderPage(tenderId: string): string {
     title: entry.tender_ref || entry.tender_id,
     body: `
 <a class="back" href="/">← до переліку знахідок</a>
+${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id), { label: true })}
 <h1 class="long">${esc(title)}</h1>
 <p class="sub">${esc(readableName(entry.entity_name))} · <span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span></p>
 
@@ -504,6 +524,7 @@ function officerPage(key: string): string {
     nav: "officers",
     body: `
 <a class="back" href="/officers">← до переліку посадовців</a>
+${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
 <h1>${esc(name)}</h1>
 <p class="sub">Відповідальна особа в закупівлях${entity ? ` — ${esc(readableName(entity))}` : ""}.</p>
 
@@ -536,7 +557,7 @@ ${sorted.length > 60 ? `<p class="note">Показано 60 найдорожчи
   });
 }
 
-function supplierPage(edrpou: string, saved: string[] = []): string {
+function supplierPage(edrpou: string): string {
   const list = db.cases.filter((c) => c.winner_edrpou === edrpou);
   if (list.length === 0) return notFound();
 
@@ -554,7 +575,7 @@ function supplierPage(edrpou: string, saved: string[] = []): string {
 <a class="back" href="/suppliers">← до переліку переможців</a>
 <h1>${esc(readableName(name))}</h1>
 <p class="sub">Постачальник · ЄДРПОУ ${esc(edrpou)}</p>
-${saveControl(edrpou, saved, "/supplier/" + encodeURIComponent(edrpou))}
+${star("supplier", edrpou, "/supplier/" + encodeURIComponent(edrpou), { label: true })}
 
 <p class="statline">
   <b>${list.length}</b> перемог у закупівлях із позначками ·
@@ -575,7 +596,7 @@ ${sorted.length > 60 ? `<p class="note">Показано 60 найдорожчи
   });
 }
 
-function entityPage(edrpou: string, saved: string[] = []): string {
+function entityPage(edrpou: string): string {
   const list = db.cases.filter((c) => c.entity_edrpou === edrpou);
   if (list.length === 0) return notFound();
 
@@ -602,7 +623,7 @@ function entityPage(edrpou: string, saved: string[] = []): string {
 <a class="back" href="/entities">← до переліку замовників</a>
 <h1 class="long">${esc(readableName(name))}</h1>
 <p class="sub">ЄДРПОУ ${esc(edrpou)}${RAILWAY_EDRPOU.has(edrpou) ? " · філія АТ «Українська залізниця»" : ""}</p>
-${saveControl(edrpou, saved, "/entity/" + encodeURIComponent(edrpou))}
+${star("entity", edrpou, "/entity/" + encodeURIComponent(edrpou), { label: true })}
 
 <p class="statline">
   <b>${list.length}</b> закупівель під питанням ·
@@ -646,7 +667,7 @@ function directoryPage(opts: {
   nav: string;
   heading: string;
   intro: string;
-  rows: { href: string; name: string; meta: string; value: number }[];
+  rows: { href: string; name: string; meta: string; value: number; kind?: FavKind; id?: string }[];
 }): string {
   return layout({
     title: opts.title,
@@ -663,7 +684,7 @@ ${opts.rows
   .map(
     (r) => `<div class="row">
   <div class="who">
-    <div class="name"><a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="name">${r.kind && r.id ? star(r.kind, r.id, r.href) : ""}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
     <div class="meta">${r.meta}</div>
   </div>
   <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
@@ -696,6 +717,8 @@ function entitiesPage(): string {
     rows: [...byEntity.entries()]
       .sort((a, b) => b[1].value - a[1].value)
       .map(([edrpou, acc]) => ({
+        kind: "entity" as FavKind,
+        id: edrpou,
         href: `/entity/${encodeURIComponent(edrpou)}`,
         name: readableName(acc.name),
         meta: `ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "закупівля", "закупівлі", "закупівель")}${RAILWAY_EDRPOU.has(edrpou) ? " · залізниця" : ""}`,
@@ -728,6 +751,8 @@ function officersPage(): string {
     rows: [...byOfficer.entries()]
       .sort((a, b) => b[1].value - a[1].value)
       .map(([key, acc]) => ({
+        kind: "officer" as FavKind,
+        id: key,
         href: `/officer/${encodeURIComponent(key)}`,
         name: acc.name,
         meta: `${esc(readableName(acc.entity))} · ${acc.count} ${plural(acc.count, "закупівля", "закупівлі", "закупівель")}`,
@@ -756,6 +781,8 @@ function suppliersPage(): string {
     rows: [...bySupplier.entries()]
       .sort((a, b) => b[1].value - a[1].value)
       .map(([edrpou, acc]) => ({
+        kind: "supplier" as FavKind,
+        id: edrpou,
         href: `/supplier/${encodeURIComponent(edrpou)}`,
         name: readableName(acc.name),
         meta: `ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "перемога", "перемоги", "перемог")}${acc.solo ? ` · ${acc.solo} без конкурентів` : ""}`,
@@ -1122,7 +1149,7 @@ function profileOf(edrpou: string): { asBuyer: Case[]; asWinner: Case[]; name: s
   return { asBuyer, asWinner, name };
 }
 
-function lookupPage(code: string | null, typed: string, saved: string[]): string {
+function lookupPage(code: string | null, typed: string): string {
   const profile = code ? profileOf(code) : null;
   const found = Boolean(profile && (profile.asBuyer.length > 0 || profile.asWinner.length > 0));
 
@@ -1158,7 +1185,7 @@ ${
 
 ${
   found && profile
-    ? `${saveControl(code as string, saved, "/lookup?edrpou=" + encodeURIComponent(code as string))}
+    ? `${star("entity", code as string, "/lookup?edrpou=" + encodeURIComponent(code as string), { label: true })}
 <h2>${esc(readableName(profile.name))}</h2>
 <p class="statline">
   <b>${profile.asBuyer.length}</b> ${plural(profile.asBuyer.length, "закупівля як замовник", "закупівлі як замовник", "закупівель як замовник")} ·
@@ -1179,51 +1206,109 @@ ${
   });
 }
 
-function savedPage(saved: string[]): string {
-  const profiles = saved.map((code) => ({ code, ...profileOf(code) }));
-  const known = profiles.filter((p) => p.asBuyer.length > 0 || p.asWinner.length > 0);
+function starredPage(saved: Favourite[]): string {
+  const tenders = saved.filter((f) => f.kind === "tender").map((f) => db.byTender.get(f.id)).filter((c): c is Case => Boolean(c));
+  const missingTenders = saved.filter((f) => f.kind === "tender").length - tenders.length;
+
+  const companyRows = saved
+    .filter((f) => f.kind === "entity" || f.kind === "supplier")
+    .map((f) => {
+      const list =
+        f.kind === "entity"
+          ? db.cases.filter((c) => c.entity_edrpou === f.id)
+          : db.cases.filter((c) => c.winner_edrpou === f.id);
+      const name =
+        f.kind === "entity"
+          ? list.find((c) => c.entity_name)?.entity_name
+          : list.find((c) => c.winner_name)?.winner_name;
+      return {
+        fav: f,
+        href: `/${f.kind === "entity" ? "entity" : "supplier"}/${encodeURIComponent(f.id)}`,
+        name: readableName(name ?? "") || f.id,
+        role: f.kind === "entity" ? "замовник" : "постачальник",
+        count: list.length,
+        value: list.reduce((sum, c) => sum + (c.value_amount ?? 0), 0),
+      };
+    });
+
+  const officerRows = saved
+    .filter((f) => f.kind === "officer")
+    .map((f) => {
+      const list = db.cases.filter((c) => c.officer_key === f.id);
+      return {
+        fav: f,
+        href: `/officer/${encodeURIComponent(f.id)}`,
+        name: list.find((c) => c.officer_name)?.officer_name ?? f.id,
+        entity: readableName(list.find((c) => c.entity_name)?.entity_name ?? ""),
+        count: list.length,
+        value: list.reduce((sum, c) => sum + (c.value_amount ?? 0), 0),
+      };
+    });
+
+  const section = (title: string, count: number, inner: string) =>
+    count === 0 ? "" : `<h2>${esc(title)} — ${count}</h2>${inner}`;
 
   return layout({
-    title: "Збережені",
-    nav: "saved",
+    title: "Обране",
+    nav: "starred",
     body: `
-<h1>Збережені підприємства</h1>
-<p class="sub">Список зберігається у вашому браузері. Він не прив'язаний до облікового запису, тож на іншому пристрої буде порожнім.</p>
+<h1>Обране</h1>
+<p class="sub">Усе, що ви позначили зірочкою: закупівлі, замовники, постачальники, посадовці. Список зберігається у вашому браузері й не прив'язаний до облікового запису.</p>
 
 <form class="filters" method="get" action="/lookup">
   <div class="filter-row">
-    <input type="search" name="edrpou" placeholder="Додати за ЄДРПОУ — наприклад, 00131954" aria-label="ЄДРПОУ" inputmode="numeric">
-    <button type="submit">Знайти й додати</button>
+    <input type="search" name="edrpou" placeholder="Знайти підприємство за ЄДРПОУ — наприклад, 00131954" aria-label="ЄДРПОУ" inputmode="numeric">
+    <button type="submit">Знайти</button>
   </div>
 </form>
 
 ${
   saved.length === 0
-    ? `<div class="empty">Поки нічого не збережено. Відкрийте будь-яке підприємство і натисніть «Зберегти підприємство».</div>`
-    : `<div class="rows">
-${profiles
-  .map((p) => {
-    const total = [...p.asBuyer, ...p.asWinner].reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
-    const href = p.asBuyer.length ? `/entity/${encodeURIComponent(p.code)}` : p.asWinner.length ? `/supplier/${encodeURIComponent(p.code)}` : `/lookup?edrpou=${encodeURIComponent(p.code)}`;
-    return `<div class="row">
-  <div class="who">
-    <div class="name"><a href="${href}">${esc(readableName(p.name) || p.code)}</a></div>
-    <div class="meta">ЄДРПОУ ${esc(p.code)} · ${p.asBuyer.length} як замовник · ${p.asWinner.length} як постачальник</div>
-  </div>
-  <div class="amount"><span class="big">${shortMoney(total)}</span></div>
-  <div class="flags">
-    <form class="save-form" method="post" action="/saved/toggle">
-      <input type="hidden" name="edrpou" value="${esc(p.code)}">
-      <input type="hidden" name="back" value="/saved">
-      <button type="submit" class="save-btn on">★ Прибрати зі збережених</button>
-    </form>
-  </div>
-</div>`;
-  })
-  .join("")}
-</div>
-${known.length < saved.length ? `<p class="note">Частина збережених кодів у базі не зустрічається — вони показані без цифр.</p>` : ""}`
+    ? `<div class="empty">Поки нічого не позначено. Натисніть ☆ біля будь-якої закупівлі, компанії чи посадовця.</div>`
+    : ""
 }
+
+${section(
+  "Закупівлі",
+  tenders.length,
+  `<div class="rows">${tenders.map((c) => caseRow(c)).join("")}</div>${
+    missingTenders > 0
+      ? `<p class="note">${missingTenders} ${plural(missingTenders, "позначена закупівля більше не знайдена", "позначені закупівлі більше не знайдені", "позначених закупівель більше не знайдено")} в базі.</p>`
+      : ""
+  }`,
+)}
+
+${section(
+  "Компанії",
+  companyRows.length,
+  `<div class="rows">${companyRows
+    .map(
+      (r) => `<div class="row">
+  <div class="who">
+    <div class="name">${star(r.fav.kind, r.fav.id, "/starred")}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="meta">ЄДРПОУ ${esc(r.fav.id)} · ${esc(r.role)} · ${r.count} ${plural(r.count, "закупівля", "закупівлі", "закупівель")}</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
+</div>`,
+    )
+    .join("")}</div>`,
+)}
+
+${section(
+  "Посадовці",
+  officerRows.length,
+  `<div class="rows">${officerRows
+    .map(
+      (r) => `<div class="row">
+  <div class="who">
+    <div class="name">${star("officer", r.fav.id, "/starred")}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="meta">${esc(r.entity)} · ${r.count} ${plural(r.count, "закупівля", "закупівлі", "закупівель")}</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
+</div>`,
+    )
+    .join("")}</div>`,
+)}
 `,
   });
 }
@@ -1307,16 +1392,20 @@ export type Rendered = { status: number; body: string };
  * Resolves one URL to a page. Pure with respect to I/O, so the same code
  * serves the local Node server and a serverless function.
  */
-export function render(url: URL, saved: string[] = []): Rendered {
+export function render(url: URL, saved: Favourite[] = []): Rendered {
+  // caseRow is called from a dozen places; threading the list through every
+  // one of them would add a parameter to each. Set it once per request.
+  starred = saved;
+
   const path = decodeURIComponent(url.pathname);
 
   // A EDRPOU typed into the lookup box: send it to whichever dossier exists.
   if (path === "/lookup") {
     const code = normaliseEdrpou(url.searchParams.get("edrpou") ?? "");
-    if (!code) return { status: 200, body: lookupPage(null, url.searchParams.get("edrpou") ?? "", saved) };
-    return { status: 200, body: lookupPage(code, code, saved) };
+    if (!code) return { status: 200, body: lookupPage(null, url.searchParams.get("edrpou") ?? "") };
+    return { status: 200, body: lookupPage(code, code) };
   }
-  if (path === "/saved") return { status: 200, body: savedPage(saved) };
+  if (path === "/starred") return { status: 200, body: starredPage(saved) };
 
   if (path === "/") return { status: 200, body: feedPage(url) };
   if (path === "/entities") return { status: 200, body: entitiesPage() };
@@ -1329,9 +1418,9 @@ export function render(url: URL, saved: string[] = []): Rendered {
   if (path === "/about") return { status: 200, body: aboutPage() };
   if (path.startsWith("/article/")) return { status: 200, body: articlePage(path.slice("/article/".length), url) };
   if (path.startsWith("/tender/")) return { status: 200, body: tenderPage(path.slice("/tender/".length)) };
-  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length), saved) };
+  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length)) };
   if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length)) };
-  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length), saved) };
+  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length)) };
 
   return { status: 404, body: notFound() };
 }

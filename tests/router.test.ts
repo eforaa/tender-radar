@@ -155,55 +155,87 @@ test("/auth/logout clears the session and sends the visitor back to sign in", as
   });
 });
 
-/* ---------- saved companies ---------- */
+/* ---------- starred items ---------- */
 
-test("posting the toggle saves a company and returns to where you were", async () => {
+test("starring a tender records it and returns to where you were", async () => {
   await withEnv({}, async () => {
     const res = await handle({
-      url: new URL("https://x.example/saved/toggle"),
+      url: new URL("https://x.example/starred/toggle"),
       cookieHeader: null,
       method: "POST",
-      body: "edrpou=40081216&back=%2Fentity%2F40081216",
+      body: "kind=tender&id=abc123&back=%2Ftender%2Fabc123",
     });
     assert.equal(res.status, 302);
-    assert.equal(res.headers.location, "/entity/40081216");
-    assert.match(String(res.headers["set-cookie"]), /tr_saved=40081216/);
+    assert.equal(res.headers.location, "/tender/abc123");
+    assert.match(String(res.headers["set-cookie"]), /tr_starred=t:abc123/);
   });
 });
 
-test("posting the toggle again removes the company", async () => {
+test("starring an officer keeps the email intact through the cookie", async () => {
   await withEnv({}, async () => {
     const res = await handle({
-      url: new URL("https://x.example/saved/toggle"),
-      cookieHeader: "tr_saved=40081216",
+      url: new URL("https://x.example/starred/toggle"),
+      cookieHeader: null,
       method: "POST",
-      body: "edrpou=40081216&back=%2Fsaved",
+      body: "kind=officer&id=taranenko%40kharkivoda.gov.ua&back=%2Fstarred",
     });
-    assert.match(String(res.headers["set-cookie"]), /tr_saved=; .*Max-Age=0/);
+    assert.match(String(res.headers["set-cookie"]), /tr_starred=o:taranenko@kharkivoda\.gov\.ua/);
+  });
+});
+
+test("starring the same thing twice removes it", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({
+      url: new URL("https://x.example/starred/toggle"),
+      cookieHeader: "tr_starred=e:00131954",
+      method: "POST",
+      body: "kind=entity&id=00131954&back=%2Fstarred",
+    });
+    assert.match(String(res.headers["set-cookie"]), /tr_starred=; .*Max-Age=0/);
+  });
+});
+
+test("an unknown kind is refused rather than stored", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({
+      url: new URL("https://x.example/starred/toggle"),
+      cookieHeader: null,
+      method: "POST",
+      body: "kind=everything&id=abc&back=%2Fstarred",
+    });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers["set-cookie"], undefined);
   });
 });
 
 test("the toggle refuses to bounce the visitor off this site", async () => {
   await withEnv({}, async () => {
     const res = await handle({
-      url: new URL("https://x.example/saved/toggle"),
+      url: new URL("https://x.example/starred/toggle"),
       cookieHeader: null,
       method: "POST",
-      body: "edrpou=40081216&back=https%3A%2F%2Fevil.example%2Fx",
+      body: "kind=entity&id=40081216&back=https%3A%2F%2Fevil.example%2Fx",
     });
-    assert.equal(res.headers.location, "/saved");
+    assert.equal(res.headers.location, "/starred");
   });
 });
 
 test("a protocol-relative redirect target is refused too", async () => {
   await withEnv({}, async () => {
     const res = await handle({
-      url: new URL("https://x.example/saved/toggle"),
+      url: new URL("https://x.example/starred/toggle"),
       cookieHeader: null,
       method: "POST",
-      body: "edrpou=40081216&back=%2F%2Fevil.example",
+      body: "kind=entity&id=40081216&back=%2F%2Fevil.example",
     });
-    assert.equal(res.headers.location, "/saved");
+    assert.equal(res.headers.location, "/starred");
+  });
+});
+
+test("a GET to the toggle does not change anything", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({ url: new URL("https://x.example/starred/toggle"), cookieHeader: null });
+    assert.equal(res.status, 404);
   });
 });
 
@@ -230,10 +262,39 @@ test("a lookup that is not a EDRPOU explains the format", async () => {
   });
 });
 
-test("the saved page lists what the cookie holds", async () => {
+test("the starred page groups what the cookie holds", async () => {
   await withEnv({}, async () => {
-    const res = await handle({ url: new URL("https://x.example/saved"), cookieHeader: "tr_saved=40081216" });
+    const res = await handle({
+      url: new URL("https://x.example/starred"),
+      cookieHeader: "tr_starred=e:00131954~o:taranenko@kharkivoda.gov.ua",
+    });
     assert.equal(res.status, 200);
-    assert.match(res.body, /40081216/);
+    assert.match(res.body, /Компанії/);
+    assert.match(res.body, /Посадовці/);
+  });
+});
+
+test("an empty starred page invites the visitor to start", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({ url: new URL("https://x.example/starred"), cookieHeader: null });
+    assert.match(res.body, /Поки нічого не позначено/);
+  });
+});
+
+test("every tender row carries a star control", async () => {
+  await withEnv({}, async () => {
+    const res = await handle({ url: new URL("https://x.example/"), cookieHeader: null });
+    assert.match(res.body, /class="star-form"/);
+    assert.match(res.body, /name="kind" value="tender"/);
+  });
+});
+
+test("a starred tender renders as filled on the list", async () => {
+  await withEnv({}, async () => {
+    const plain = await handle({ url: new URL("https://x.example/"), cookieHeader: null });
+    const firstId = /name="id" value="([^"]+)"/.exec(plain.body)?.[1];
+    assert.ok(firstId);
+    const withStar = await handle({ url: new URL("https://x.example/"), cookieHeader: `tr_starred=t:${firstId}` });
+    assert.match(withStar.body, /class="star on"/);
   });
 });

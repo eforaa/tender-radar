@@ -401,11 +401,25 @@ form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
 .filter-row input[type=date]{flex:0 0 auto;width:10.5rem}
 .filter-row input.num{flex:0 0 auto;width:9rem;font-variant-numeric:tabular-nums}
 .filter-label.faint{color:var(--ink-faint);font-size:.85rem}
-.save-form{display:inline-block;margin:0 0 1.5rem}
-.row .save-form{margin:0}
-.save-btn{background:var(--surface);color:var(--accent);border:1px solid var(--line);font-size:.9rem;padding:.45rem .9rem;cursor:pointer;border-radius:var(--radius)}
-.save-btn:hover{border-color:var(--accent);background:var(--accent-bg)}
-.save-btn.on{background:var(--accent-bg);border-color:var(--accent);font-weight:500}
+/* star toggle \u2014 a form so the site still needs no scripts */
+.star-form{display:inline;margin:0}
+.star{background:none;border:0;padding:0 .4rem 0 0;margin:0;cursor:pointer;font-size:1.15rem;line-height:1;color:var(--ink-faint);border-radius:var(--radius);vertical-align:baseline}
+.star:hover{color:var(--warn)}
+.star.on{color:#D9A21B}
+.star span{display:none}
+.name .star{float:left}
+
+/* the labelled variant, used at the top of a dossier */
+.star-form:has(.star span){display:inline-block;margin:0 0 1.25rem}
+.star:has(span){display:inline-flex;align-items:center;gap:.5rem;font-size:1rem;border:1px solid var(--line);background:var(--surface);padding:.45rem .9rem;color:var(--accent)}
+.star:has(span) span{display:inline}
+.star.on:has(span){background:var(--accent-bg);border-color:var(--accent);font-weight:500}
+.name .star:has(span){float:none}
+
+.starred-btn{display:inline-flex;align-items:center;gap:.4rem;text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:.3rem .65rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.starred-btn:hover{color:var(--accent);border-color:var(--accent)}
+.starred-btn.on{color:var(--accent);background:var(--accent-bg);border-color:var(--accent);font-weight:500}
+@media (max-width:34rem){.starred-btn span{display:none}}
 .filter-label{font-size:.92rem;color:var(--ink-faint);white-space:nowrap}
 select:disabled{opacity:.5;cursor:not-allowed}
 
@@ -509,7 +523,7 @@ var MENU = [
   { href: "/", nav: "feed", label: "\u0423\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", hint: "\u043F\u043E\u0432\u043D\u0438\u0439 \u043F\u0435\u0440\u0435\u043B\u0456\u043A, \u0437 \u043F\u043E\u0448\u0443\u043A\u043E\u043C \u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0430\u043C\u0438" },
   { href: "/railway", nav: "railway", label: "\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F", hint: "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438" },
   { href: "/prices", nav: "prices", label: "\u0417\u0430\u0432\u0438\u0449\u0435\u043D\u0456 \u0446\u0456\u043D\u0438", hint: "\u0434\u0435 \u043C\u0438 \u0441\u0430\u043C\u0456 \u043F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442\u0443" },
-  { href: "/saved", nav: "saved", label: "\u0417\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u0456", hint: "\u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u0430, \u044F\u043A\u0456 \u0432\u0438 \u0432\u0456\u0434\u0441\u0442\u0435\u0436\u0443\u0454\u0442\u0435" },
+  { href: "/starred", nav: "starred", label: "\u041E\u0431\u0440\u0430\u043D\u0435", hint: "\u0443\u0441\u0435, \u0449\u043E \u0432\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0438 \u0437\u0456\u0440\u043E\u0447\u043A\u043E\u044E" },
   { href: "/lookup", nav: "lookup", label: "\u041F\u043E\u0448\u0443\u043A \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423", hint: "\u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0431\u0443\u0434\u044C-\u044F\u043A\u0435 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E" },
   { href: "/article/366", nav: "article-366", label: "\u041F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432", hint: "\u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445 \u0456 \u0437\u0432\u0456\u0442\u0430\u0445" },
   { href: "/entities", nav: "entities", label: "\u0425\u0442\u043E \u043A\u0443\u043F\u0443\u0454", hint: "\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438-\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438" },
@@ -540,6 +554,7 @@ function layout(opts) {
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</a>
     <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443</a>
   </nav>
+  <a class="starred-btn${opts.nav === "starred" ? " on" : ""}" href="/starred" title="\u041E\u0431\u0440\u0430\u043D\u0435">\u2605<span>\u041E\u0431\u0440\u0430\u043D\u0435</span></a>
   <label class="burger" for="menu-toggle" role="button" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438" title="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438"><span></span><span></span><span></span></label>
 </div></header>
 <label class="scrim" for="menu-toggle" aria-hidden="true"></label>
@@ -908,9 +923,17 @@ function buildGroups(cases, first, second, riskLabel) {
 }
 
 // server/favourites.ts
-var FAVOURITES_COOKIE = "tr_saved";
+var FAVOURITES_COOKIE = "tr_starred";
 var MAX_SAVED = 60;
 var TTL_SECONDS = 365 * 24 * 60 * 60;
+var SEPARATOR = "~";
+var PREFIX = {
+  tender: "t",
+  entity: "e",
+  supplier: "s",
+  officer: "o"
+};
+var BY_PREFIX = { t: "tender", e: "entity", s: "supplier", o: "officer" };
 var EDRPOU = /^\d{6,10}$/;
 function isEdrpou(value) {
   return EDRPOU.test(value.trim());
@@ -919,19 +942,58 @@ function normaliseEdrpou(input) {
   const digits = input.replace(/\D/g, "");
   return isEdrpou(digits) ? digits : null;
 }
+function isUsableId(id) {
+  return id.length > 0 && id.length <= 120 && !/[~;,\s\\"]/.test(id);
+}
+function isFavKind(value) {
+  return value === "tender" || value === "entity" || value === "supplier" || value === "officer";
+}
+function encodeFavourite(fav) {
+  return `${PREFIX[fav.kind]}:${fav.id}`;
+}
+function decodeFavourite(token) {
+  const colon = token.indexOf(":");
+  if (colon !== 1) return null;
+  const kind = BY_PREFIX[token.slice(0, 1)];
+  const id = token.slice(colon + 1);
+  if (!kind || !isUsableId(id)) return null;
+  return { kind, id };
+}
 function parseFavourites(cookieValue) {
   if (!cookieValue) return [];
-  return [...new Set(cookieValue.split(".").map((c) => c.trim()).filter(isEdrpou))].slice(0, MAX_SAVED);
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const token of cookieValue.split(SEPARATOR)) {
+    const fav = decodeFavourite(token.trim());
+    if (!fav) continue;
+    const key = encodeFavourite(fav);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(fav);
+  }
+  return out.slice(0, MAX_SAVED);
 }
-function serialiseFavourites(codes) {
-  return [...new Set(codes.filter(isEdrpou))].slice(0, MAX_SAVED).join(".");
+function serialiseFavourites(favourites) {
+  const seen = /* @__PURE__ */ new Set();
+  const tokens = [];
+  for (const fav of favourites) {
+    if (!isUsableId(fav.id)) continue;
+    const token = encodeFavourite(fav);
+    if (seen.has(token)) continue;
+    seen.add(token);
+    tokens.push(token);
+  }
+  return tokens.slice(0, MAX_SAVED).join(SEPARATOR);
 }
-function toggleFavourite(current, code) {
-  if (!isEdrpou(code)) return current;
-  return current.includes(code) ? current.filter((c) => c !== code) : [code, ...current];
+function isStarred(favourites, kind, id) {
+  return favourites.some((f) => f.kind === kind && f.id === id);
 }
-function favouritesCookie(codes, secure) {
-  const value = serialiseFavourites(codes);
+function toggleFavourite(current, kind, id) {
+  if (!isUsableId(id)) return current;
+  return isStarred(current, kind, id) ? current.filter((f) => !(f.kind === kind && f.id === id)) : [{ kind, id }, ...current];
+}
+function favouritesCookie(favourites, secure) {
+  const value = serialiseFavourites(favourites);
   const attrs = `SameSite=Lax; Path=/${secure ? "; Secure" : ""}`;
   return value.length === 0 ? `${FAVOURITES_COOKIE}=; ${attrs}; Max-Age=0` : `${FAVOURITES_COOKIE}=${value}; ${attrs}; Max-Age=${TTL_SECONDS}`;
 }
@@ -956,6 +1018,18 @@ function alarms(entry) {
   if (entry.risks.length >= 3) out.push(`${entry.risks.length} \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438 \u043E\u0434\u0440\u0430\u0437\u0443`);
   return out;
 }
+var starred = [];
+function star(kind, id, back, opts = {}) {
+  if (!id) return "";
+  const on = isStarred(starred, kind, id);
+  const title = on ? "\u041F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0437 \u043E\u0431\u0440\u0430\u043D\u043E\u0433\u043E" : "\u0414\u043E\u0434\u0430\u0442\u0438 \u0434\u043E \u043E\u0431\u0440\u0430\u043D\u043E\u0433\u043E";
+  return `<form class="star-form" method="post" action="/starred/toggle">
+  <input type="hidden" name="kind" value="${esc(kind)}">
+  <input type="hidden" name="id" value="${esc(id)}">
+  <input type="hidden" name="back" value="${esc(back)}">
+  <button type="submit" class="star${on ? " on" : ""}" title="${title}" aria-label="${title}" aria-pressed="${on}">${on ? "\u2605" : "\u2606"}${opts.label ? `<span>${on ? "\u0412 \u043E\u0431\u0440\u0430\u043D\u043E\u043C\u0443" : "\u0414\u043E \u043E\u0431\u0440\u0430\u043D\u043E\u0433\u043E"}</span>` : ""}</button>
+</form>`;
+}
 function caseRow(entry, opts = {}) {
   const showOfficer = opts.showOfficer ?? true;
   const showEntity = opts.showEntity ?? true;
@@ -976,7 +1050,7 @@ function caseRow(entry, opts = {}) {
   }
   return `<div class="row">
   <div class="who">
-    <div class="name"><a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
+    <div class="name">${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
     ${meta.length ? `<div class="meta">${meta.join(" \xB7 ")}</div>` : ""}
     <div class="meta"><span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span> \xB7 \u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E ${date(entry.date_assessed)}</div>
   </div>
@@ -1228,6 +1302,7 @@ function tenderPage(tenderId) {
     title: entry.tender_ref || entry.tender_id,
     body: `
 <a class="back" href="/">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u043D\u0430\u0445\u0456\u0434\u043E\u043A</a>
+${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id), { label: true })}
 <h1 class="long">${esc(title)}</h1>
 <p class="sub">${esc(readableName(entry.entity_name))} \xB7 <span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span></p>
 
@@ -1319,6 +1394,7 @@ function officerPage(key) {
     nav: "officers",
     body: `
 <a class="back" href="/officers">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456\u0432</a>
+${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
 <h1>${esc(name)}</h1>
 <p class="sub">\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0430 \u043E\u0441\u043E\u0431\u0430 \u0432 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445${entity ? ` \u2014 ${esc(readableName(entity))}` : ""}.</p>
 
@@ -1350,7 +1426,7 @@ ${sorted.length > 60 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u04
 `
   });
 }
-function supplierPage(edrpou, saved = []) {
+function supplierPage(edrpou) {
   const list = db.cases.filter((c) => c.winner_edrpou === edrpou);
   if (list.length === 0) return notFound();
   const name = list.find((c) => c.winner_name)?.winner_name ?? edrpou;
@@ -1366,7 +1442,7 @@ function supplierPage(edrpou, saved = []) {
 <a class="back" href="/suppliers">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456\u0432</a>
 <h1>${esc(readableName(name))}</h1>
 <p class="sub">\u041F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A \xB7 \u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)}</p>
-${saveControl(edrpou, saved, "/supplier/" + encodeURIComponent(edrpou))}
+${star("supplier", edrpou, "/supplier/" + encodeURIComponent(edrpou), { label: true })}
 
 <p class="statline">
   <b>${list.length}</b> \u043F\u0435\u0440\u0435\u043C\u043E\u0433 \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \xB7
@@ -1386,7 +1462,7 @@ ${sorted.length > 60 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u04
 `
   });
 }
-function entityPage(edrpou, saved = []) {
+function entityPage(edrpou) {
   const list = db.cases.filter((c) => c.entity_edrpou === edrpou);
   if (list.length === 0) return notFound();
   const name = list.find((c) => c.entity_name)?.entity_name ?? edrpou;
@@ -1410,7 +1486,7 @@ function entityPage(edrpou, saved = []) {
 <a class="back" href="/entities">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432</a>
 <h1 class="long">${esc(readableName(name))}</h1>
 <p class="sub">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)}${RAILWAY_EDRPOU.has(edrpou) ? " \xB7 \u0444\u0456\u043B\u0456\u044F \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB" : ""}</p>
-${saveControl(edrpou, saved, "/entity/" + encodeURIComponent(edrpou))}
+${star("entity", edrpou, "/entity/" + encodeURIComponent(edrpou), { label: true })}
 
 <p class="statline">
   <b>${list.length}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043F\u0456\u0434 \u043F\u0438\u0442\u0430\u043D\u043D\u044F\u043C \xB7
@@ -1452,7 +1528,7 @@ ${opts.rows.length === 0 ? '<div class="empty">\u0414\u0430\u043D\u0438\u0445 \u
 ${opts.rows.slice(0, 150).map(
       (r) => `<div class="row">
   <div class="who">
-    <div class="name"><a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="name">${r.kind && r.id ? star(r.kind, r.id, r.href) : ""}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
     <div class="meta">${r.meta}</div>
   </div>
   <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
@@ -1479,6 +1555,8 @@ function entitiesPage() {
     heading: "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438",
     intro: `\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0457 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456, \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u044F\u043A\u0438\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0456 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438. \u041D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0456 \u0437\u0430 \u0441\u0443\u043C\u043E\u044E \u2014 \u0437\u0433\u043E\u0440\u0438.`,
     rows: [...byEntity.entries()].sort((a, b) => b[1].value - a[1].value).map(([edrpou, acc]) => ({
+      kind: "entity",
+      id: edrpou,
       href: `/entity/${encodeURIComponent(edrpou)}`,
       name: readableName(acc.name),
       meta: `\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}${RAILWAY_EDRPOU.has(edrpou) ? " \xB7 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F" : ""}`,
@@ -1506,6 +1584,8 @@ function officersPage() {
     heading: "\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0456 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
     intro: "\u041E\u0441\u043E\u0431\u0438, \u044F\u043A\u0438\u0445 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438 \u0432\u043A\u0430\u0437\u0430\u043B\u0438 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0438\u043C\u0438 \u0432 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438. \u0426\u0435 \u043D\u0435 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u043F\u0456\u0434\u043E\u0437\u0440\u044E\u0432\u0430\u043D\u0438\u0445 \u2014 \u0446\u0435 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u0442\u0438\u0445, \u0447\u0438\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432\u0430\u0440\u0442\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438.",
     rows: [...byOfficer.entries()].sort((a, b) => b[1].value - a[1].value).map(([key, acc]) => ({
+      kind: "officer",
+      id: key,
       href: `/officer/${encodeURIComponent(key)}`,
       name: acc.name,
       meta: `${esc(readableName(acc.entity))} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}`,
@@ -1530,6 +1610,8 @@ function suppliersPage() {
     heading: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C",
     intro: "\u041A\u043E\u043C\u043F\u0430\u043D\u0456\u0457, \u044F\u043A\u0456 \u0432\u0438\u0433\u0440\u0430\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438. \u041D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0456 \u0437\u0430 \u0441\u0443\u043C\u043E\u044E \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0456\u0432 \u2014 \u0437\u0433\u043E\u0440\u0438.",
     rows: [...bySupplier.entries()].sort((a, b) => b[1].value - a[1].value).map(([edrpou, acc]) => ({
+      kind: "supplier",
+      id: edrpou,
       href: `/supplier/${encodeURIComponent(edrpou)}`,
       name: readableName(acc.name),
       meta: `\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433")}${acc.solo ? ` \xB7 ${acc.solo} \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432` : ""}`,
@@ -1812,21 +1894,13 @@ ${sorted.length === 0 ? '<div class="empty">\u041F\u043E\u043A\u0438 \u0449\u043
 `
   });
 }
-function saveControl(edrpou, saved, back) {
-  const isSaved = saved.includes(edrpou);
-  return `<form class="save-form" method="post" action="/saved/toggle">
-  <input type="hidden" name="edrpou" value="${esc(edrpou)}">
-  <input type="hidden" name="back" value="${esc(back)}">
-  <button type="submit" class="save-btn${isSaved ? " on" : ""}">${isSaved ? "\u2605 \u0423 \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u0438\u0445" : "\u2606 \u0417\u0431\u0435\u0440\u0435\u0433\u0442\u0438 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E"}</button>
-</form>`;
-}
 function profileOf(edrpou) {
   const asBuyer = db.cases.filter((c) => c.entity_edrpou === edrpou);
   const asWinner = db.cases.filter((c) => c.winner_edrpou === edrpou);
   const name = asBuyer.find((c) => c.entity_name)?.entity_name ?? asWinner.find((c) => c.winner_name)?.winner_name ?? null;
   return { asBuyer, asWinner, name };
 }
-function lookupPage(code, typed, saved) {
+function lookupPage(code, typed) {
   const profile = code ? profileOf(code) : null;
   const found = Boolean(profile && (profile.asBuyer.length > 0 || profile.asWinner.length > 0));
   return layout({
@@ -1851,7 +1925,7 @@ ${code && !found ? `<div class="empty">
   <p><a href="https://prozorro.gov.ua/search/tenders?edrpou=${encodeURIComponent(code)}" target="_blank" rel="noopener">\u041F\u043E\u0448\u0443\u043A \u0446\u044C\u043E\u0433\u043E \u043A\u043E\u0434\u0443 \u0432 Prozorro \u2192</a></p>
 </div>` : ""}
 
-${found && profile ? `${saveControl(code, saved, "/lookup?edrpou=" + encodeURIComponent(code))}
+${found && profile ? `${star("entity", code, "/lookup?edrpou=" + encodeURIComponent(code), { label: true })}
 <h2>${esc(readableName(profile.name))}</h2>
 <p class="statline">
   <b>${profile.asBuyer.length}</b> ${plural(profile.asBuyer.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u044F\u043A \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u044F\u043A \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u044F\u043A \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A")} \xB7
@@ -1865,44 +1939,82 @@ ${found && profile ? `${saveControl(code, saved, "/lookup?edrpou=" + encodeURICo
 `
   });
 }
-function savedPage(saved) {
-  const profiles = saved.map((code) => ({ code, ...profileOf(code) }));
-  const known = profiles.filter((p) => p.asBuyer.length > 0 || p.asWinner.length > 0);
+function starredPage(saved) {
+  const tenders = saved.filter((f) => f.kind === "tender").map((f) => db.byTender.get(f.id)).filter((c) => Boolean(c));
+  const missingTenders = saved.filter((f) => f.kind === "tender").length - tenders.length;
+  const companyRows = saved.filter((f) => f.kind === "entity" || f.kind === "supplier").map((f) => {
+    const list = f.kind === "entity" ? db.cases.filter((c) => c.entity_edrpou === f.id) : db.cases.filter((c) => c.winner_edrpou === f.id);
+    const name = f.kind === "entity" ? list.find((c) => c.entity_name)?.entity_name : list.find((c) => c.winner_name)?.winner_name;
+    return {
+      fav: f,
+      href: `/${f.kind === "entity" ? "entity" : "supplier"}/${encodeURIComponent(f.id)}`,
+      name: readableName(name ?? "") || f.id,
+      role: f.kind === "entity" ? "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A" : "\u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A",
+      count: list.length,
+      value: list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0)
+    };
+  });
+  const officerRows = saved.filter((f) => f.kind === "officer").map((f) => {
+    const list = db.cases.filter((c) => c.officer_key === f.id);
+    return {
+      fav: f,
+      href: `/officer/${encodeURIComponent(f.id)}`,
+      name: list.find((c) => c.officer_name)?.officer_name ?? f.id,
+      entity: readableName(list.find((c) => c.entity_name)?.entity_name ?? ""),
+      count: list.length,
+      value: list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0)
+    };
+  });
+  const section = (title, count, inner) => count === 0 ? "" : `<h2>${esc(title)} \u2014 ${count}</h2>${inner}`;
   return layout({
-    title: "\u0417\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u0456",
-    nav: "saved",
+    title: "\u041E\u0431\u0440\u0430\u043D\u0435",
+    nav: "starred",
     body: `
-<h1>\u0417\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u0456 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u0430</h1>
-<p class="sub">\u0421\u043F\u0438\u0441\u043E\u043A \u0437\u0431\u0435\u0440\u0456\u0433\u0430\u0454\u0442\u044C\u0441\u044F \u0443 \u0432\u0430\u0448\u043E\u043C\u0443 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0456. \u0412\u0456\u043D \u043D\u0435 \u043F\u0440\u0438\u0432'\u044F\u0437\u0430\u043D\u0438\u0439 \u0434\u043E \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u043E\u0433\u043E \u0437\u0430\u043F\u0438\u0441\u0443, \u0442\u043E\u0436 \u043D\u0430 \u0456\u043D\u0448\u043E\u043C\u0443 \u043F\u0440\u0438\u0441\u0442\u0440\u043E\u0457 \u0431\u0443\u0434\u0435 \u043F\u043E\u0440\u043E\u0436\u043D\u0456\u043C.</p>
+<h1>\u041E\u0431\u0440\u0430\u043D\u0435</h1>
+<p class="sub">\u0423\u0441\u0435, \u0449\u043E \u0432\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0438 \u0437\u0456\u0440\u043E\u0447\u043A\u043E\u044E: \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438, \u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A\u0438, \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456. \u0421\u043F\u0438\u0441\u043E\u043A \u0437\u0431\u0435\u0440\u0456\u0433\u0430\u0454\u0442\u044C\u0441\u044F \u0443 \u0432\u0430\u0448\u043E\u043C\u0443 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0456 \u0439 \u043D\u0435 \u043F\u0440\u0438\u0432'\u044F\u0437\u0430\u043D\u0438\u0439 \u0434\u043E \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u043E\u0433\u043E \u0437\u0430\u043F\u0438\u0441\u0443.</p>
 
 <form class="filters" method="get" action="/lookup">
   <div class="filter-row">
-    <input type="search" name="edrpou" placeholder="\u0414\u043E\u0434\u0430\u0442\u0438 \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423 \u2014 \u043D\u0430\u043F\u0440\u0438\u043A\u043B\u0430\u0434, 00131954" aria-label="\u0404\u0414\u0420\u041F\u041E\u0423" inputmode="numeric">
-    <button type="submit">\u0417\u043D\u0430\u0439\u0442\u0438 \u0439 \u0434\u043E\u0434\u0430\u0442\u0438</button>
+    <input type="search" name="edrpou" placeholder="\u0417\u043D\u0430\u0439\u0442\u0438 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423 \u2014 \u043D\u0430\u043F\u0440\u0438\u043A\u043B\u0430\u0434, 00131954" aria-label="\u0404\u0414\u0420\u041F\u041E\u0423" inputmode="numeric">
+    <button type="submit">\u0417\u043D\u0430\u0439\u0442\u0438</button>
   </div>
 </form>
 
-${saved.length === 0 ? `<div class="empty">\u041F\u043E\u043A\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u043E. \u0412\u0456\u0434\u043A\u0440\u0438\u0439\u0442\u0435 \u0431\u0443\u0434\u044C-\u044F\u043A\u0435 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E \u0456 \u043D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \xAB\u0417\u0431\u0435\u0440\u0435\u0433\u0442\u0438 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E\xBB.</div>` : `<div class="rows">
-${profiles.map((p) => {
-      const total = [...p.asBuyer, ...p.asWinner].reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
-      const href = p.asBuyer.length ? `/entity/${encodeURIComponent(p.code)}` : p.asWinner.length ? `/supplier/${encodeURIComponent(p.code)}` : `/lookup?edrpou=${encodeURIComponent(p.code)}`;
-      return `<div class="row">
+${saved.length === 0 ? `<div class="empty">\u041F\u043E\u043A\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E. \u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u2606 \u0431\u0456\u043B\u044F \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457 \u0447\u0438 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u044F.</div>` : ""}
+
+${section(
+      "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
+      tenders.length,
+      `<div class="rows">${tenders.map((c) => caseRow(c)).join("")}</div>${missingTenders > 0 ? `<p class="note">${missingTenders} ${plural(missingTenders, "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0430", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0456", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E")} \u0432 \u0431\u0430\u0437\u0456.</p>` : ""}`
+    )}
+
+${section(
+      "\u041A\u043E\u043C\u043F\u0430\u043D\u0456\u0457",
+      companyRows.length,
+      `<div class="rows">${companyRows.map(
+        (r) => `<div class="row">
   <div class="who">
-    <div class="name"><a href="${href}">${esc(readableName(p.name) || p.code)}</a></div>
-    <div class="meta">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(p.code)} \xB7 ${p.asBuyer.length} \u044F\u043A \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \xB7 ${p.asWinner.length} \u044F\u043A \u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A</div>
+    <div class="name">${star(r.fav.kind, r.fav.id, "/starred")}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="meta">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(r.fav.id)} \xB7 ${esc(r.role)} \xB7 ${r.count} ${plural(r.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}</div>
   </div>
-  <div class="amount"><span class="big">${shortMoney(total)}</span></div>
-  <div class="flags">
-    <form class="save-form" method="post" action="/saved/toggle">
-      <input type="hidden" name="edrpou" value="${esc(p.code)}">
-      <input type="hidden" name="back" value="/saved">
-      <button type="submit" class="save-btn on">\u2605 \u041F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0437\u0456 \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u0438\u0445</button>
-    </form>
+  <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
+</div>`
+      ).join("")}</div>`
+    )}
+
+${section(
+      "\u041F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
+      officerRows.length,
+      `<div class="rows">${officerRows.map(
+        (r) => `<div class="row">
+  <div class="who">
+    <div class="name">${star("officer", r.fav.id, "/starred")}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="meta">${esc(r.entity)} \xB7 ${r.count} ${plural(r.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}</div>
   </div>
-</div>`;
-    }).join("")}
-</div>
-${known.length < saved.length ? `<p class="note">\u0427\u0430\u0441\u0442\u0438\u043D\u0430 \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u0438\u0445 \u043A\u043E\u0434\u0456\u0432 \u0443 \u0431\u0430\u0437\u0456 \u043D\u0435 \u0437\u0443\u0441\u0442\u0440\u0456\u0447\u0430\u0454\u0442\u044C\u0441\u044F \u2014 \u0432\u043E\u043D\u0438 \u043F\u043E\u043A\u0430\u0437\u0430\u043D\u0456 \u0431\u0435\u0437 \u0446\u0438\u0444\u0440.</p>` : ""}`}
+  <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
+</div>`
+      ).join("")}</div>`
+    )}
 `
   });
 }
@@ -1967,13 +2079,14 @@ function notFound() {
   });
 }
 function render(url, saved = []) {
+  starred = saved;
   const path = decodeURIComponent(url.pathname);
   if (path === "/lookup") {
     const code = normaliseEdrpou(url.searchParams.get("edrpou") ?? "");
-    if (!code) return { status: 200, body: lookupPage(null, url.searchParams.get("edrpou") ?? "", saved) };
-    return { status: 200, body: lookupPage(code, code, saved) };
+    if (!code) return { status: 200, body: lookupPage(null, url.searchParams.get("edrpou") ?? "") };
+    return { status: 200, body: lookupPage(code, code) };
   }
-  if (path === "/saved") return { status: 200, body: savedPage(saved) };
+  if (path === "/starred") return { status: 200, body: starredPage(saved) };
   if (path === "/") return { status: 200, body: feedPage(url) };
   if (path === "/entities") return { status: 200, body: entitiesPage() };
   if (path === "/officers") return { status: 200, body: officersPage() };
@@ -1985,9 +2098,9 @@ function render(url, saved = []) {
   if (path === "/about") return { status: 200, body: aboutPage() };
   if (path.startsWith("/article/")) return { status: 200, body: articlePage(path.slice("/article/".length), url) };
   if (path.startsWith("/tender/")) return { status: 200, body: tenderPage(path.slice("/tender/".length)) };
-  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length), saved) };
+  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length)) };
   if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length)) };
-  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length), saved) };
+  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length)) };
   return { status: 404, body: notFound() };
 }
 
@@ -2139,7 +2252,7 @@ function redirect(location, setCookie) {
   return { status: 302, body: "", headers };
 }
 function safeBack(value) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/saved";
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/starred";
   return value;
 }
 async function handle(req) {
@@ -2147,12 +2260,13 @@ async function handle(req) {
   const secure = req.url.protocol === "https:";
   const saved = parseFavourites(readCookie(req.cookieHeader, FAVOURITES_COOKIE));
   function serve() {
-    if (req.url.pathname === "/saved/toggle" && (req.method ?? "GET").toUpperCase() === "POST") {
+    if (req.url.pathname === "/starred/toggle" && (req.method ?? "GET").toUpperCase() === "POST") {
       const form = new URLSearchParams(req.body ?? "");
-      const code = normaliseEdrpou(form.get("edrpou") ?? "");
+      const kind = form.get("kind") ?? "";
+      const id = (form.get("id") ?? "").trim();
       const back = safeBack(form.get("back"));
-      if (!code) return redirect(back);
-      return redirect(back, favouritesCookie(toggleFavourite(saved, code), secure));
+      if (!isFavKind(kind) || !id) return redirect(back);
+      return redirect(back, favouritesCookie(toggleFavourite(saved, kind, id), secure));
     }
     const { status, body } = render(req.url, saved);
     return page(status, body);

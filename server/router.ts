@@ -21,7 +21,7 @@ import {
   parseFavourites,
   toggleFavourite,
   favouritesCookie,
-  normaliseEdrpou,
+  isFavKind,
 } from "./favourites.ts";
 
 export type HttpRequest = {
@@ -46,7 +46,7 @@ function redirect(location: string, setCookie?: string | string[]): HttpResponse
 
 /** Keeps a redirect target on this site, so a form cannot bounce elsewhere. */
 function safeBack(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/saved";
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/starred";
   return value;
 }
 
@@ -63,12 +63,13 @@ export async function handle(req: HttpRequest): Promise<HttpResponse> {
 
   /** Everything past the gate — shared by the gated and ungated paths. */
   function serve(): HttpResponse {
-    if (req.url.pathname === "/saved/toggle" && (req.method ?? "GET").toUpperCase() === "POST") {
+    if (req.url.pathname === "/starred/toggle" && (req.method ?? "GET").toUpperCase() === "POST") {
       const form = new URLSearchParams(req.body ?? "");
-      const code = normaliseEdrpou(form.get("edrpou") ?? "");
+      const kind = form.get("kind") ?? "";
+      const id = (form.get("id") ?? "").trim();
       const back = safeBack(form.get("back"));
-      if (!code) return redirect(back);
-      return redirect(back, favouritesCookie(toggleFavourite(saved, code), secure));
+      if (!isFavKind(kind) || !id) return redirect(back);
+      return redirect(back, favouritesCookie(toggleFavourite(saved, kind, id), secure));
     }
 
     const { status, body } = render(req.url, saved);
