@@ -468,13 +468,28 @@ const MENU = [
   { href: "/about", nav: "about", label: "Про систему", hint: "звідки дані і чого вона не робить" },
 ];
 
-export function layout(opts: { title: string; nav?: string; body: string }): string {
+/**
+ * What a link to this site looks like when it is pasted somewhere. The daily
+ * notifier posts links to Telegram, which renders whatever these say; without
+ * them a link arrives as a bare URL.
+ */
+const SITE_DESCRIPTION =
+  "Публічні закупівлі України з позначками державної системи моніторингу: " +
+  "висновки Держаудитслужби, власний розрахунок цін і правова кваліфікація по кожній закупівлі.";
+
+export function layout(opts: { title: string; nav?: string; body: string; description?: string }): string {
   return `<!doctype html>
 <html lang="uk">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.title)} — Tender Radar</title>
+<meta name="description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
+<meta property="og:site_name" content="Tender Radar">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="${esc(opts.title)} — Tender Radar">
+<meta property="og:description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
