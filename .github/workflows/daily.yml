@@ -48,6 +48,20 @@ jobs:
       - name: Зібрати бандл функції
         run: npm run build:api
 
+      - name: Викласти оновлений сайт
+        # Skipped silently until a Vercel token is added, so the data refresh
+        # keeps working on its own before deployment is wired up.
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "VERCEL_TOKEN не задано — деплой пропущено."
+            exit 0
+          fi
+          npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"
+
       - name: Закомітити зміни
         run: |
           git config user.name "tender-radar-bot"
