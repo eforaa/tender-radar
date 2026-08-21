@@ -64,8 +64,12 @@ jobs:
 
       - name: Закомітити зміни
         run: |
-          git config user.name "tender-radar-bot"
-          git config user.email "bot@users.noreply.github.com"
+          # Vercel's Hobby plan refuses to build a commit whose author is not
+          # the owner of the account holding the project, so the daily commit
+          # is authored by the repository owner rather than a bot identity.
+          # Deployments made under a bot name sit in BLOCKED forever.
+          git config user.name "Sofiia Vedenieva"
+          git config user.email "ved.sofi2006@gmail.com"
           git add web-data api/index.js
           if git diff --staged --quiet; then
             echo "Нічого не змінилося — коміт не потрібен."
