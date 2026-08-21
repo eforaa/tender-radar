@@ -59,6 +59,9 @@ var JsonStore = class {
   upsertRuns(rows) {
     return this.#upsert("runs", rows, (r) => r.run_id);
   }
+  replaceRuns(rows) {
+    return this.#write("runs", rows);
+  }
   allTenders() {
     return this.#read("tenders");
   }
