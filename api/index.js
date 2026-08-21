@@ -2718,9 +2718,13 @@ ${blocks.map((block) => {
         entities.set(key, acc);
       }
       return `
-<h3 class="block-head">${esc(block.heading)}</h3>
+<details class="group-block">
+  <summary>
+    <span class="g-name">${esc(block.heading)}</span>
+    <span class="g-meta">${block.list.length} ${plural(block.list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \xB7 ${shortMoney(blockValue)} \xB7 ${entities.size} ${plural(entities.size, "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A", "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438", "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432")}</span>
+  </summary>
+  <div class="g-body">
 <p class="hint">${esc(block.note)}</p>
-<p class="hint"><strong>${block.list.length}</strong> ${plural(block.list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(blockValue)}, ${entities.size} ${plural(entities.size, "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A", "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438", "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432")}.</p>
 <div class="rows">
 ${[...entities.entries()].sort((a, b) => b[1].value - a[1].value).map(
         ([edrpou, acc]) => `<div class="row">
@@ -2731,7 +2735,9 @@ ${[...entities.entries()].sort((a, b) => b[1].value - a[1].value).map(
   <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
 </div>`
       ).join("")}
-</div>`;
+</div>
+  </div>
+</details>`;
     }).join("")}
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456</h2>

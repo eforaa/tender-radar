@@ -1183,9 +1183,13 @@ ${blocks
     }
 
     return `
-<h3 class="block-head">${esc(block.heading)}</h3>
+<details class="group-block">
+  <summary>
+    <span class="g-name">${esc(block.heading)}</span>
+    <span class="g-meta">${block.list.length} ${plural(block.list.length, "закупівля", "закупівлі", "закупівель")} · ${shortMoney(blockValue)} · ${entities.size} ${plural(entities.size, "замовник", "замовники", "замовників")}</span>
+  </summary>
+  <div class="g-body">
 <p class="hint">${esc(block.note)}</p>
-<p class="hint"><strong>${block.list.length}</strong> ${plural(block.list.length, "закупівля", "закупівлі", "закупівель")} на ${shortMoney(blockValue)}, ${entities.size} ${plural(entities.size, "замовник", "замовники", "замовників")}.</p>
 <div class="rows">
 ${[...entities.entries()]
   .sort((a, b) => b[1].value - a[1].value)
@@ -1199,7 +1203,9 @@ ${[...entities.entries()]
 </div>`,
   )
   .join("")}
-</div>`;
+</div>
+  </div>
+</details>`;
   })
   .join("")}
 
