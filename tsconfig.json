@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+
+    // The project runs TypeScript directly on Node, so imports carry the
+    // .ts extension. Without this the deployment build rejects every import.
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "server/**/*.ts", "scripts/**/*.ts", "api-src/**/*.ts", "tests/**/*.ts"]
+}

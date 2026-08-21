@@ -1,0 +1,1677 @@
+// src/config.ts
+import { existsSync } from "node:fs";
+import { join as join2 } from "node:path";
+
+// src/store/json-store.ts
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+var JsonStore = class {
+  #dir;
+  constructor(dir) {
+    this.#dir = dir;
+  }
+  async #read(table) {
+    try {
+      return JSON.parse(await readFile(join(this.#dir, `${table}.json`), "utf8"));
+    } catch (err) {
+      if (err.code === "ENOENT") return [];
+      throw err;
+    }
+  }
+  async #write(table, rows) {
+    await mkdir(this.#dir, { recursive: true });
+    await writeFile(join(this.#dir, `${table}.json`), JSON.stringify(rows), "utf8");
+  }
+  async #upsert(table, rows, key) {
+    if (rows.length === 0) return;
+    const existing = await this.#read(table);
+    const byKey = new Map(existing.map((row) => [key(row), row]));
+    for (const row of rows) byKey.set(key(row), row);
+    await this.#write(table, [...byKey.values()]);
+  }
+  upsertTenders(rows) {
+    return this.#upsert("tenders", rows, (r) => r.id);
+  }
+  upsertTenderItems(rows) {
+    return this.#upsert("tender_items", rows, (r) => `${r.tender_id}|${r.item_id}`);
+  }
+  upsertBids(rows) {
+    return this.#upsert("bids", rows, (r) => `${r.tender_id}|${r.bid_id}`);
+  }
+  upsertAwards(rows) {
+    return this.#upsert("awards", rows, (r) => `${r.tender_id}|${r.award_id}`);
+  }
+  upsertRiskFlags(rows) {
+    return this.#upsert("risk_flags", rows, (r) => `${r.tender_id}|${r.risk_id}`);
+  }
+  upsertRiskRules(rows) {
+    return this.#upsert("risk_rules", rows, (r) => r.risk_id);
+  }
+  upsertMonitorings(rows) {
+    return this.#upsert("monitorings", rows, (r) => r.monitoring_id);
+  }
+  upsertCatalogPrices(rows) {
+    return this.#upsert("catalog_prices", rows, (r) => r.offer_id);
+  }
+  upsertFindings(rows) {
+    return this.#upsert("findings", rows, (r) => `${r.tender_id}|${r.detector_key}`);
+  }
+  upsertRuns(rows) {
+    return this.#upsert("runs", rows, (r) => r.run_id);
+  }
+  allTenders() {
+    return this.#read("tenders");
+  }
+  allTenderItems() {
+    return this.#read("tender_items");
+  }
+  allBids() {
+    return this.#read("bids");
+  }
+  allAwards() {
+    return this.#read("awards");
+  }
+  allRiskFlags() {
+    return this.#read("risk_flags");
+  }
+  allRiskRules() {
+    return this.#read("risk_rules");
+  }
+  allMonitorings() {
+    return this.#read("monitorings");
+  }
+  allCatalogPrices() {
+    return this.#read("catalog_prices");
+  }
+  allFindings() {
+    return this.#read("findings");
+  }
+  allRuns() {
+    return this.#read("runs");
+  }
+  async getCursor(worker) {
+    const all = await this.#read("cursors");
+    return all[0]?.[worker] ?? null;
+  }
+  async setCursor(worker, cursor) {
+    const all = await this.#read("cursors");
+    const map = all[0] ?? {};
+    map[worker] = cursor;
+    await this.#write("cursors", [map]);
+  }
+};
+
+// src/config.ts
+var REGION = "\u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0430 \u043E\u0431\u043B\u0430\u0441\u0442\u044C";
+var SOUTHERN_RAILWAY_EDRPOU = "40081216";
+var RAILWAY_EDRPOU = /* @__PURE__ */ new Set([
+  SOUTHERN_RAILWAY_EDRPOU,
+  // РФ "Південна залізниця" — the Kharkiv branch
+  "40081347",
+  // Філія "Центр забезпечення виробництва"
+  "41022900",
+  // Філія "Пасажирська компанія"
+  "40123454",
+  // Філія "Центр з ремонту та експлуатації колійних машин"
+  "45462724",
+  // Філія "УЗ Вагон-Сервіс"
+  "45246390"
+  // Філія "Приміська пасажирська компанія"
+]);
+var RAILWAY_NAME = /залізни|укрзаліз|колійн|локомотив|вагон|тепловоз|електровоз/i;
+function railwayScope(entity) {
+  const edrpou = entity.entity_edrpou ?? "";
+  if (edrpou === SOUTHERN_RAILWAY_EDRPOU) return "southern";
+  if (RAILWAY_EDRPOU.has(edrpou)) return "branch";
+  if (entity.region === REGION && RAILWAY_NAME.test(entity.entity_name ?? "")) return "local";
+  return null;
+}
+function dataDir() {
+  if (process.env.TR_DATA_DIR) return process.env.TR_DATA_DIR;
+  const working = join2(import.meta.dirname, "..", "data");
+  return existsSync(working) ? working : join2(import.meta.dirname, "..", "web-data");
+}
+function openStore() {
+  return new JsonStore(dataDir());
+}
+
+// src/labels.ts
+var RISK_LABELS = {
+  "ari-1-1": {
+    short: "\u0414\u043E\u0433\u043E\u0432\u0456\u0440 \u043F\u0435\u0440\u0435\u043F\u0438\u0441\u0443\u0432\u0430\u043B\u0438 \u0449\u043E\u043D\u0430\u0439\u043C\u0435\u043D\u0448\u0435 \u0442\u0440\u0438\u0447\u0456",
+    means: "\u041F\u0456\u0441\u043B\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438 \u0434\u043E \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443 \u0443\u043A\u043B\u0430\u043B\u0438 \u0442\u0440\u0438 \u0447\u0438 \u0431\u0456\u043B\u044C\u0448\u0435 \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0438\u0445 \u0443\u0433\u043E\u0434. \u0421\u0430\u043C\u0435 \u0442\u0430\u043A \u043D\u0430\u0439\u0447\u0430\u0441\u0442\u0456\u0448\u0435 \u043F\u0456\u0434\u043D\u0456\u043C\u0430\u044E\u0442\u044C \u0446\u0456\u043D\u0443 \u0432\u0436\u0435 \u043F\u0456\u0441\u043B\u044F \u0442\u043E\u0433\u043E, \u044F\u043A \u0442\u043E\u0440\u0433\u0438 \u0432\u0438\u0433\u0440\u0430\u043D\u043E.",
+    group: "\u0426\u0456\u043D\u0443 \u0437\u043C\u0456\u043D\u0438\u043B\u0438 \u043F\u0456\u0441\u043B\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438"
+  },
+  "ari-1-2": {
+    short: "\u0426\u0456\u043D\u0443 \u043F\u0456\u0434\u043D\u044F\u043B\u0438 \xAB\u0437\u0430 \u043F\u043E\u043A\u0440\u0430\u0449\u0435\u043D\u043D\u044F \u044F\u043A\u043E\u0441\u0442\u0456\xBB",
+    means: "\u0414\u0432\u0456 \u0447\u0438 \u0431\u0456\u043B\u044C\u0448\u0435 \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0438\u0445 \u0443\u0433\u043E\u0434 \u0456\u0437 \u0444\u043E\u0440\u043C\u0443\u043B\u044E\u0432\u0430\u043D\u043D\u044F\u043C \u043F\u0440\u043E \u043F\u043E\u043A\u0440\u0430\u0449\u0435\u043D\u043D\u044F \u044F\u043A\u043E\u0441\u0442\u0456. \u0426\u0435 \u043F\u043E\u0448\u0438\u0440\u0435\u043D\u0438\u0439 \u0441\u043F\u043E\u0441\u0456\u0431 \u043E\u0431\u0491\u0440\u0443\u043D\u0442\u0443\u0432\u0430\u0442\u0438 \u043F\u0456\u0434\u0432\u0438\u0449\u0435\u043D\u043D\u044F \u0446\u0456\u043D\u0438.",
+    group: "\u0426\u0456\u043D\u0443 \u0437\u043C\u0456\u043D\u0438\u043B\u0438 \u043F\u0456\u0441\u043B\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438"
+  },
+  "sas24-3-4": {
+    short: "\u0426\u0456\u043D\u0443 \u043F\u0456\u0434\u043D\u044F\u043B\u0438 \u0439 \u0441\u0442\u0440\u043E\u043A \u043F\u043E\u0434\u043E\u0432\u0436\u0438\u043B\u0438",
+    means: "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0437\u043C\u0456\u043D\u0438\u0432 \u0456\u0441\u0442\u043E\u0442\u043D\u0456 \u0443\u043C\u043E\u0432\u0438 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443 \u043E\u0434\u0440\u0430\u0437\u0443 \u0443 \u0434\u0432\u043E\u0445 \u0447\u0430\u0441\u0442\u0438\u043D\u0430\u0445 \u2014 \u0446\u0456\u043D\u0430 \u0432\u0433\u043E\u0440\u0443, \u0441\u0442\u0440\u043E\u043A \u0434\u0430\u043B\u0456.",
+    group: "\u0426\u0456\u043D\u0443 \u0437\u043C\u0456\u043D\u0438\u043B\u0438 \u043F\u0456\u0441\u043B\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438"
+  },
+  "sas24-3-2": {
+    short: "\u0412\u0456\u0434\u0445\u0438\u043B\u0438\u043B\u0438 \u0434\u0432\u043E\u0445 \u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432 \u2014 \u0442\u043E\u0432\u0430\u0440\u0438 \u0439 \u043F\u043E\u0441\u043B\u0443\u0433\u0438",
+    means: "\u0423\u0441\u0456\u0445, \u043A\u0440\u0456\u043C \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F, \u0437\u043D\u044F\u043B\u0438 \u0437 \u0442\u043E\u0440\u0433\u0456\u0432. \u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u044F \u0437\u043D\u0438\u043A\u0430\u0454, \u0446\u0456\u043D\u0443 \u043D\u0435\u043C\u0430 \u0437 \u0447\u0438\u043C \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u0442\u0438.",
+    group: "\u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \u0443\u0441\u0443\u043D\u0443\u043B\u0438"
+  },
+  "sas24-3-2-1": {
+    short: "\u0412\u0456\u0434\u0445\u0438\u043B\u0438\u043B\u0438 \u0434\u0432\u043E\u0445 \u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432 \u2014 \u0440\u043E\u0431\u043E\u0442\u0438",
+    means: "\u0422\u0435 \u0441\u0430\u043C\u0435 \u043D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0440\u043E\u0431\u0456\u0442: \u0443\u0441\u0456\u0445 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u0432\u0456\u0434\u0445\u0438\u043B\u0435\u043D\u043E.",
+    group: "\u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \u0443\u0441\u0443\u043D\u0443\u043B\u0438"
+  },
+  "sas24-3-5": {
+    short: "\u0412\u0456\u0434\u0445\u0438\u043B\u0438\u043B\u0438, \u043D\u0435 \u0434\u0430\u0432\u0448\u0438 \u0432\u0438\u043F\u0440\u0430\u0432\u0438\u0442\u0438 \u043F\u043E\u043C\u0438\u043B\u043A\u0443",
+    means: "\u0417\u0430\u043A\u043E\u043D \u0434\u0430\u0454 \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0443 24 \u0433\u043E\u0434\u0438\u043D\u0438 \u043D\u0430 \u0443\u0441\u0443\u043D\u0435\u043D\u043D\u044F \u043D\u0435\u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u043D\u043E\u0441\u0442\u0435\u0439. \u0422\u0443\u0442 \u0449\u043E\u043D\u0430\u0439\u043C\u0435\u043D\u0448\u0435 \u0434\u0432\u043E\u0445 \u0432\u0456\u0434\u0445\u0438\u043B\u0438\u043B\u0438, \u043D\u0435 \u0441\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u0432\u0448\u0438\u0441\u044C \u0446\u0438\u043C \u043C\u0435\u0445\u0430\u043D\u0456\u0437\u043C\u043E\u043C.",
+    group: "\u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \u0443\u0441\u0443\u043D\u0443\u043B\u0438"
+  },
+  "sas24-3-15": {
+    short: "\u0412\u0456\u0434\u0445\u0438\u043B\u0438\u043B\u0438 \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432, \u043F\u043E\u043A\u0438 \u0442\u0440\u0438\u0432\u0430\u043B\u0430 \u0441\u043A\u0430\u0440\u0433\u0430",
+    means: "\u0414\u0432\u043E\u0445 \u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432 \u0437\u043D\u044F\u043B\u0438 \u0437 \u0442\u043E\u0440\u0433\u0456\u0432 \u0443 \u043C\u043E\u043C\u0435\u043D\u0442, \u043A\u043E\u043B\u0438 \u0441\u043A\u0430\u0440\u0433\u0430 \u0449\u0435 \u0440\u043E\u0437\u0433\u043B\u044F\u0434\u0430\u043B\u0430\u0441\u044F.",
+    group: "\u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \u0443\u0441\u0443\u043D\u0443\u043B\u0438"
+  },
+  "sas24-3-13": {
+    short: "\u0411\u0435\u0437\u043F\u0456\u0434\u0441\u0442\u0430\u0432\u043D\u043E \u0437\u0430\u0441\u0442\u043E\u0441\u0443\u0432\u0430\u043B\u0438 \u043C\u0435\u0445\u0430\u043D\u0456\u0437\u043C \xAB24 \u0433\u043E\u0434\u0438\u043D\u0438\xBB",
+    means: "\u041D\u0430 \u0441\u043F\u0440\u043E\u0449\u0435\u043D\u0456\u0439 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0441\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u043B\u0438\u0441\u044F \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u043E\u044E \u0432\u0438\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043D\u044F \u0442\u0430\u043C, \u0434\u0435 \u043F\u0456\u0434\u0441\u0442\u0430\u0432 \u0434\u043B\u044F \u043D\u0435\u0457 \u043D\u0435 \u0431\u0443\u043B\u043E.",
+    group: "\u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \u0443\u0441\u0443\u043D\u0443\u043B\u0438"
+  },
+  "sas24-3-10": {
+    short: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u043D\u0435 \u0432\u0456\u0434\u0445\u0438\u043B\u0438\u043B\u0438 \u043F\u043E\u043F\u0440\u0438 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0432\u0438\u043C\u043E\u0433",
+    means: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0435\u0446\u044C \u043D\u0435 \u0432\u0438\u043A\u043E\u043D\u0430\u0432 \u043E\u0431\u043E\u0432'\u044F\u0437\u043A\u043E\u0432\u0456 \u0432\u0438\u043C\u043E\u0433\u0438 \u0449\u043E\u0434\u043E \u043E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043D\u044F, \u0430\u043B\u0435 \u0439\u043E\u0433\u043E \u0437\u0430\u043B\u0438\u0448\u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0435\u043C.",
+    group: "\u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \u0443\u0441\u0443\u043D\u0443\u043B\u0438"
+  },
+  "sas24-3-11-1": {
+    short: "\u0414\u043E\u0433\u043E\u0432\u0456\u0440 \u0443\u043A\u043B\u0430\u043B\u0438 \u043F\u043E\u0432\u0437 \u0435\u043B\u0435\u043A\u0442\u0440\u043E\u043D\u043D\u0443 \u0441\u0438\u0441\u0442\u0435\u043C\u0443",
+    means: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u043F\u0440\u043E\u0432\u0435\u043B\u0438 \u0431\u0435\u0437 \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u043D\u043D\u044F \u0435\u043B\u0435\u043A\u0442\u0440\u043E\u043D\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u0442\u0430\u043C, \u0434\u0435 \u0432\u043E\u043D\u0430 \u043E\u0431\u043E\u0432'\u044F\u0437\u043A\u043E\u0432\u0430.",
+    group: "\u0421\u0438\u0441\u0442\u0435\u043C\u0443 \u043E\u0431\u0456\u0439\u0448\u043B\u0438"
+  },
+  "sas24-3-11-2": {
+    short: "\u0414\u043E\u0433\u043E\u0432\u0456\u0440 \u0443\u043A\u043B\u0430\u043B\u0438 \u043F\u0456\u0434 \u0447\u0430\u0441 \u043E\u0441\u043A\u0430\u0440\u0436\u0435\u043D\u043D\u044F",
+    means: "\u0414\u043E\u0433\u043E\u0432\u0456\u0440 \u043F\u0456\u0434\u043F\u0438\u0441\u0430\u043B\u0438, \u043F\u043E\u043A\u0438 \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0443 \u043E\u0441\u043A\u0430\u0440\u0436\u0443\u0432\u0430\u043B\u0438 \u2014 \u0442\u043E\u0431\u0442\u043E \u043D\u0435 \u0434\u043E\u0447\u0435\u043A\u0430\u0432\u0448\u0438\u0441\u044C \u0440\u0456\u0448\u0435\u043D\u043D\u044F.",
+    group: "\u0421\u0438\u0441\u0442\u0435\u043C\u0443 \u043E\u0431\u0456\u0439\u0448\u043B\u0438"
+  },
+  "sas24-3-1": {
+    short: "\u041D\u0435 \u0432\u0438\u043A\u043E\u043D\u0430\u043B\u0438 \u0440\u0456\u0448\u0435\u043D\u043D\u044F \u043F\u043E \u0441\u043A\u0430\u0440\u0437\u0456 \u0432\u0447\u0430\u0441\u043D\u043E",
+    means: "\u0420\u0456\u0448\u0435\u043D\u043D\u044F \u043E\u0440\u0433\u0430\u043D\u0443 \u043E\u0441\u043A\u0430\u0440\u0436\u0435\u043D\u043D\u044F \u043E\u0431\u043E\u0432'\u044F\u0437\u043A\u043E\u0432\u0435 \u0434\u043E \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F. \u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u043D\u0435 \u0432\u0438\u043A\u043E\u043D\u0430\u0432 \u0439\u043E\u0433\u043E \u0443 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0439 \u0437\u0430\u043A\u043E\u043D\u043E\u043C \u0441\u0442\u0440\u043E\u043A.",
+    group: "\u0421\u043A\u0430\u0440\u0433\u0443 \u043F\u0440\u043E\u0456\u0433\u043D\u043E\u0440\u0443\u0432\u0430\u043B\u0438"
+  },
+  "sas24-3-9": {
+    short: "\u041F\u043E\u0432\u0442\u043E\u0440\u043D\u043E \u043E\u0431\u0440\u0430\u043B\u0438 \u0442\u043E\u0433\u043E \u0441\u0430\u043C\u043E\u0433\u043E \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F",
+    means: "\u041F\u0456\u0441\u043B\u044F \u0440\u0456\u0448\u0435\u043D\u043D\u044F \u043E\u0440\u0433\u0430\u043D\u0443 \u043E\u0441\u043A\u0430\u0440\u0436\u0435\u043D\u043D\u044F \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0437\u043D\u043E\u0432\u0443 \u0432\u0438\u0437\u043D\u0430\u0432 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0435\u043C \u0442\u043E\u0433\u043E \u0441\u0430\u043C\u043E\u0433\u043E \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0430.",
+    group: "\u0421\u043A\u0430\u0440\u0433\u0443 \u043F\u0440\u043E\u0456\u0433\u043D\u043E\u0440\u0443\u0432\u0430\u043B\u0438"
+  },
+  "sas24-3-7": {
+    short: "\u0420\u043E\u0431\u043E\u0442\u0438 \xAB\u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043E\xBB \u043F\u0456\u0434\u043E\u0437\u0440\u0456\u043B\u043E \u0448\u0432\u0438\u0434\u043A\u043E",
+    means: "\u041C\u0456\u0436 \u043E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043D\u044F\u043C \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443 \u043D\u0430 \u0440\u043E\u0431\u043E\u0442\u0438 \u0456 \u0437\u0432\u0456\u0442\u043E\u043C \u043F\u0440\u043E \u0439\u043E\u0433\u043E \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F \u043C\u0438\u043D\u0443\u043B\u043E \u043C\u0435\u043D\u0448\u0435 60 \u0434\u043D\u0456\u0432.",
+    group: "\u0421\u0442\u0440\u043E\u043A\u0438 \u043D\u0435 \u0441\u0445\u043E\u0434\u044F\u0442\u044C\u0441\u044F"
+  }
+};
+var GROUP_ORDER = [
+  "\u0426\u0456\u043D\u0443 \u0437\u043C\u0456\u043D\u0438\u043B\u0438 \u043F\u0456\u0441\u043B\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438",
+  "\u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \u0443\u0441\u0443\u043D\u0443\u043B\u0438",
+  "\u0421\u0438\u0441\u0442\u0435\u043C\u0443 \u043E\u0431\u0456\u0439\u0448\u043B\u0438",
+  "\u0421\u043A\u0430\u0440\u0433\u0443 \u043F\u0440\u043E\u0456\u0433\u043D\u043E\u0440\u0443\u0432\u0430\u043B\u0438",
+  "\u0421\u0442\u0440\u043E\u043A\u0438 \u043D\u0435 \u0441\u0445\u043E\u0434\u044F\u0442\u044C\u0441\u044F"
+];
+var PROCEDURES = {
+  aboveThreshold: "\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0456 \u0442\u043E\u0440\u0433\u0438",
+  aboveThresholdUA: "\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0456 \u0442\u043E\u0440\u0433\u0438",
+  aboveThresholdEU: "\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0456 \u0442\u043E\u0440\u0433\u0438 \u0437 \u043F\u0443\u0431\u043B\u0456\u043A\u0430\u0446\u0456\u0454\u044E \u0432 \u0404\u0421",
+  belowThreshold: "\u0421\u043F\u0440\u043E\u0449\u0435\u043D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F",
+  reporting: "\u0417\u0432\u0456\u0442 \u043F\u0440\u043E \u0443\u043A\u043B\u0430\u0434\u0435\u043D\u0438\u0439 \u0434\u043E\u0433\u043E\u0432\u0456\u0440",
+  negotiation: "\u041F\u0435\u0440\u0435\u0433\u043E\u0432\u043E\u0440\u043D\u0430 \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0430",
+  "negotiation.quick": "\u041F\u0435\u0440\u0435\u0433\u043E\u0432\u043E\u0440\u043D\u0430 \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0430, \u0441\u043A\u043E\u0440\u043E\u0447\u0435\u043D\u0430",
+  competitiveDialogue: "\u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u043D\u0438\u0439 \u0434\u0456\u0430\u043B\u043E\u0433",
+  "competitiveDialogue.stage2": "\u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u043D\u0438\u0439 \u0434\u0456\u0430\u043B\u043E\u0433, \u0434\u0440\u0443\u0433\u0438\u0439 \u0435\u0442\u0430\u043F",
+  priceQuotation: "\u0417\u0430\u043F\u0438\u0442 \u043F\u0440\u043E\u043F\u043E\u0437\u0438\u0446\u0456\u0439",
+  simple: "\u0421\u043F\u0440\u043E\u0449\u0435\u043D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F",
+  esco: "\u0415\u043D\u0435\u0440\u0433\u043E\u0441\u0435\u0440\u0432\u0456\u0441",
+  closeFrameworkAgreementUA: "\u0420\u0430\u043C\u043A\u043E\u0432\u0430 \u0443\u0433\u043E\u0434\u0430"
+};
+function procedureLabel(code) {
+  if (!code) return null;
+  return PROCEDURES[code] ?? code;
+}
+function readableName(name) {
+  if (!name) return "";
+  const letters = name.replace(/[^\p{L}]/gu, "");
+  if (letters.length === 0) return name;
+  const upper = [...letters].filter((c) => c === c.toUpperCase()).length;
+  if (upper / letters.length < 0.8) return name;
+  let first = true;
+  let afterQuote = false;
+  return name.replace(new RegExp(`\\p{L}[\\p{L}'\u2019-]*|[\xAB"\u201C']`, "gu"), (token) => {
+    if (/^[«"“']$/.test(token)) {
+      afterQuote = true;
+      return token;
+    }
+    if (token.length <= 4) {
+      first = false;
+      afterQuote = false;
+      return token;
+    }
+    const lower = token[0] + token.slice(1).toLowerCase();
+    const capitalise = first || afterQuote;
+    first = false;
+    afterQuote = false;
+    return capitalise ? lower[0].toUpperCase() + lower.slice(1) : lower.toLowerCase();
+  });
+}
+
+// server/html.ts
+function esc(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function money(amount) {
+  if (amount === null || !Number.isFinite(amount)) return "\u2014";
+  return new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 0 }).format(amount) + " \u20B4";
+}
+function unitMoney(amount) {
+  if (amount === null || !Number.isFinite(amount)) return "\u2014";
+  const digits = Math.abs(amount) < 1e3 ? 2 : 0;
+  return new Intl.NumberFormat("uk-UA", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount) + " \u20B4";
+}
+function shortMoney(amount) {
+  if (amount === null || !Number.isFinite(amount)) return "\u2014";
+  if (amount >= 1e9) return (amount / 1e9).toFixed(2).replace(".", ",") + " \u043C\u043B\u0440\u0434 \u20B4";
+  if (amount >= 1e6) return (amount / 1e6).toFixed(1).replace(".", ",") + " \u043C\u043B\u043D \u20B4";
+  if (amount >= 1e3) return Math.round(amount / 1e3).toLocaleString("uk-UA") + " \u0442\u0438\u0441 \u20B4";
+  return Math.round(amount) + " \u20B4";
+}
+function date(value) {
+  if (!value) return "\u2014";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "\u2014";
+  return d.toLocaleDateString("uk-UA", { day: "2-digit", month: "long", year: "numeric" });
+}
+function plural(n, one, few, many) {
+  const mod100 = Math.abs(n) % 100;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  const mod10 = mod100 % 10;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+function trim(text, max = 130) {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut) + "\u2026";
+}
+var STYLES = `
+:root {
+  color-scheme: light;
+
+  --paper:#F6F8F9; --surface:#FFFFFF; --surface-2:#EEF3F5; --surface-3:#FAFCFC;
+  --ink:#17222B; --ink-soft:#4A5966; --ink-faint:#7C8B96;
+  --line:#DDE4E8; --line-soft:#EBF0F2;
+  --accent:#17607F; --accent-bg:#E6F0F4;
+  --alarm:#A03A2B; --alarm-bg:#FBE9E5;
+  --warn:#87621F; --warn-bg:#FAF0DC;
+  --calm:#276B4C; --calm-bg:#E4F1EA;
+  --shadow:0 1px 2px rgba(23,34,43,.04), 0 8px 24px -18px rgba(23,34,43,.26);
+  --radius:5px;
+  --f-display:"Literata",Georgia,serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-underline-offset:3px}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- chrome ---------- */
+.top{border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:10}
+.top .inner{max-width:72rem;margin:0 auto;padding:.9rem clamp(1rem,3vw,2rem);display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1.6rem}
+.brand{font-family:var(--f-display);font-weight:700;font-size:1.1rem;letter-spacing:-.01em;text-decoration:none;color:var(--ink);white-space:nowrap}
+.brand span{color:var(--accent)}
+.nav{display:flex;flex-wrap:wrap;gap:.25rem;margin-left:auto}
+.nav a{text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:.3rem .65rem;border-radius:2px}
+.nav a:hover{color:var(--accent);background:var(--surface-2)}
+.nav a[aria-current]{color:var(--accent);background:var(--accent-bg);font-weight:500}
+
+/* Slide-in drawer. CSS only \u2014 a checkbox drives it, because <details>
+   cannot animate between display:none and shown. The checkbox is hidden
+   visually rather than with display:none, which keeps it keyboard-reachable
+   and keeps the sibling selectors working. */
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+.burger{border-radius:var(--radius);flex:none;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:4px;width:2.4rem;height:2.4rem;padding:.55rem;border:1px solid var(--line);background:var(--surface)}
+.burger span{display:block;height:2px;background:var(--ink);border-radius:1px;transition:background .2s ease}
+.burger:hover{border-color:var(--accent)}
+.burger:hover span{background:var(--accent)}
+#menu-toggle:focus-visible + .top .burger{border-radius:var(--radius);outline:2px solid var(--accent);outline-offset:2px}
+
+.scrim{position:fixed;inset:0;background:rgba(10,18,24,.42);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease;z-index:40;cursor:pointer}
+#menu-toggle:checked ~ .scrim{opacity:1;visibility:visible}
+
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(20rem,86vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
+#menu-toggle:checked ~ .drawer{transform:translateX(0)}
+
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.15rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+.drawer-head strong{font-family:var(--f-display);font-size:1.02rem;font-weight:700}
+.drawer-close{cursor:pointer;font-size:1.5rem;line-height:1;color:var(--ink-faint);padding:.1rem .45rem;border:1px solid transparent}
+.drawer-close:hover{color:var(--accent);border-color:var(--line)}
+.drawer a{display:flex;flex-direction:column;gap:.05rem;padding:.8rem 1.15rem;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);font-size:.99rem}
+.drawer a:last-child{border-bottom:0}
+.drawer a:hover{background:var(--surface-2);color:var(--accent)}
+.drawer a[aria-current]{background:var(--accent-bg);color:var(--accent);font-weight:500;box-shadow:inset 3px 0 0 var(--accent)}
+.drawer small{color:var(--ink-faint);font-size:.82rem;font-weight:400}
+
+@media (prefers-reduced-motion: reduce){.drawer,.scrim{transition-duration:.01ms}}
+@media (max-width:30rem){.nav a:not([href="/"]):not([href="/railway"]){display:none}}
+
+.wrap{max-width:72rem;margin:0 auto;padding:clamp(1.5rem,4vw,2.75rem) clamp(1rem,3vw,2rem) 6rem}
+
+/* ---------- type ---------- */
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(1.7rem,4vw,2.5rem);line-height:1.14;letter-spacing:-.015em;margin:0 0 .6rem;text-wrap:balance;max-width:24ch}
+h1.long{font-size:clamp(1.35rem,3vw,1.9rem);max-width:32ch}
+h2{font-family:var(--f-display);font-weight:700;font-size:1.35rem;line-height:1.25;margin:2.75rem 0 .35rem;text-wrap:balance}
+h2:first-of-type{margin-top:2rem}
+.sub{color:var(--ink-soft);max-width:64ch;margin:0 0 1.5rem;font-size:1.02rem}
+.hint{color:var(--ink-faint);font-size:.92rem;max-width:64ch;margin:.15rem 0 1.25rem}
+.statline{display:flex;flex-wrap:wrap;gap:.3rem .55rem;align-items:baseline;font-size:.95rem;color:var(--ink-soft);margin:0 0 .5rem;max-width:none}
+.statline b{font-family:var(--f-display);font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.caution{font-size:.88rem;line-height:1.5;color:var(--alarm);background:var(--alarm-bg);border:1px solid var(--alarm);border-radius:var(--radius);padding:.5rem .75rem;margin:0 0 1.5rem;max-width:72ch}
+
+/* ---------- breadcrumb ---------- */
+.back{display:inline-block;font-size:.9rem;color:var(--ink-soft);text-decoration:none;margin-bottom:1.1rem}
+.back:hover{color:var(--accent)}
+
+
+/* ---------- filters ---------- */
+form.filters{display:flex;flex-wrap:wrap;gap:.55rem;margin-bottom:.9rem;align-items:center}
+input,select{border-radius:var(--radius);font-family:inherit;font-size:.95rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);padding:.55rem .75rem;min-width:0}
+input[type=search]{flex:1 1 20rem}
+select{max-width:24rem}
+button{border-radius:var(--radius);font-family:inherit;font-size:.95rem;font-weight:500;color:#fff;background:var(--accent);border:1px solid var(--accent);padding:.55rem 1.15rem;cursor:pointer}
+button:hover{filter:brightness(1.08)}
+.check{display:flex;align-items:center;gap:.4rem;font-size:.93rem;color:var(--ink-soft);white-space:nowrap}
+.check input{min-width:auto}
+.reset{font-size:.9rem;color:var(--ink-faint)}
+form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
+.filter-row{display:flex;flex-wrap:wrap;gap:.55rem;align-items:center}
+/* Inputs must not stretch vertically: the form itself is a column, so a
+   bare flex-grow on a child would grow it down the page. */
+.filter-row input,.filter-row select,.filter-row button{align-self:center}
+.filter-row input[type=search]{flex:1 1 22rem;max-width:38rem}
+.filter-label{font-size:.92rem;color:var(--ink-faint);white-space:nowrap}
+select:disabled{opacity:.5;cursor:not-allowed}
+
+/* grouped results */
+.group-block{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);margin-bottom:.6rem}
+.group-block summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.4rem 1rem;padding:.85rem 1.15rem}
+.group-block summary::-webkit-details-marker{display:none}
+.group-block summary::before{content:"\u25B8";color:var(--ink-faint);margin-right:.5rem;font-size:.8rem;transition:transform .15s ease;display:inline-block}
+.group-block[open] > summary::before{transform:rotate(90deg)}
+.group-block[open] > summary{border-bottom:1px solid var(--line-soft)}
+.group-block summary:hover{background:var(--surface-3)}
+.g-name{font-weight:600;font-size:1.02rem;flex:1 1 18rem;min-width:0}
+.g-meta{font-size:.9rem;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+.g-body{padding:.9rem 1.15rem 1.15rem}
+.group-block .depth-1{background:var(--surface-3);box-shadow:none}
+.group-block .rows{box-shadow:none}
+
+/* ---------- result rows ---------- */
+.rows{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.row{background:var(--surface);padding:1.15rem 1.35rem;display:grid;grid-template-columns:1fr minmax(7rem,auto);gap:.55rem 1.75rem;align-items:start}
+.row:hover{background:var(--surface-3)}
+.row .who{min-width:0}
+.row .name{font-size:1.06rem;font-weight:600;line-height:1.4;letter-spacing:-.005em}
+.row .name a{color:var(--ink);text-decoration:none}
+.row .name a:hover{color:var(--accent);text-decoration:underline}
+.row .meta{font-size:.9rem;color:var(--ink-soft);margin-top:.25rem;line-height:1.5}
+.row .meta a{color:var(--ink-soft)}
+.row .meta a:hover{color:var(--accent)}
+.row .ref{font-family:var(--f-mono);font-size:.78rem;color:var(--ink-faint)}
+.row .amount{text-align:right}
+.row .amount .big{font-family:var(--f-display);font-weight:700;font-size:1.2rem;line-height:1.2;font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:-.01em}
+.row .amount .exact{font-family:var(--f-mono);font-size:.74rem;color:var(--ink-faint);white-space:nowrap;display:block;margin-top:.15rem}
+.row .flags{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.3rem}
+@media (max-width:40rem){.row{grid-template-columns:1fr}.row .amount{text-align:left}.row .amount .exact{display:inline;margin-left:.5rem}}
+
+/* ---------- badges ---------- */
+.flag{font-size:.84rem;line-height:1.35;padding:.28rem .6rem;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-soft);text-decoration:none;border-radius:2px}
+a.flag:hover{border-color:var(--accent);color:var(--accent)}
+.flag.alarm{border-color:var(--alarm);background:var(--alarm-bg);color:var(--alarm);font-weight:500}
+.flag.warn{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
+.tier{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:.24rem .55rem;border:1px solid currentColor;white-space:nowrap;border-radius:2px}
+.tier.confirmed{color:var(--calm);background:var(--calm-bg)}
+.tier.state{color:var(--warn);background:var(--warn-bg)}
+.tier.own{color:var(--ink-faint);background:var(--surface-2)}
+.code{font-family:var(--f-mono);font-size:.74rem;color:var(--ink-faint)}
+
+/* ---------- cards ---------- */
+.card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.4rem 1.55rem;margin-bottom:1rem}
+.card h3{margin:0 0 .5rem;font-size:1.08rem;font-weight:600;line-height:1.4;letter-spacing:-.005em}
+.card p{margin:0 0 .7rem;color:var(--ink-soft);max-width:68ch}
+.card p:last-child{margin-bottom:0}
+.card p.lead{color:var(--ink);font-size:1.02rem}
+.legal{border-left:3px solid var(--accent);background:var(--accent-bg);padding:.75rem 1rem;font-size:.94rem;color:var(--ink);max-width:none}
+.faint{color:var(--ink-faint);font-size:.9rem}
+
+.group{margin:2rem 0 .75rem;display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap}
+.group h3{font-family:var(--f-display);font-weight:700;font-size:1.12rem;margin:0}
+.group .count{font-size:.88rem;color:var(--ink-faint)}
+
+dl.facts{display:grid;grid-template-columns:minmax(8rem,max-content) 1fr;gap:.55rem 1.5rem;margin:0}
+dl.facts dt{font-size:.86rem;color:var(--ink-faint);padding-top:.1rem}
+dl.facts dd{margin:0;font-size:1rem}
+dl.facts dd strong{font-weight:600}
+@media (max-width:34rem){dl.facts{grid-template-columns:1fr;gap:.05rem}dl.facts dd{margin-bottom:.7rem}}
+
+/* ---------- misc ---------- */
+.pager{display:flex;gap:.6rem;align-items:center;margin-top:1.75rem;font-size:.94rem}
+.pager a{padding:.5rem 1rem;border:1px solid var(--line);background:var(--surface);text-decoration:none}
+.pager a:hover{border-color:var(--accent)}
+.pager span{color:var(--ink-faint)}
+.empty{background:var(--surface);border:1px dashed var(--line);padding:3rem 1.5rem;text-align:center;color:var(--ink-soft)}
+.card ul{margin:.2rem 0 .9rem;padding-left:1.2rem;color:var(--ink-soft);max-width:68ch}
+.card li{margin-bottom:.4rem}
+.note{font-size:.9rem;color:var(--ink-faint);max-width:68ch;margin-top:2.5rem;padding-top:1.15rem;border-top:1px solid var(--line)}
+
+details.help{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:1.75rem}
+details.help summary{cursor:pointer;padding:.85rem 1.25rem;font-weight:500;font-size:.97rem;list-style:none;display:flex;align-items:center;gap:.5rem}
+details.help summary::-webkit-details-marker{display:none}
+details.help summary::before{content:"?";display:inline-flex;align-items:center;justify-content:center;width:1.35rem;height:1.35rem;border:1px solid var(--accent);color:var(--accent);font-size:.82rem;font-weight:600;flex:none}
+details.help[open] summary{border-bottom:1px solid var(--line-soft)}
+details.help .inner{padding:1.1rem 1.25rem 1.35rem}
+details.help p{margin:0 0 .7rem;color:var(--ink-soft);max-width:68ch}
+details.help p:last-child{margin-bottom:0}
+details.help ul{margin:.2rem 0 .9rem;padding-left:1.2rem;color:var(--ink-soft);max-width:68ch}
+details.help li{margin-bottom:.35rem}
+details.help p.lead{color:var(--ink)}
+details.help p strong{color:var(--ink)}
+details.help + details.help{margin-top:-1rem}
+`;
+var MENU = [
+  { href: "/", nav: "feed", label: "\u0423\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", hint: "\u043F\u043E\u0432\u043D\u0438\u0439 \u043F\u0435\u0440\u0435\u043B\u0456\u043A, \u0437 \u043F\u043E\u0448\u0443\u043A\u043E\u043C \u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0430\u043C\u0438" },
+  { href: "/railway", nav: "railway", label: "\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F", hint: "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438" },
+  { href: "/prices", nav: "prices", label: "\u0417\u0430\u0432\u0438\u0449\u0435\u043D\u0456 \u0446\u0456\u043D\u0438", hint: "\u0434\u0435 \u043C\u0438 \u0441\u0430\u043C\u0456 \u043F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442\u0443" },
+  { href: "/article/366", nav: "article-366", label: "\u041F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432", hint: "\u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445 \u0456 \u0437\u0432\u0456\u0442\u0430\u0445" },
+  { href: "/entities", nav: "entities", label: "\u0425\u0442\u043E \u043A\u0443\u043F\u0443\u0454", hint: "\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438-\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438" },
+  { href: "/suppliers", nav: "suppliers", label: "\u0425\u0442\u043E \u043F\u0440\u043E\u0434\u0430\u0454", hint: "\u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457-\u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456" },
+  { href: "/officers", nav: "officers", label: "\u0425\u0442\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0454", hint: "\u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456, \u0449\u043E \u0432\u0435\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456" },
+  { href: "/indicators", nav: "indicators", label: "\u0429\u043E \u043C\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E", hint: "\u0443\u0441\u0456 \u043E\u0437\u043D\u0430\u043A\u0438 \u043F\u0440\u043E\u0441\u0442\u0438\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438" },
+  { href: "/updates", nav: "updates", label: "\u0429\u043E \u043D\u043E\u0432\u043E\u0433\u043E", hint: "\u043E\u0441\u0442\u0430\u043D\u043D\u0454 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0431\u0430\u0437\u0438" },
+  { href: "/about", nav: "about", label: "\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443", hint: "\u0437\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456 \u0456 \u0447\u043E\u0433\u043E \u0432\u043E\u043D\u0430 \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C" }
+];
+function layout(opts) {
+  return `<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(opts.title)} \u2014 Tender Radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>${STYLES}</style>
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" class="sr-only" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0432\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
+<header class="top"><div class="inner">
+  <a class="brand" href="/">Tender<span>&nbsp;Radar</span></a>
+  <nav class="nav">
+    <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
+    <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</a>
+    <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443</a>
+  </nav>
+  <label class="burger" for="menu-toggle" role="button" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438" title="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438"><span></span><span></span><span></span></label>
+</div></header>
+<label class="scrim" for="menu-toggle" aria-hidden="true"></label>
+<nav class="drawer" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
+  <div class="drawer-head">
+    <strong>\u0420\u043E\u0437\u0434\u0456\u043B\u0438</strong>
+    <label class="drawer-close" for="menu-toggle" role="button" aria-label="\u0417\u0430\u043A\u0440\u0438\u0442\u0438">&times;</label>
+  </div>
+  ${MENU.map(
+    (item) => `<a href="${item.href}"${opts.nav === item.nav ? ' aria-current="page"' : ""}>${item.label}<small>${item.hint}</small></a>`
+  ).join("")}
+</nav>
+<main class="wrap">
+${opts.body}
+</main>
+</body>
+</html>`;
+}
+
+// src/legal.ts
+var ARTICLES = {
+  "366": {
+    code: "366",
+    title: "\u0421\u043B\u0443\u0436\u0431\u043E\u0432\u0435 \u043F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F",
+    summary: "\u0421\u043A\u043B\u0430\u0434\u0430\u043D\u043D\u044F \u0447\u0438 \u0432\u0438\u0434\u0430\u0447\u0430 \u0441\u043B\u0443\u0436\u0431\u043E\u0432\u043E\u044E \u043E\u0441\u043E\u0431\u043E\u044E \u0437\u0430\u0432\u0456\u0434\u043E\u043C\u043E \u043D\u0435\u043F\u0440\u0430\u0432\u0434\u0438\u0432\u0438\u0445 \u043E\u0444\u0456\u0446\u0456\u0439\u043D\u0438\u0445 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432, \u0432\u043D\u0435\u0441\u0435\u043D\u043D\u044F \u0434\u043E \u043E\u0444\u0456\u0446\u0456\u0439\u043D\u0438\u0445 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432 \u0437\u0430\u0432\u0456\u0434\u043E\u043C\u043E \u043D\u0435\u043F\u0440\u0430\u0432\u0434\u0438\u0432\u0438\u0445 \u0432\u0456\u0434\u043E\u043C\u043E\u0441\u0442\u0435\u0439 \u0430\u0431\u043E \u0456\u043D\u0448\u0435 \u043F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432.",
+    elements: [
+      "\u041E\u0441\u043E\u0431\u0430 \u0454 \u0441\u043B\u0443\u0436\u0431\u043E\u0432\u043E\u044E \u2014 \u043C\u0430\u0454 \u043E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0439\u043D\u043E-\u0440\u043E\u0437\u043F\u043E\u0440\u044F\u0434\u0447\u0456 \u0430\u0431\u043E \u0430\u0434\u043C\u0456\u043D\u0456\u0441\u0442\u0440\u0430\u0442\u0438\u0432\u043D\u043E-\u0433\u043E\u0441\u043F\u043E\u0434\u0430\u0440\u0441\u044C\u043A\u0456 \u043F\u043E\u0432\u043D\u043E\u0432\u0430\u0436\u0435\u043D\u043D\u044F.",
+      "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442 \u0454 \u043E\u0444\u0456\u0446\u0456\u0439\u043D\u0438\u043C \u2014 \u0434\u043E\u0433\u043E\u0432\u0456\u0440 \u043F\u0440\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E, \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0430 \u0443\u0433\u043E\u0434\u0430, \u0437\u0432\u0456\u0442 \u043F\u0440\u043E \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F, \u043F\u0440\u043E\u0442\u043E\u043A\u043E\u043B \u0443\u043F\u043E\u0432\u043D\u043E\u0432\u0430\u0436\u0435\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438.",
+      "\u0412\u0456\u0434\u043E\u043C\u043E\u0441\u0442\u0456 \u0437\u0430\u0432\u0456\u0434\u043E\u043C\u043E \u043D\u0435\u043F\u0440\u0430\u0432\u0434\u0438\u0432\u0456 \u2014 \u043E\u0441\u043E\u0431\u0430 \u0437\u043D\u0430\u043B\u0430 \u043F\u0440\u043E \u0457\u0445 \u043D\u0435\u043F\u0440\u0430\u0432\u0434\u0438\u0432\u0456\u0441\u0442\u044C \u0443 \u043C\u043E\u043C\u0435\u043D\u0442 \u0432\u043D\u0435\u0441\u0435\u043D\u043D\u044F.",
+      "\u041D\u0430\u044F\u0432\u043D\u0438\u0439 \u0443\u043C\u0438\u0441\u0435\u043B. \u041F\u043E\u043C\u0438\u043B\u043A\u0430, \u043D\u0435\u0434\u0431\u0430\u043B\u0456\u0441\u0442\u044C \u0447\u0438 \u0445\u0438\u0431\u043D\u0435 \u0442\u043B\u0443\u043C\u0430\u0447\u0435\u043D\u043D\u044F \u0437\u0430\u043A\u043E\u043D\u0443 \u0441\u043A\u043B\u0430\u0434\u0443 \u0446\u0456\u0454\u0457 \u0441\u0442\u0430\u0442\u0442\u0456 \u043D\u0435 \u0443\u0442\u0432\u043E\u0440\u044E\u044E\u0442\u044C."
+    ],
+    caution: "\u0416\u043E\u0434\u0435\u043D \u0456\u0437 \u043D\u0430\u0432\u0435\u0434\u0435\u043D\u0438\u0445 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u043D\u0435 \u0434\u043E\u0432\u043E\u0434\u0438\u0442\u044C \u043F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F. \u0412\u043E\u043D\u0438 \u043F\u043E\u043A\u0430\u0437\u0443\u044E\u0442\u044C \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u043B\u044C\u043D\u0456 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u2014 \u0442\u043E\u0431\u0442\u043E \u043C\u0456\u0441\u0446\u0435, \u0434\u0435 \u0432\u0430\u0440\u0442\u043E \u043F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F \u043D\u0430 \u0441\u0430\u043C\u0456 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438. \u0423\u043C\u0438\u0441\u0435\u043B \u0456 \u0437\u0430\u0432\u0456\u0434\u043E\u043C\u0456\u0441\u0442\u044C \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u0432\u0438\u043A\u043B\u044E\u0447\u043D\u043E \u0441\u0443\u0434.",
+    links: [
+      {
+        risk_id: "ari-1-1",
+        why: "\u041A\u043E\u0436\u043D\u0430 \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0430 \u0443\u0433\u043E\u0434\u0430 \u2014 \u043E\u0444\u0456\u0446\u0456\u0439\u043D\u0438\u0439 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442 \u0456\u0437 \u0437\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u043E\u044E \u043F\u0456\u0434\u0441\u0442\u0430\u0432\u043E\u044E. \u0422\u0440\u0438 \u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u0443\u0433\u043E\u0434 \u0434\u043E \u043E\u0434\u043D\u043E\u0433\u043E \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443 \u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0442\u0440\u0438 \u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u043F\u0456\u0434\u0441\u0442\u0430\u0432, \u044F\u043A\u0456 \u043C\u043E\u0436\u043D\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u043D\u0456\u0441\u0442\u044C \u0434\u0456\u0439\u0441\u043D\u043E\u0441\u0442\u0456."
+      },
+      {
+        risk_id: "ari-1-2",
+        why: "\u041F\u0456\u0434\u0441\u0442\u0430\u0432\u0430 \xAB\u043F\u043E\u043A\u0440\u0430\u0449\u0435\u043D\u043D\u044F \u044F\u043A\u043E\u0441\u0442\u0456 \u043F\u0440\u0435\u0434\u043C\u0435\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456\xBB \u0444\u0456\u043A\u0441\u0443\u0454\u0442\u044C\u0441\u044F \u0432 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456. \u042F\u043A\u0449\u043E \u0444\u0430\u043A\u0442\u0438\u0447\u043D\u043E \u043F\u0440\u0435\u0434\u043C\u0435\u0442 \u043D\u0435 \u0437\u043C\u0456\u043D\u044E\u0432\u0430\u0432\u0441\u044F, \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u0456\u0441\u0442\u044C \u043C\u0456\u0436 \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u0438\u043C \u0456 \u0434\u0456\u0439\u0441\u043D\u0438\u043C \u0441\u0442\u0430\u0454 \u043F\u0440\u0435\u0434\u043C\u0435\u0442\u043E\u043C \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438."
+      },
+      {
+        risk_id: "sas24-3-4",
+        why: "\u0417\u043C\u0456\u043D\u0430 \u0456\u0441\u0442\u043E\u0442\u043D\u0438\u0445 \u0443\u043C\u043E\u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443 \u043E\u0444\u043E\u0440\u043C\u043B\u044E\u0454\u0442\u044C\u0441\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u043B\u044C\u043D\u043E \u0439 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043E\u0431\u0491\u0440\u0443\u043D\u0442\u0443\u0432\u0430\u043D\u043D\u044F. \u041E\u0434\u043D\u043E\u0447\u0430\u0441\u043D\u0435 \u043F\u0456\u0434\u0432\u0438\u0449\u0435\u043D\u043D\u044F \u0446\u0456\u043D\u0438 \u0442\u0430 \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0435\u043D\u043D\u044F \u0441\u0442\u0440\u043E\u043A\u0443 \u2014 \u0442\u0438\u043F\u043E\u0432\u0435 \u043C\u0456\u0441\u0446\u0435 \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u043E\u0431\u0491\u0440\u0443\u043D\u0442\u0443\u0432\u0430\u043D\u044C."
+      },
+      {
+        risk_id: "sas24-3-7",
+        why: "\u0417\u0432\u0456\u0442 \u043F\u0440\u043E \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443 \u2014 \u043E\u0444\u0456\u0446\u0456\u0439\u043D\u0438\u0439 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442. \u042F\u043A\u0449\u043E \u043C\u0456\u0436 \u043E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043D\u044F\u043C \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443 \u043D\u0430 \u0440\u043E\u0431\u043E\u0442\u0438 \u0456 \u0437\u0432\u0456\u0442\u043E\u043C \u043F\u0440\u043E \u0457\u0445 \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F \u043C\u0438\u043D\u0443\u043B\u043E \u043C\u0435\u043D\u0448\u0435 60 \u0434\u043D\u0456\u0432, \u0432\u0430\u0440\u0442\u043E \u0437\u0432\u0456\u0440\u0438\u0442\u0438 \u043E\u0431\u0441\u044F\u0433 \u0440\u043E\u0431\u0456\u0442 \u0456\u0437 \u0437\u0430\u044F\u0432\u043B\u0435\u043D\u0438\u043C \u0441\u0442\u0440\u043E\u043A\u043E\u043C."
+      },
+      {
+        risk_id: "sas24-3-10",
+        why: "\u041D\u0435\u0432\u0456\u0434\u0445\u0438\u043B\u0435\u043D\u043D\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F, \u044F\u043A\u0438\u0439 \u043D\u0435 \u0432\u0438\u043A\u043E\u043D\u0430\u0432 \u0432\u0438\u043C\u043E\u0433\u0438 \u0449\u043E\u0434\u043E \u043E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432, \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0440\u0456\u0448\u0435\u043D\u043D\u044F \u0443\u043F\u043E\u0432\u043D\u043E\u0432\u0430\u0436\u0435\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438 \u0440\u043E\u0437\u0445\u043E\u0434\u0438\u0442\u044C\u0441\u044F \u0437 \u043D\u0430\u044F\u0432\u043D\u0438\u043C\u0438 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u043C\u0438."
+      }
+    ]
+  }
+};
+var JOINT_STOCK = /(^|[\s"«(“'])(АТ|ПАТ|ПрАТ|ВАТ|ЗАТ)([\s"«.,“']|$)|акціонерн/i;
+function isJointStock(name) {
+  return name !== null && JOINT_STOCK.test(name);
+}
+
+// src/normalize/tender.ts
+function officerKey(row) {
+  if (row.officer_email) return row.officer_email.trim().toLowerCase();
+  if (row.officer_name && row.entity_edrpou) return `${row.officer_name.trim().toLowerCase()}@@${row.entity_edrpou}`;
+  return null;
+}
+
+// server/data.ts
+function activeAward(awards) {
+  return awards.find((a) => a.status === "active") ?? awards[0];
+}
+async function loadDataset() {
+  const store = openStore();
+  const flags = await store.allRiskFlags();
+  const rules = await store.allRiskRules();
+  const tenders = await store.allTenders();
+  const awards = await store.allAwards();
+  const bids = await store.allBids();
+  const runs = await store.allRuns();
+  const findings = await store.allFindings();
+  const findingsByTender = /* @__PURE__ */ new Map();
+  for (const finding of findings) {
+    const list = findingsByTender.get(finding.tender_id) ?? [];
+    list.push(finding);
+    findingsByTender.set(finding.tender_id, list);
+  }
+  const tenderById = new Map(tenders.map((t) => [t.id, t]));
+  const awardsByTender = /* @__PURE__ */ new Map();
+  for (const award of awards) {
+    const list = awardsByTender.get(award.tender_id) ?? [];
+    list.push(award);
+    awardsByTender.set(award.tender_id, list);
+  }
+  const bidCount = /* @__PURE__ */ new Map();
+  for (const bid of bids) bidCount.set(bid.tender_id, (bidCount.get(bid.tender_id) ?? 0) + 1);
+  const byTender = /* @__PURE__ */ new Map();
+  for (const flag of flags) {
+    let entry = byTender.get(flag.tender_id);
+    if (!entry) {
+      const detail = tenderById.get(flag.tender_id);
+      const won = activeAward(awardsByTender.get(flag.tender_id) ?? []);
+      entry = {
+        tender_id: flag.tender_id,
+        tender_ref: flag.tender_ref || detail?.tender_id || "",
+        title: detail?.title ?? null,
+        status: detail?.status ?? null,
+        method: detail?.method ?? null,
+        entity_edrpou: flag.entity_edrpou ?? detail?.entity_edrpou ?? null,
+        entity_name: flag.entity_name ?? detail?.entity_name ?? null,
+        region: flag.region ?? detail?.region ?? null,
+        value_amount: flag.value_amount ?? detail?.value_amount ?? null,
+        date_assessed: flag.date_assessed,
+        risks: [],
+        officer_name: detail?.officer_name ?? null,
+        officer_email: detail?.officer_email ?? null,
+        officer_phone: detail?.officer_phone ?? null,
+        officer_key: detail ? officerKey(detail) : null,
+        winner_name: won?.supplier_name ?? null,
+        winner_edrpou: won?.supplier_edrpou ?? null,
+        winner_amount: won?.amount ?? null,
+        bidders: bidCount.get(flag.tender_id) ?? 0,
+        detailed: Boolean(detail),
+        findings: findingsByTender.get(flag.tender_id) ?? []
+      };
+      byTender.set(flag.tender_id, entry);
+    }
+    if (!entry.tender_ref && flag.tender_ref) entry.tender_ref = flag.tender_ref;
+    if (entry.value_amount === null) entry.value_amount = flag.value_amount;
+    if (!entry.risks.includes(flag.risk_id)) entry.risks.push(flag.risk_id);
+  }
+  const cases = [...byTender.values()];
+  return {
+    cases,
+    byTender,
+    rules,
+    ruleById: new Map(rules.map((r) => [r.risk_id, r])),
+    runs,
+    findingCount: findings.length,
+    flagCount: flags.length,
+    totalValue: cases.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0)
+  };
+}
+
+// server/grouping.ts
+var DIMENSIONS = [
+  { value: "", label: "\u0411\u0435\u0437 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F" },
+  { value: "entity", label: "\u0417\u0430 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u043E\u043C" },
+  { value: "officer", label: "\u0417\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0438\u043C" },
+  { value: "supplier", label: "\u0417\u0430 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0435\u043C" },
+  { value: "risk", label: "\u0417\u0430 \u043E\u0437\u043D\u0430\u043A\u043E\u044E" },
+  { value: "year", label: "\u0417\u0430 \u0440\u043E\u043A\u043E\u043C" },
+  { value: "method", label: "\u0417\u0430 \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u043E\u044E" },
+  { value: "severity", label: "\u0417\u0430 \u0433\u043E\u0441\u0442\u0440\u043E\u0442\u043E\u044E" }
+];
+function isDimension(value) {
+  return DIMENSIONS.some((d) => d.value === value);
+}
+var SEVERITY_ORDER = { \u0413\u043E\u0441\u0442\u0440\u0456: 0, \u041F\u043E\u043C\u0456\u0442\u043D\u0456: 1, \u0417\u0432\u0438\u0447\u0430\u0439\u043D\u0456: 2 };
+function bucketsOf(entry, dimension, riskLabel) {
+  switch (dimension) {
+    case "entity":
+      return [
+        {
+          key: entry.entity_edrpou ?? "\u2014",
+          label: entry.entity_name ?? "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u0438\u0439",
+          href: entry.entity_edrpou ? `/entity/${encodeURIComponent(entry.entity_edrpou)}` : null
+        }
+      ];
+    case "officer":
+      return entry.officer_key ? [{ key: entry.officer_key, label: entry.officer_name ?? entry.officer_key, href: `/officer/${encodeURIComponent(entry.officer_key)}` }] : [{ key: "\u2014", label: "\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u043E", href: null }];
+    case "supplier":
+      return entry.winner_edrpou ? [{ key: entry.winner_edrpou, label: entry.winner_name ?? entry.winner_edrpou, href: `/supplier/${encodeURIComponent(entry.winner_edrpou)}` }] : [{ key: "\u2014", label: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043E", href: null }];
+    case "risk":
+      return entry.risks.map((id) => ({ key: id, label: riskLabel(id), href: `/?risk=${encodeURIComponent(id)}` }));
+    case "year": {
+      const year = (entry.date_assessed ?? entry.tender_ref.slice(3, 7) ?? "").slice(0, 4);
+      return [{ key: year || "\u2014", label: year ? `${year} \u0440\u0456\u043A` : "\u0420\u0456\u043A \u043D\u0435\u0432\u0456\u0434\u043E\u043C\u0438\u0439", href: null }];
+    }
+    case "method":
+      return [{ key: entry.method ?? "\u2014", label: entry.method ?? "\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0443 \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u043E", href: null }];
+    case "severity": {
+      const label = entry.findings.some((f) => f.severity === "high") || entry.risks.length >= 3 ? "\u0413\u043E\u0441\u0442\u0440\u0456" : entry.findings.length > 0 || entry.bidders === 1 ? "\u041F\u043E\u043C\u0456\u0442\u043D\u0456" : "\u0417\u0432\u0438\u0447\u0430\u0439\u043D\u0456";
+      return [{ key: label, label, href: null }];
+    }
+    default:
+      return [];
+  }
+}
+function sum(cases) {
+  return cases.reduce((total, c) => total + (c.value_amount ?? 0), 0);
+}
+function sortGroups(groups, dimension) {
+  if (dimension === "year") return groups.sort((a, b) => b.bucket.key.localeCompare(a.bucket.key));
+  if (dimension === "severity") {
+    return groups.sort((a, b) => (SEVERITY_ORDER[a.bucket.key] ?? 9) - (SEVERITY_ORDER[b.bucket.key] ?? 9));
+  }
+  return groups.sort((a, b) => b.value - a.value || b.cases.length - a.cases.length);
+}
+function buildGroups(cases, first, second, riskLabel) {
+  if (!first) return [];
+  const byKey = /* @__PURE__ */ new Map();
+  for (const entry of cases) {
+    for (const bucket of bucketsOf(entry, first, riskLabel)) {
+      const group = byKey.get(bucket.key) ?? { bucket, cases: [] };
+      group.cases.push(entry);
+      byKey.set(bucket.key, group);
+    }
+  }
+  const groups = [...byKey.values()].map(({ bucket, cases: inner }) => ({
+    bucket,
+    cases: inner,
+    value: sum(inner),
+    children: second && second !== first ? buildGroups(inner, second, "", riskLabel) : []
+  }));
+  return sortGroups(groups, first);
+}
+
+// server/app.ts
+var PAGE_SIZE = 30;
+var db = await loadDataset();
+console.log(
+  `loaded ${db.flagCount} flags across ${db.cases.length} tenders (${db.cases.filter((c) => c.detailed).length} with full cards)`
+);
+function shortRisk(riskId) {
+  return RISK_LABELS[riskId]?.short ?? db.ruleById.get(riskId)?.name ?? riskId;
+}
+function riskFlag(riskId) {
+  return `<a class="flag" href="/?risk=${encodeURIComponent(riskId)}">${esc(shortRisk(riskId))}</a>`;
+}
+function alarms(entry) {
+  const out = [];
+  for (const finding of entry.findings) out.push(finding.title);
+  if (entry.detailed && entry.bidders === 1) out.push("\u0404\u0434\u0438\u043D\u0438\u0439 \u0443\u0447\u0430\u0441\u043D\u0438\u043A");
+  if ((entry.value_amount ?? 0) >= 1e9) out.push("\u041F\u043E\u043D\u0430\u0434 \u043C\u0456\u043B\u044C\u044F\u0440\u0434");
+  if (entry.risks.length >= 3) out.push(`${entry.risks.length} \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438 \u043E\u0434\u0440\u0430\u0437\u0443`);
+  return out;
+}
+function caseRow(entry, opts = {}) {
+  const showOfficer = opts.showOfficer ?? true;
+  const showEntity = opts.showEntity ?? true;
+  const title = entry.title ? trim(entry.title) : readableName(entry.entity_name) || "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F";
+  const meta = [];
+  if (showEntity && entry.entity_name) {
+    meta.push(
+      `<a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">${esc(readableName(entry.entity_name))}</a>`
+    );
+  }
+  if (showOfficer && entry.officer_name) {
+    meta.push(`\u0432\u0456\u0432(\u043B\u0430) <a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a>`);
+  }
+  if (entry.winner_name) {
+    meta.push(
+      `\u0432\u0438\u0433\u0440\u0430\u0432 <a href="/supplier/${encodeURIComponent(entry.winner_edrpou ?? "")}">${esc(readableName(entry.winner_name))}</a>`
+    );
+  }
+  return `<div class="row">
+  <div class="who">
+    <div class="name"><a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
+    ${meta.length ? `<div class="meta">${meta.join(" \xB7 ")}</div>` : ""}
+    <div class="meta"><span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span> \xB7 \u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E ${date(entry.date_assessed)}</div>
+  </div>
+  <div class="amount">
+    <span class="big">${shortMoney(entry.value_amount)}</span>
+    <span class="exact">${money(entry.value_amount)}</span>
+  </div>
+  <div class="flags">
+    ${alarms(entry).map((a) => `<span class="flag alarm">${esc(a)}</span>`).join("")}
+    ${entry.risks.map(riskFlag).join("")}
+  </div>
+</div>`;
+}
+function rankRisks(list) {
+  const counts = /* @__PURE__ */ new Map();
+  for (const entry of list) for (const r of entry.risks) counts.set(r, (counts.get(r) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+}
+function riskCard(riskId, count) {
+  const rule = db.ruleById.get(riskId);
+  const label = RISK_LABELS[riskId];
+  return `<div class="card">
+  <h3><span class="tier state">\u041F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430</span> &nbsp;${esc(label?.short ?? rule?.name ?? riskId)}${count ? ` <span class="faint">\u2014 ${count} ${plural(count, "\u0440\u0430\u0437", "\u0440\u0430\u0437\u0438", "\u0440\u0430\u0437\u0456\u0432")}</span>` : ""}</h3>
+  ${label ? `<p class="lead">${esc(label.means)}</p>` : ""}
+  ${rule?.name && label ? `<p class="faint"><strong>\u041E\u0444\u0456\u0446\u0456\u0439\u043D\u0435 \u0444\u043E\u0440\u043C\u0443\u043B\u044E\u0432\u0430\u043D\u043D\u044F:</strong> ${esc(rule.name)}</p>` : ""}
+  ${rule?.legitimateness ? `<p class="legal"><strong>\u041D\u043E\u0440\u043C\u0430 \u0437\u0430\u043A\u043E\u043D\u0443:</strong> ${esc(rule.legitimateness)}</p>` : ""}
+  <p class="code">\u0406\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 ${esc(riskId)} \xB7 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C</p>
+</div>`;
+}
+function groupedRiskCards(ranked) {
+  const byGroup = /* @__PURE__ */ new Map();
+  const ungrouped = [];
+  for (const pair of ranked) {
+    const group = RISK_LABELS[pair[0]]?.group;
+    if (!group) {
+      ungrouped.push(pair);
+      continue;
+    }
+    const list = byGroup.get(group) ?? [];
+    list.push(pair);
+    byGroup.set(group, list);
+  }
+  const parts = [];
+  for (const group of GROUP_ORDER) {
+    const list = byGroup.get(group);
+    if (!list) continue;
+    const total = list.reduce((sum2, [, n]) => sum2 + n, 0);
+    parts.push(
+      `<div class="group"><h3>${esc(group)}</h3><span class="count">${total} ${plural(total, "\u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u043D\u044F", "\u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u043D\u044F", "\u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u044C")}</span></div>`,
+      ...list.map(([riskId, count]) => riskCard(riskId, count))
+    );
+  }
+  parts.push(...ungrouped.map(([riskId, count]) => riskCard(riskId, count)));
+  return parts.join("");
+}
+var HELP = `<details class="help">
+  <summary>\u042F\u043A \u0447\u0438\u0442\u0430\u0442\u0438 \u0446\u044E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443</summary>
+  <div class="inner">
+    <p>\u041A\u043E\u0436\u0435\u043D \u0440\u044F\u0434\u043E\u043A \u2014 \u0446\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F, \u0443 \u044F\u043A\u0456\u0439 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443. \u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u0441\u0430\u043C\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0442\u0430\u043A\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456; \u043C\u0438 \u043B\u0438\u0448\u0435 \u0437\u0431\u0438\u0440\u0430\u0454\u043C\u043E \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u043F\u043E ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u044F\u0445 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0439 \u043F\u043E\u043A\u0430\u0437\u0443\u0454\u043C\u043E \u0457\u0445 \u0437\u0440\u043E\u0437\u0443\u043C\u0456\u043B\u043E.</p>
+    <p>\u0427\u0435\u0440\u0432\u043E\u043D\u0456 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u2014 \u0442\u0435, \u043D\u0430 \u0449\u043E \u0432\u0430\u0440\u0442\u043E \u0433\u043B\u044F\u043D\u0443\u0442\u0438 \u043F\u0435\u0440\u0448\u0438\u043C: \u0454\u0434\u0438\u043D\u0438\u0439 \u0443\u0447\u0430\u0441\u043D\u0438\u043A \u043D\u0430 \u0432\u0435\u043B\u0438\u043A\u0438\u0445 \u0442\u043E\u0440\u0433\u0430\u0445, \u0441\u0443\u043C\u0430 \u043F\u043E\u043D\u0430\u0434 \u043C\u0456\u043B\u044C\u044F\u0440\u0434, \u043A\u0456\u043B\u044C\u043A\u0430 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u043E\u0434\u0440\u0430\u0437\u0443.</p>
+    <p>\u0421\u0456\u0440\u0456 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u2014 \u0449\u043E \u0441\u0430\u043C\u0435 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430. \u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u043D\u0430 \u0431\u0443\u0434\u044C-\u044F\u043A\u0443, \u0449\u043E\u0431 \u043F\u043E\u0431\u0430\u0447\u0438\u0442\u0438 \u0432\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u0442\u0456\u0454\u044E \u0441\u0430\u043C\u043E\u044E \u043E\u0437\u043D\u0430\u043A\u043E\u044E.</p>
+    <p><strong>\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043D\u0435 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</strong> \u0426\u0435 \u043F\u0456\u0434\u0441\u0442\u0430\u0432\u0430 \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u0439 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0457\u0457 \u043B\u044E\u0434\u0438\u043D\u043E\u044E.</p>
+  </div>
+</details>`;
+function groupBlock(group, depth) {
+  const inner = group.children.length > 0 ? group.children.map((child) => groupBlock(child, depth + 1)).join("") : `<div class="rows">${group.cases.slice(0, 20).map((c) => caseRow(c)).join("")}</div>${group.cases.length > 20 ? `<p class="hint" style="margin:.6rem 0 0">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 20 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${group.cases.length}.</p>` : ""}`;
+  return `<details class="group-block depth-${depth}"${depth === 0 && group.cases.length <= 40 ? " open" : ""}>
+  <summary>
+    <span class="g-name">${esc(readableName(group.bucket.label))}</span>
+    <span class="g-meta">${group.cases.length} ${plural(group.cases.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \xB7 ${shortMoney(group.value)}</span>
+  </summary>
+  <div class="g-body">
+    ${group.bucket.href ? `<p class="hint" style="margin:0 0 .6rem"><a href="${esc(group.bucket.href)}">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u043F\u043E\u0432\u043D\u0435 \u0434\u043E\u0441\u044C\u0454 \u2192</a></p>` : ""}
+    ${inner}
+  </div>
+</details>`;
+}
+function feedPage(url) {
+  const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+  const risk = url.searchParams.get("risk") ?? "";
+  const sort = url.searchParams.get("sort") ?? "value";
+  const railOnly = url.searchParams.get("rail") === "1";
+  const soloOnly = url.searchParams.get("solo") === "1";
+  const priceOnly = url.searchParams.get("price") === "1";
+  const year = url.searchParams.get("year") ?? "";
+  const min = Number(url.searchParams.get("min") ?? "") || 0;
+  const rawGroup = url.searchParams.get("group") ?? "";
+  const rawThen = url.searchParams.get("then") ?? "";
+  const group = isDimension(rawGroup) ? rawGroup : "";
+  const then = isDimension(rawThen) ? rawThen : "";
+  const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
+  const years = [...new Set(db.cases.map((c) => (c.date_assessed ?? "").slice(0, 4)).filter(Boolean))].sort().reverse();
+  let list = db.cases;
+  if (q) {
+    list = list.filter(
+      (c) => (c.entity_name ?? "").toLowerCase().includes(q) || (c.title ?? "").toLowerCase().includes(q) || (c.officer_name ?? "").toLowerCase().includes(q) || (c.winner_name ?? "").toLowerCase().includes(q) || (c.entity_edrpou ?? "").includes(q) || (c.winner_edrpou ?? "").includes(q) || c.tender_ref.toLowerCase().includes(q)
+    );
+  }
+  if (risk) list = list.filter((c) => c.risks.includes(risk));
+  if (railOnly) list = list.filter((c) => RAILWAY_EDRPOU.has(c.entity_edrpou ?? ""));
+  if (soloOnly) list = list.filter((c) => c.bidders === 1);
+  if (priceOnly) list = list.filter((c) => c.findings.length > 0);
+  if (year) list = list.filter((c) => (c.date_assessed ?? "").slice(0, 4) === year);
+  if (min > 0) list = list.filter((c) => (c.value_amount ?? 0) >= min);
+  list = [...list].sort(
+    (a, b) => sort === "date" ? String(b.date_assessed ?? "").localeCompare(String(a.date_assessed ?? "")) : sort === "date-asc" ? String(a.date_assessed ?? "").localeCompare(String(b.date_assessed ?? "")) : sort === "value-asc" ? (a.value_amount ?? 0) - (b.value_amount ?? 0) : sort === "risks" ? b.risks.length - a.risks.length || (b.value_amount ?? 0) - (a.value_amount ?? 0) : (b.value_amount ?? 0) - (a.value_amount ?? 0)
+  );
+  const shownValue = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+  const groups = group ? buildGroups(list, group, then, shortRisk) : [];
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const slice = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const keep = (over) => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (risk) p.set("risk", risk);
+    if (sort !== "value") p.set("sort", sort);
+    if (railOnly) p.set("rail", "1");
+    if (soloOnly) p.set("solo", "1");
+    if (priceOnly) p.set("price", "1");
+    if (year) p.set("year", year);
+    if (min > 0) p.set("min", String(min));
+    if (group) p.set("group", group);
+    if (then) p.set("then", then);
+    for (const [k, v] of Object.entries(over)) p.set(k, v);
+    return `/?${p.toString()}`;
+  };
+  const filtered = Boolean(q || risk || railOnly || soloOnly || priceOnly || year || min > 0);
+  const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
+  return layout({
+    title: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
+    nav: "feed",
+    body: `
+<h1>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u044F\u043A\u0456 \u0432\u0430\u0440\u0442\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438</h1>
+<p class="sub">\u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0430 \u043E\u0431\u043B\u0430\u0441\u0442\u044C \u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F. \u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u0441\u0430\u043C\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u043F\u0456\u0434\u043E\u0437\u0440\u0456\u043B\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u2014 \u043C\u0438 \u0437\u0431\u0438\u0440\u0430\u0454\u043C\u043E \u0446\u0456 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u0432 \u043E\u0434\u043D\u043E\u043C\u0443 \u043C\u0456\u0441\u0446\u0456, \u043F\u043E\u044F\u0441\u043D\u044E\u0454\u043C\u043E \u0457\u0445 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u043E\u044E \u043C\u043E\u0432\u043E\u044E \u0456 \u0434\u043E\u0434\u0430\u0454\u043C\u043E \u0432\u043B\u0430\u0441\u043D\u0438\u0439 \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0446\u0456\u043D.</p>
+
+<p class="statline">
+  <b>${db.cases.length.toLocaleString("uk-UA")}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043F\u0456\u0434 \u043F\u0438\u0442\u0430\u043D\u043D\u044F\u043C \xB7
+  <b>${shortMoney(db.totalValue)}</b> \u0437\u0430\u0433\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430 \xB7
+  <b>${db.flagCount.toLocaleString("uk-UA")}</b> \u0432\u0438\u044F\u0432\u043B\u0435\u043D\u0438\u0445 \u043E\u0437\u043D\u0430\u043A \xB7
+  <b>${db.findingCount.toLocaleString("uk-UA")}</b> \u0434\u0435 \u043C\u0438 \u0437\u043D\u0430\u0439\u0448\u043B\u0438 \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442\u0443
+</p>
+
+${HELP}
+
+<form class="filters" method="get" action="/">
+  <div class="filter-row">
+    <input type="search" name="q" value="${esc(q)}" placeholder="\u041D\u0430\u0437\u0432\u0430, \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A, \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0435\u0446\u044C, \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0435\u0446\u044C, \u0404\u0414\u0420\u041F\u041E\u0423 \u0430\u0431\u043E \u043D\u043E\u043C\u0435\u0440 \u0442\u0435\u043D\u0434\u0435\u0440\u0430" aria-label="\u041F\u043E\u0448\u0443\u043A">
+  </div>
+
+  <div class="filter-row">
+    <select name="risk" aria-label="\u041E\u0437\u043D\u0430\u043A\u0430">
+      <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0430 \u043E\u0437\u043D\u0430\u043A\u0430</option>
+      ${db.rules.map(
+      (r) => `<option value="${esc(r.risk_id)}"${r.risk_id === risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`
+    ).join("")}
+    </select>
+    <select name="year" aria-label="\u0420\u0456\u043A">
+      <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0438\u0439 \u0440\u0456\u043A</option>
+      ${years.map((y) => `<option value="${esc(y)}"${y === year ? " selected" : ""}>${esc(y)} \u0440\u0456\u043A</option>`).join("")}
+    </select>
+    <select name="min" aria-label="\u0421\u0443\u043C\u0430">
+      <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0430 \u0441\u0443\u043C\u0430</option>
+      <option value="1000000"${min === 1e6 ? " selected" : ""}>\u0432\u0456\u0434 1 \u043C\u043B\u043D \u20B4</option>
+      <option value="10000000"${min === 1e7 ? " selected" : ""}>\u0432\u0456\u0434 10 \u043C\u043B\u043D \u20B4</option>
+      <option value="100000000"${min === 1e8 ? " selected" : ""}>\u0432\u0456\u0434 100 \u043C\u043B\u043D \u20B4</option>
+      <option value="1000000000"${min === 1e9 ? " selected" : ""}>\u0432\u0456\u0434 1 \u043C\u043B\u0440\u0434 \u20B4</option>
+    </select>
+    <select name="sort" aria-label="\u0421\u043E\u0440\u0442\u0443\u0432\u0430\u043D\u043D\u044F">
+      <option value="value"${sort === "value" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0456</option>
+      <option value="value-asc"${sort === "value-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0434\u0435\u0448\u0435\u0432\u0448\u0456</option>
+      <option value="date"${sort === "date" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u043D\u043E\u0432\u0456\u0448\u0456</option>
+      <option value="date-asc"${sort === "date-asc" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043D\u0430\u0439\u0441\u0442\u0430\u0440\u0456\u0448\u0456</option>
+      <option value="risks"${sort === "risks" ? " selected" : ""}>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0437 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u043E\u044E \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044E \u043E\u0437\u043D\u0430\u043A</option>
+    </select>
+  </div>
+
+  <div class="filter-row">
+    <span class="filter-label">\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u0442\u0438</span>
+    <select name="group" aria-label="\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F">${dimensionOptions(group)}</select>
+    <span class="filter-label">\u043F\u043E\u0442\u0456\u043C</span>
+    <select name="then" aria-label="\u0414\u0440\u0443\u0433\u0435 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F"${group ? "" : " disabled"}>${dimensionOptions(then, group || void 0)}</select>
+  </div>
+
+  <div class="filter-row">
+    <label class="check"><input type="checkbox" name="rail" value="1"${railOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</label>
+    <label class="check"><input type="checkbox" name="solo" value="1"${soloOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432</label>
+    <label class="check"><input type="checkbox" name="price" value="1"${priceOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0434\u0435 \u0446\u0456\u043D\u0430 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u0430</label>
+    <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
+    ${filtered || group ? `<a class="reset" href="/">\u0441\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0435</a>` : ""}
+  </div>
+</form>
+
+<p class="hint">${filtered ? `\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(shownValue)}.` : "\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E \u0432\u0441\u0456, \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0456 \u0437\u0433\u043E\u0440\u0438."}${group ? ` \u0417\u0433\u0440\u0443\u043F\u043E\u0432\u0430\u043D\u043E \u0443 <strong>${groups.length}</strong> ${plural(groups.length, "\u0433\u0440\u0443\u043F\u0443", "\u0433\u0440\u0443\u043F\u0438", "\u0433\u0440\u0443\u043F")}.` : ""}</p>
+
+${risk ? riskCard(risk) : ""}
+
+${list.length === 0 ? `<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0447\u0430\u0441\u0442\u0438\u043D\u0443 \u0444\u0456\u043B\u044C\u0442\u0440\u0456\u0432.</div>` : group ? groups.map((g) => groupBlock(g, 0)).join("") : `<div class="rows">${slice.map((c) => caseRow(c)).join("")}</div>`}
+
+${!group && pages > 1 ? `<div class="pager">
+  ${page > 1 ? `<a href="${keep({ page: String(page - 1) })}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
+  <span>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 ${page} \u0437 ${pages}</span>
+  ${page < pages ? `<a href="${keep({ page: String(page + 1) })}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a>` : ""}
+</div>` : ""}
+
+<p class="note">\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0426\u0435 \u043E\u0437\u043D\u0430\u043A\u0430 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0430 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0430 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0439 \u0444\u0430\u043A\u0442 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
+`
+  });
+}
+function tenderPage(tenderId) {
+  const entry = db.byTender.get(tenderId);
+  if (!entry) return notFound();
+  const sameEntity = db.cases.filter((c) => c.entity_edrpou && c.entity_edrpou === entry.entity_edrpou);
+  const sameOfficer = entry.officer_key ? db.cases.filter((c) => c.officer_key === entry.officer_key) : [];
+  const officerValue = sameOfficer.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+  const sameWinner = entry.winner_edrpou ? db.cases.filter((c) => c.winner_edrpou === entry.winner_edrpou) : [];
+  const winnerValue = sameWinner.reduce((sum2, c) => sum2 + (c.winner_amount ?? c.value_amount ?? 0), 0);
+  const title = entry.title || readableName(entry.entity_name) || "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F";
+  const signals = alarms(entry);
+  return layout({
+    title: entry.tender_ref || entry.tender_id,
+    body: `
+<a class="back" href="/">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u043D\u0430\u0445\u0456\u0434\u043E\u043A</a>
+<h1 class="long">${esc(title)}</h1>
+<p class="sub">${esc(readableName(entry.entity_name))} \xB7 <span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span></p>
+
+${signals.length ? `<div class="flags" style="margin-bottom:1.5rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
+
+<div class="card">
+  <dl class="facts">
+    <dt>\u0421\u0443\u043C\u0430</dt><dd><strong>${money(entry.value_amount)}</strong> <span class="faint">(${shortMoney(entry.value_amount)})</span></dd>
+    <dt>\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A</dt><dd><a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">${esc(readableName(entry.entity_name))}</a><br><span class="faint">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(entry.entity_edrpou ?? "\u2014")}</span></dd>
+    <dt>\u0420\u0435\u0433\u0456\u043E\u043D</dt><dd>${esc(entry.region ?? "\u2014")}</dd>
+    ${entry.method ? `<dt>\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0430</dt><dd>${esc(procedureLabel(entry.method) ?? "\u2014")}</dd>` : ""}
+    ${entry.detailed ? `<dt>\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432</dt><dd>${entry.bidders === 1 ? "<strong>\u043E\u0434\u0438\u043D</strong> \u2014 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u0457 \u043D\u0435 \u0431\u0443\u043B\u043E" : entry.bidders || "\u2014"}</dd>` : ""}
+    <dt>\u041F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E</dt><dd>${date(entry.date_assessed)}</dd>
+    <dt>\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E</dt><dd><a href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u043A\u0430\u0440\u0442\u043A\u0443 \u0432 Prozorro \u2192</a></dd>
+  </dl>
+</div>
+
+<h2>\u0425\u0442\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0432 \u0437\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E</h2>
+${entry.officer_name ? `<div class="card">
+  <h3><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a></h3>
+  <p class="lead">\u0426\u044F \u043E\u0441\u043E\u0431\u0430 \u0432\u043A\u0430\u0437\u0430\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E \u0449\u0435 \u0443 <strong>${sameOfficer.length}</strong> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0440\u0430\u0437\u043E\u043C \u043D\u0430 <strong>${shortMoney(officerValue)}</strong>.</p>
+  <dl class="facts">
+    <dt>\u041F\u043E\u0448\u0442\u0430</dt><dd>${esc(entry.officer_email ?? "\u2014")}</dd>
+    <dt>\u0422\u0435\u043B\u0435\u0444\u043E\u043D</dt><dd>${esc(entry.officer_phone ?? "\u2014")}</dd>
+  </dl>
+  <p style="margin-top:.9rem"><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0434\u043E\u0441\u044C\u0454 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u044F \u2192</a></p>
+</div>` : `<div class="card"><p>\u041A\u0430\u0440\u0442\u043A\u0443 \u0446\u0456\u0454\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E, \u0442\u043E\u043C\u0443 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0430 \u043E\u0441\u043E\u0431\u0430 \u043D\u0435\u0432\u0456\u0434\u043E\u043C\u0430.</p></div>`}
+
+<h2>\u0425\u0442\u043E \u0432\u0438\u0433\u0440\u0430\u0432</h2>
+${entry.winner_name ? `<div class="card">
+  <h3><a href="/supplier/${encodeURIComponent(entry.winner_edrpou ?? "")}">${esc(readableName(entry.winner_name))}</a></h3>
+  <p class="lead">\u0426\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u043B\u0430 \u0449\u0435 \u0443 <strong>${sameWinner.length}</strong> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0440\u0430\u0437\u043E\u043C \u043D\u0430 <strong>${shortMoney(winnerValue)}</strong>.</p>
+  <dl class="facts">
+    <dt>\u0404\u0414\u0420\u041F\u041E\u0423</dt><dd>${esc(entry.winner_edrpou ?? "\u2014")}</dd>
+    <dt>\u0421\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443</dt><dd>${money(entry.winner_amount)}</dd>
+  </dl>
+</div>` : `<div class="card"><p>\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0430\u0431\u043E \u043A\u0430\u0440\u0442\u043A\u0443 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E.</p></div>`}
+
+${entry.findings.length ? `<h2>\u0421\u043A\u0456\u043B\u044C\u043A\u0438 \u0446\u0435 \u043A\u043E\u0448\u0442\u0443\u0454 \u0432 \u0456\u043D\u0448\u0438\u0445</h2>
+<p class="hint">\u041F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F \u0432\u0438\u043A\u043E\u043D\u0430\u043B\u0430 \u0446\u044F \u0441\u0438\u0441\u0442\u0435\u043C\u0430, \u0430 \u043D\u0435 \u0434\u0435\u0440\u0436\u0430\u0432\u0430. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0447\u0438\u0441\u043B\u0430, \u0437 \u044F\u043A\u0438\u0445 \u0437\u0440\u043E\u0431\u043B\u0435\u043D\u043E \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A.</p>
+${entry.findings.map((f) => {
+      const e = f.evidence;
+      const rows = Object.entries({
+        "\u0426\u0456\u043D\u0430 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E": typeof e.unit_price === "number" ? `${unitMoney(e.unit_price)}` : null,
+        "\u0422\u0438\u043F\u043E\u0432\u0430 \u0446\u0456\u043D\u0430 (\u043C\u0435\u0434\u0456\u0430\u043D\u0430)": typeof e.peer_median === "number" ? `${unitMoney(e.peer_median)}` : null,
+        "\u0421\u0435\u0440\u0435\u0434\u043D\u044F \u043F\u043E\u043B\u043E\u0432\u0438\u043D\u0430 \u0446\u0456\u043D": typeof e.peer_p25 === "number" && typeof e.peer_p75 === "number" ? `${unitMoney(e.peer_p25)} \u2014 ${unitMoney(e.peer_p75)}` : null,
+        "\u041F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043E \u0456\u0437 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438": typeof e.peer_count === "number" ? String(e.peer_count) : null,
+        "\u041F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u044F \u0446\u0456\u043D\u0430 \u0446\u044C\u043E\u0433\u043E \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430": typeof e.previous_price === "number" ? `${unitMoney(e.previous_price)}` : null,
+        "\u0417\u0440\u043E\u0441\u0442\u0430\u043D\u043D\u044F": typeof e.growth === "number" ? `${Math.round(e.growth * 100)}%` : null,
+        "\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C": typeof e.quantity === "number" ? `${e.quantity.toLocaleString("uk-UA")} ${esc(String(e.unit_code ?? ""))}` : null,
+        "\u0420\u0456\u0437\u043D\u0438\u0446\u044F \u043D\u0430 \u0432\u0441\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E": typeof e.overpayment === "number" ? money(e.overpayment) : typeof e.extra_cost === "number" ? money(e.extra_cost) : null,
+        "\u0420\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0432\u0456\u0434": e.basis === "award" ? "\u0441\u0443\u043C\u0438 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443" : e.basis === "expected" ? "\u043E\u0447\u0456\u043A\u0443\u0432\u0430\u043D\u043E\u0457 \u0432\u0430\u0440\u0442\u043E\u0441\u0442\u0456" : null
+      }).filter(([, v]) => v !== null);
+      return `<div class="card">
+  <h3><span class="tier own">\u041F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043C\u0438</span> &nbsp;${esc(f.title)}</h3>
+  <p class="lead">${esc(f.explanation)}</p>
+  <dl class="facts">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl>
+</div>`;
+    }).join("")}` : ""}
+
+<h2>\u0429\u043E \u0442\u0443\u0442 \u043D\u0435 \u0442\u0430\u043A</h2>
+<p class="hint">\u0421\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u043E ${entry.risks.length} ${plural(entry.risks.length, "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432")} \u0456\u0437 \u0447\u043E\u0442\u0438\u0440\u043D\u0430\u0434\u0446\u044F\u0442\u0438 \u0447\u0438\u043D\u043D\u0438\u0445.</p>
+${entry.risks.map((r) => riskCard(r)).join("")}
+
+<h2>\u0426\u0435\u0439 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0437\u0430\u0433\u0430\u043B\u043E\u043C</h2>
+<div class="card">
+  <p class="lead">\u0417\u0430 ${esc(readableName(entry.entity_name))} \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0430\u043D\u043E <strong>${sameEntity.length}</strong> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438.</p>
+  <p><a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0434\u043E\u0441\u044C\u0454 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430 \u2192</a></p>
+</div>
+
+<p class="note">\u041D\u0430\u044F\u0432\u043D\u0456\u0441\u0442\u044C \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u043D\u0435 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F, \u0456 \u043D\u0435 \u0454 \u0437\u0432\u0438\u043D\u0443\u0432\u0430\u0447\u0435\u043D\u043D\u044F\u043C \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0445 \u043E\u0441\u0456\u0431. \u0426\u0435 \u043F\u0456\u0434\u0441\u0442\u0430\u0432\u0430 \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u043B\u044E\u0434\u0438\u043D\u043E\u044E.</p>
+`
+  });
+}
+function officerPage(key) {
+  const list = db.cases.filter((c) => c.officer_key === key);
+  if (list.length === 0) return notFound();
+  const name = list.find((c) => c.officer_name)?.officer_name ?? key;
+  const email = list.find((c) => c.officer_email)?.officer_email ?? null;
+  const phone = list.find((c) => c.officer_phone)?.officer_phone ?? null;
+  const entity = list.find((c) => c.entity_name)?.entity_name ?? null;
+  const entityEdrpou = list.find((c) => c.entity_edrpou)?.entity_edrpou ?? "";
+  const value = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+  const solo = list.filter((c) => c.bidders === 1).length;
+  const ranked = rankRisks(list);
+  const sorted = [...list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  return layout({
+    title: name,
+    nav: "officers",
+    body: `
+<a class="back" href="/officers">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456\u0432</a>
+<h1>${esc(name)}</h1>
+<p class="sub">\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0430 \u043E\u0441\u043E\u0431\u0430 \u0432 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445${entity ? ` \u2014 ${esc(readableName(entity))}` : ""}.</p>
+
+<p class="statline">
+  <b>${list.length}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043F\u0456\u0434 \u043F\u0438\u0442\u0430\u043D\u043D\u044F\u043C \xB7
+  <b>${shortMoney(value)}</b> \u0437\u0430\u0433\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430 \xB7
+  <b>${solo}</b> \u0437 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
+  <b>${ranked.length}</b> \u0440\u0456\u0437\u043D\u0438\u0445 \u043E\u0437\u043D\u0430\u043A
+</p>
+
+<div class="card">
+  <dl class="facts">
+    <dt>\u041F\u043E\u0448\u0442\u0430</dt><dd>${esc(email ?? "\u2014")}</dd>
+    <dt>\u0422\u0435\u043B\u0435\u0444\u043E\u043D</dt><dd>${esc(phone ?? "\u2014")}</dd>
+    <dt>\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0430</dt><dd><a href="/entity/${encodeURIComponent(entityEdrpou)}">${esc(readableName(entity))}</a></dd>
+  </dl>
+  <p class="faint" style="margin-top:.9rem">\u0414\u0430\u043D\u0456 \u0432\u0437\u044F\u0442\u043E \u0437 \u043A\u0430\u0440\u0442\u043E\u043A \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0443 Prozorro, \u0434\u0435 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0441\u0430\u043C \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0443 \u043E\u0441\u043E\u0431\u0443. \u041E\u0434\u043D\u0443 \u043B\u044E\u0434\u0438\u043D\u0443 \u043C\u0456\u0436 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438 \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043E \u0437\u0430 \u043F\u043E\u0448\u0442\u043E\u044E \u2014 \u0432\u043E\u043D\u0430 \u0441\u0442\u0430\u0431\u0456\u043B\u044C\u043D\u0456\u0448\u0430 \u0437\u0430 \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044F \u0456\u043C\u0435\u043D\u0456.</p>
+</div>
+
+<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0457\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
+<p class="hint">\u0426\u0435 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0437\u043D\u0430\u043A, \u044F\u043A\u0456 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438. <strong>\u0426\u0435 \u043D\u0435 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432\u0438\u043D\u0430.</strong></p>
+${groupedRiskCards(ranked)}
+
+<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
+<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c, { showOfficer: false })).join("")}</div>
+${sorted.length > 60 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 60 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${sorted.length}.</p>` : ""}
+
+<p class="note">\u0426\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 \u043D\u0435 \u0454 \u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F\u043C \u043F\u0440\u043E \u043F\u0440\u0430\u0432\u043E\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0437 \u0431\u043E\u043A\u0443 \u043D\u0430\u0437\u0432\u0430\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438. \u0412\u043E\u043D\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454, \u0449\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0443 \u044F\u043A\u0438\u0445 \u0446\u044E \u043E\u0441\u043E\u0431\u0443 \u0432\u043A\u0430\u0437\u0430\u043D\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u043E\u044E \u043E\u0441\u043E\u0431\u043E\u044E.</p>
+`
+  });
+}
+function supplierPage(edrpou) {
+  const list = db.cases.filter((c) => c.winner_edrpou === edrpou);
+  if (list.length === 0) return notFound();
+  const name = list.find((c) => c.winner_name)?.winner_name ?? edrpou;
+  const value = list.reduce((sum2, c) => sum2 + (c.winner_amount ?? c.value_amount ?? 0), 0);
+  const ranked = rankRisks(list);
+  const buyers = new Set(list.map((c) => c.entity_edrpou).filter(Boolean));
+  const solo = list.filter((c) => c.bidders === 1).length;
+  const sorted = [...list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  return layout({
+    title: name,
+    nav: "suppliers",
+    body: `
+<a class="back" href="/suppliers">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456\u0432</a>
+<h1>${esc(readableName(name))}</h1>
+<p class="sub">\u041F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A \xB7 \u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)}</p>
+
+<p class="statline">
+  <b>${list.length}</b> \u043F\u0435\u0440\u0435\u043C\u043E\u0433 \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \xB7
+  <b>${shortMoney(value)}</b> \u0441\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0456\u0432 \xB7
+  <b>${solo}</b> \u0434\u0435 \u0431\u0443\u0432 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
+  <b>${buyers.size}</b> \u0440\u0456\u0437\u043D\u0438\u0445 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432
+</p>
+
+<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0446\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
+${groupedRiskCards(ranked)}
+
+<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
+<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c)).join("")}</div>
+${sorted.length > 60 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 60 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${sorted.length}.</p>` : ""}
+
+<p class="note">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0445\u043E\u043F\u043B\u044E\u0454 \u043B\u0438\u0448\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0439 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456, \u044F\u043A\u0456 \u0432\u0436\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E. \u0426\u0435 \u043D\u0435 \u043F\u043E\u0432\u043D\u0430 \u0456\u0441\u0442\u043E\u0440\u0456\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457 \u043F\u043E \u0423\u043A\u0440\u0430\u0457\u043D\u0456.</p>
+`
+  });
+}
+function entityPage(edrpou) {
+  const list = db.cases.filter((c) => c.entity_edrpou === edrpou);
+  if (list.length === 0) return notFound();
+  const name = list.find((c) => c.entity_name)?.entity_name ?? edrpou;
+  const value = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+  const solo = list.filter((c) => c.bidders === 1).length;
+  const ranked = rankRisks(list);
+  const sorted = [...list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  const officers = /* @__PURE__ */ new Map();
+  for (const entry of list) {
+    if (!entry.officer_key) continue;
+    const acc = officers.get(entry.officer_key) ?? { name: entry.officer_name ?? entry.officer_key, count: 0, value: 0 };
+    acc.count++;
+    acc.value += entry.value_amount ?? 0;
+    officers.set(entry.officer_key, acc);
+  }
+  const rankedOfficers = [...officers.entries()].sort((a, b) => b[1].value - a[1].value);
+  return layout({
+    title: name,
+    nav: "entities",
+    body: `
+<a class="back" href="/entities">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432</a>
+<h1 class="long">${esc(readableName(name))}</h1>
+<p class="sub">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)}${RAILWAY_EDRPOU.has(edrpou) ? " \xB7 \u0444\u0456\u043B\u0456\u044F \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB" : ""}</p>
+
+<p class="statline">
+  <b>${list.length}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043F\u0456\u0434 \u043F\u0438\u0442\u0430\u043D\u043D\u044F\u043C \xB7
+  <b>${shortMoney(value)}</b> \u0437\u0430\u0433\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430 \xB7
+  <b>${solo}</b> \u0437 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
+  <b>${rankedOfficers.length}</b> \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0438\u0445 \u043E\u0441\u0456\u0431
+</p>
+
+${rankedOfficers.length > 0 ? `<h2>\u0425\u0442\u043E \u0432\u0456\u0432 \u0446\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
+<div class="rows">
+${rankedOfficers.map(
+      ([key, acc]) => `<div class="row">
+  <div class="who">
+    <div class="name"><a href="/officer/${encodeURIComponent(key)}">${esc(acc.name)}</a></div>
+    <div class="meta">${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
+</div>`
+    ).join("")}
+</div>` : ""}
+
+<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430</h2>
+${groupedRiskCards(ranked)}
+
+<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
+<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c, { showEntity: false })).join("")}</div>
+${sorted.length > 60 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 60 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${sorted.length}.</p>` : ""}
+`
+  });
+}
+function directoryPage(opts) {
+  return layout({
+    title: opts.title,
+    nav: opts.nav,
+    body: `
+<h1>${esc(opts.heading)}</h1>
+<p class="sub">${opts.intro}</p>
+${opts.rows.length === 0 ? '<div class="empty">\u0414\u0430\u043D\u0438\u0445 \u043F\u043E\u043A\u0438 \u043D\u0435\u043C\u0430\u0454.</div>' : `<div class="rows">
+${opts.rows.slice(0, 150).map(
+      (r) => `<div class="row">
+  <div class="who">
+    <div class="name"><a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="meta">${r.meta}</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
+</div>`
+    ).join("")}
+</div>`}
+${opts.rows.length > 150 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 150 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0438\u0445 \u0456\u0437 ${opts.rows.length}.</p>` : ""}
+`
+  });
+}
+function entitiesPage() {
+  const byEntity = /* @__PURE__ */ new Map();
+  for (const entry of db.cases) {
+    const key = entry.entity_edrpou ?? "";
+    if (!key) continue;
+    const acc = byEntity.get(key) ?? { name: entry.entity_name ?? key, count: 0, value: 0 };
+    acc.count++;
+    acc.value += entry.value_amount ?? 0;
+    byEntity.set(key, acc);
+  }
+  return directoryPage({
+    title: "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438",
+    nav: "entities",
+    heading: "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438",
+    intro: `\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0457 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456, \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u044F\u043A\u0438\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0456 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438. \u041D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0456 \u0437\u0430 \u0441\u0443\u043C\u043E\u044E \u2014 \u0437\u0433\u043E\u0440\u0438.`,
+    rows: [...byEntity.entries()].sort((a, b) => b[1].value - a[1].value).map(([edrpou, acc]) => ({
+      href: `/entity/${encodeURIComponent(edrpou)}`,
+      name: readableName(acc.name),
+      meta: `\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}${RAILWAY_EDRPOU.has(edrpou) ? " \xB7 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F" : ""}`,
+      value: acc.value
+    }))
+  });
+}
+function officersPage() {
+  const byOfficer = /* @__PURE__ */ new Map();
+  for (const entry of db.cases) {
+    if (!entry.officer_key) continue;
+    const acc = byOfficer.get(entry.officer_key) ?? {
+      name: entry.officer_name ?? entry.officer_key,
+      entity: entry.entity_name ?? "",
+      count: 0,
+      value: 0
+    };
+    acc.count++;
+    acc.value += entry.value_amount ?? 0;
+    byOfficer.set(entry.officer_key, acc);
+  }
+  return directoryPage({
+    title: "\u041F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
+    nav: "officers",
+    heading: "\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0456 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
+    intro: "\u041E\u0441\u043E\u0431\u0438, \u044F\u043A\u0438\u0445 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438 \u0432\u043A\u0430\u0437\u0430\u043B\u0438 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0438\u043C\u0438 \u0432 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438. \u0426\u0435 \u043D\u0435 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u043F\u0456\u0434\u043E\u0437\u0440\u044E\u0432\u0430\u043D\u0438\u0445 \u2014 \u0446\u0435 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u0442\u0438\u0445, \u0447\u0438\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432\u0430\u0440\u0442\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438.",
+    rows: [...byOfficer.entries()].sort((a, b) => b[1].value - a[1].value).map(([key, acc]) => ({
+      href: `/officer/${encodeURIComponent(key)}`,
+      name: acc.name,
+      meta: `${esc(readableName(acc.entity))} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}`,
+      value: acc.value
+    }))
+  });
+}
+function suppliersPage() {
+  const bySupplier = /* @__PURE__ */ new Map();
+  for (const entry of db.cases) {
+    const key = entry.winner_edrpou ?? "";
+    if (!key) continue;
+    const acc = bySupplier.get(key) ?? { name: entry.winner_name ?? key, count: 0, value: 0, solo: 0 };
+    acc.count++;
+    acc.value += entry.winner_amount ?? entry.value_amount ?? 0;
+    if (entry.bidders === 1) acc.solo++;
+    bySupplier.set(key, acc);
+  }
+  return directoryPage({
+    title: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456",
+    nav: "suppliers",
+    heading: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C",
+    intro: "\u041A\u043E\u043C\u043F\u0430\u043D\u0456\u0457, \u044F\u043A\u0456 \u0432\u0438\u0433\u0440\u0430\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438. \u041D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0456 \u0437\u0430 \u0441\u0443\u043C\u043E\u044E \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0456\u0432 \u2014 \u0437\u0433\u043E\u0440\u0438.",
+    rows: [...bySupplier.entries()].sort((a, b) => b[1].value - a[1].value).map(([edrpou, acc]) => ({
+      href: `/supplier/${encodeURIComponent(edrpou)}`,
+      name: readableName(acc.name),
+      meta: `\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433")}${acc.solo ? ` \xB7 ${acc.solo} \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432` : ""}`,
+      value: acc.value
+    }))
+  });
+}
+function railwayBlocks() {
+  const by = /* @__PURE__ */ new Map();
+  for (const entry of db.cases) {
+    const scope = railwayScope(entry);
+    if (!scope) continue;
+    const list = by.get(scope) ?? [];
+    list.push(entry);
+    by.set(scope, list);
+  }
+  const blocks = [
+    {
+      scope: "southern",
+      heading: "\u0420\u0435\u0433\u0456\u043E\u043D\u0430\u043B\u044C\u043D\u0430 \u0444\u0456\u043B\u0456\u044F \xAB\u041F\u0456\u0432\u0434\u0435\u043D\u043D\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB",
+      note: `\u0412\u043B\u0430\u0441\u043D\u0435 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438 \u2014 \u0440\u0435\u0433\u0456\u043E\u043D\u0430\u043B\u044C\u043D\u0430 \u0444\u0456\u043B\u0456\u044F \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB \u0437 \u043E\u0441\u0456\u0434\u043A\u043E\u043C \u0443 \u0425\u0430\u0440\u043A\u043E\u0432\u0456, \u0404\u0414\u0420\u041F\u041E\u0423 ${SOUTHERN_RAILWAY_EDRPOU}.`,
+      list: by.get("southern") ?? []
+    },
+    {
+      scope: "branch",
+      heading: "\u0406\u043D\u0448\u0456 \u0444\u0456\u043B\u0456\u0457 \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB",
+      note: "\u0426\u0435\u043D\u0442\u0440\u0430\u043B\u0456\u0437\u043E\u0432\u0430\u043D\u0456 \u0444\u0456\u043B\u0456\u0457, \u044F\u043A\u0456 \u0437\u0430\u043A\u0443\u043F\u043E\u0432\u0443\u044E\u0442\u044C \u0434\u043B\u044F \u0432\u0441\u0456\u0454\u0457 \u043C\u0435\u0440\u0435\u0436\u0456, \u0437\u043E\u043A\u0440\u0435\u043C\u0430 \u0439 \u0434\u043B\u044F \u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u043E\u0433\u043E \u0432\u0443\u0437\u043B\u0430. \u0417\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u043E\u0432\u0430\u043D\u0456 \u043F\u043E\u0437\u0430 \u043C\u0435\u0436\u0430\u043C\u0438 \u043E\u0431\u043B\u0430\u0441\u0442\u0456, \u0442\u043E\u043C\u0443 \u043C\u0438 \u043F\u043E\u043A\u0430\u0437\u0443\u0454\u043C\u043E \u0457\u0445 \u043E\u043A\u0440\u0435\u043C\u043E, \u0430 \u043D\u0435 \u0437\u043C\u0456\u0448\u0443\u0454\u043C\u043E \u0437 \u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0438\u043C\u0438.",
+      list: by.get("branch") ?? []
+    },
+    {
+      scope: "local",
+      heading: "\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0456 \u0437\u0430\u043A\u043B\u0430\u0434\u0438 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438",
+      note: "\u041E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0457 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u043E\u0433\u043E \u043F\u0440\u043E\u0444\u0456\u043B\u044E, \u0437\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u043E\u0432\u0430\u043D\u0456 \u0432 \u043E\u0431\u043B\u0430\u0441\u0442\u0456: \u0443\u043D\u0456\u0432\u0435\u0440\u0441\u0438\u0442\u0435\u0442, \u043B\u0456\u0446\u0435\u0439, \u0446\u0435\u043D\u0442\u0440 \u043F\u0440\u043E\u0444\u0435\u0441\u0456\u0439\u043D\u043E\u0457 \u043E\u0441\u0432\u0456\u0442\u0438.",
+      list: by.get("local") ?? []
+    }
+  ];
+  return blocks.filter((b) => b.list.length > 0);
+}
+function railwayPage() {
+  const blocks = railwayBlocks();
+  const all = blocks.flatMap((b) => b.list);
+  const value = all.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+  const solo = all.filter((c) => c.bidders === 1).length;
+  const southern = blocks.find((b) => b.scope === "southern")?.list ?? [];
+  const suppliers = /* @__PURE__ */ new Map();
+  for (const entry of all) {
+    const key = entry.winner_edrpou ?? "";
+    if (!key) continue;
+    const acc = suppliers.get(key) ?? { name: entry.winner_name ?? key, count: 0, value: 0, solo: 0 };
+    acc.count++;
+    acc.value += entry.winner_amount ?? entry.value_amount ?? 0;
+    if (entry.bidders === 1) acc.solo++;
+    suppliers.set(key, acc);
+  }
+  const topSuppliers = [...suppliers.entries()].sort((a, b) => b[1].value - a[1].value).slice(0, 15);
+  return layout({
+    title: "\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F \u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u043E\u0457 \u043E\u0431\u043B\u0430\u0441\u0442\u0456",
+    nav: "railway",
+    body: `
+<h1>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F \u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u043E\u0457 \u043E\u0431\u043B\u0430\u0441\u0442\u0456</h1>
+<p class="sub">\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u043E\u0457 \u0433\u0430\u043B\u0443\u0437\u0456 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0442\u0440\u0438 \u0440\u0456\u0437\u043D\u0456 \u0437\u0430 \u043F\u0440\u0438\u0440\u043E\u0434\u043E\u044E \u0433\u0440\u0443\u043F\u0438, \u0456 \u043C\u0438 \u0457\u0445 \u043D\u0435 \u0437\u043C\u0456\u0448\u0443\u0454\u043C\u043E.</p>
+
+<p class="statline">
+  <b>${all.length.toLocaleString("uk-UA")}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043F\u0456\u0434 \u043F\u0438\u0442\u0430\u043D\u043D\u044F\u043C \xB7
+  <b>${shortMoney(value)}</b> \u0437\u0430\u0433\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430 \xB7
+  <b>${solo}</b> \u0437 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
+  <b>${southern.length}</b> \u0443 \xAB\u041F\u0456\u0432\u0434\u0435\u043D\u043D\u043E\u0457 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456\xBB
+</p>
+
+<details class="help">
+  <summary>\u0429\u043E \u0441\u0430\u043C\u0435 \u0432\u0445\u043E\u0434\u0438\u0442\u044C \u0443 \u0446\u0435\u0439 \u0440\u043E\u0437\u0434\u0456\u043B</summary>
+  <div class="inner">
+    <p><strong>\u041F\u0456\u0432\u0434\u0435\u043D\u043D\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</strong> \u2014 \u0440\u0435\u0433\u0456\u043E\u043D\u0430\u043B\u044C\u043D\u0430 \u0444\u0456\u043B\u0456\u044F \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB, \u0449\u043E \u043E\u0431\u0441\u043B\u0443\u0433\u043E\u0432\u0443\u0454 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0443. \u0426\u0435 \u0456 \u0454 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F \u043E\u0431\u043B\u0430\u0441\u0442\u0456 \u0443 \u043F\u0440\u044F\u043C\u043E\u043C\u0443 \u0437\u043D\u0430\u0447\u0435\u043D\u043D\u0456.</p>
+    <p><strong>\u0406\u043D\u0448\u0456 \u0444\u0456\u043B\u0456\u0457 \u0423\u043A\u0440\u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456</strong> \u0437\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u043E\u0432\u0430\u043D\u0456 \u0432 \u041A\u0438\u0454\u0432\u0456, \u0430\u043B\u0435 \u0437\u0430\u043A\u0443\u043F\u043E\u0432\u0443\u044E\u0442\u044C \u0446\u0435\u043D\u0442\u0440\u0430\u043B\u0456\u0437\u043E\u0432\u0430\u043D\u043E \u0434\u043B\u044F \u0432\u0441\u0456\u0454\u0457 \u043C\u0435\u0440\u0435\u0436\u0456, \u0437\u043E\u043A\u0440\u0435\u043C\u0430 \u0439 \u0434\u043B\u044F \u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0438\u0445 \u043F\u0456\u0434\u0440\u043E\u0437\u0434\u0456\u043B\u0456\u0432. \u041C\u0438 \u0432\u0456\u0434\u0441\u0442\u0435\u0436\u0443\u0454\u043C\u043E \u0457\u0445 \u043E\u043A\u0440\u0435\u043C\u043E \u0439 \u043D\u0435 \u0432\u0438\u0434\u0430\u0454\u043C\u043E \u0437\u0430 \u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0456.</p>
+    <p><strong>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0456 \u0437\u0430\u043A\u043B\u0430\u0434\u0438 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438</strong> \u2014 \u043E\u0441\u0432\u0456\u0442\u043D\u0456 \u0442\u0430 \u043D\u0430\u0443\u043A\u043E\u0432\u0456 \u043E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0457 \u0433\u0430\u043B\u0443\u0437\u0456, \u0437\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u043E\u0432\u0430\u043D\u0456 \u0432 \u043E\u0431\u043B\u0430\u0441\u0442\u0456.</p>
+    <p>\u0412\u0456\u0434\u0431\u0456\u0440 \u0437\u0430 \u043D\u0430\u0437\u0432\u043E\u044E \u043D\u0430\u0432\u043C\u0438\u0441\u043D\u043E \u0432\u0443\u0437\u044C\u043A\u0438\u0439. \u0428\u0438\u0440\u0448\u0438\u0439 \u0448\u0430\u0431\u043B\u043E\u043D \u043F\u043E\u043C\u0438\u043B\u043A\u043E\u0432\u043E \u0437\u0430\u0440\u0430\u0445\u043E\u0432\u0443\u0432\u0430\u0432 \u0434\u043E \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0417\u043C\u0456\u0457\u0432\u0441\u044C\u043A\u0443 \u0442\u0435\u043F\u043B\u043E\u0432\u0443 \u0435\u043B\u0435\u043A\u0442\u0440\u043E\u0441\u0442\u0430\u043D\u0446\u0456\u044E \u0442\u0430 \u0434\u043E\u0441\u043B\u0456\u0434\u043D\u0443 \u0441\u0442\u0430\u043D\u0446\u0456\u044E \u043F\u0442\u0430\u0445\u0456\u0432\u043D\u0438\u0446\u0442\u0432\u0430.</p>
+  </div>
+</details>
+
+${blocks.map((block) => {
+      const blockValue = block.list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+      const entities = /* @__PURE__ */ new Map();
+      for (const entry of block.list) {
+        const key = entry.entity_edrpou ?? "";
+        const acc = entities.get(key) ?? { name: entry.entity_name ?? key, count: 0, value: 0 };
+        acc.count++;
+        acc.value += entry.value_amount ?? 0;
+        entities.set(key, acc);
+      }
+      const sorted = [...block.list].sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+      return `
+<h2>${esc(block.heading)}</h2>
+<p class="hint">${esc(block.note)}</p>
+<p class="hint"><strong>${block.list.length}</strong> ${plural(block.list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(blockValue)}, ${entities.size} ${plural(entities.size, "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A", "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438", "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432")}.</p>
+<div class="rows">
+${[...entities.entries()].sort((a, b) => b[1].value - a[1].value).map(
+        ([edrpou, acc]) => `<div class="row">
+  <div class="who">
+    <div class="name"><a href="/entity/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
+    <div class="meta">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
+</div>`
+      ).join("")}
+</div>
+<div class="rows" style="margin-top:1rem">${sorted.slice(0, 20).map((c) => caseRow(c)).join("")}</div>
+${sorted.length > 20 ? `<p class="hint" style="margin-top:.8rem">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 20 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${sorted.length}.</p>` : ""}
+`;
+    }).join("")}
+
+<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
+${groupedRiskCards(rankRisks(all))}
+
+<h2>\u0425\u0442\u043E \u0432\u0438\u0433\u0440\u0430\u0454 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0456 \u0442\u0435\u043D\u0434\u0435\u0440\u0438</h2>
+<p class="hint">\u041F'\u044F\u0442\u043D\u0430\u0434\u0446\u044F\u0442\u044C \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0438\u0445 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456\u0432 \u0437\u0430 \u0441\u0443\u043C\u043E\u044E \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0456\u0432.</p>
+<div class="rows">
+${topSuppliers.map(
+      ([edrpou, acc]) => `<div class="row">
+  <div class="who">
+    <div class="name"><a href="/supplier/${encodeURIComponent(edrpou)}">${esc(readableName(acc.name))}</a></div>
+    <div class="meta">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433")}${acc.solo ? ` \xB7 ${acc.solo} \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432` : ""}</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
+</div>`
+    ).join("")}
+</div>
+
+<p class="note">\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0426\u0435 \u043E\u0437\u043D\u0430\u043A\u0430 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0430 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0430 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0439 \u0444\u0430\u043A\u0442 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
+`
+  });
+}
+function articlePage(code, url) {
+  const article = ARTICLES[code];
+  if (!article) return notFound();
+  const relevant = new Set(article.links.map((l) => l.risk_id));
+  const jointOnly = url.searchParams.get("at") === "1";
+  let list = db.cases.filter(
+    (c) => c.region === REGION && c.risks.some((r) => relevant.has(r))
+  );
+  if (jointOnly) list = list.filter((c) => isJointStock(c.entity_name) || isJointStock(c.winner_name));
+  const value = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+  const solo = list.filter((c) => c.bidders === 1).length;
+  const officers = new Set(list.map((c) => c.officer_key).filter(Boolean));
+  const score = (entry) => entry.risks.filter((r) => relevant.has(r)).length;
+  const sorted = [...list].sort(
+    (a, b) => score(b) - score(a) || (b.value_amount ?? 0) - (a.value_amount ?? 0)
+  );
+  return layout({
+    title: `\u0421\u0442\u0430\u0442\u0442\u044F ${article.code}`,
+    nav: `article-${article.code}`,
+    body: `
+<h1>\u041F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432</h1>
+<p class="sub">\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438, \u0434\u0435 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445, \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0438\u0445 \u0443\u0433\u043E\u0434\u0430\u0445 \u0447\u0438 \u0437\u0432\u0456\u0442\u0430\u0445 \u0454 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u2014 \u0442\u043E\u0431\u0442\u043E \u0442\u0435, \u0449\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u044E\u0442\u044C \u0437\u0430 \u0441\u0442\u0430\u0442\u0442\u0435\u044E ${esc(article.code)} \xAB${esc(article.title)}\xBB.</p>
+
+<p class="statline">
+  <b>${list.length.toLocaleString("uk-UA")}</b> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \xB7
+  <b>${shortMoney(value)}</b> \xB7
+  <b>${solo}</b> \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \xB7
+  <b>${officers.size}</b> ${plural(officers.size, "\u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0430 \u043E\u0441\u043E\u0431\u0430", "\u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0456 \u043E\u0441\u043E\u0431\u0438", "\u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0438\u0445 \u043E\u0441\u0456\u0431")}
+</p>
+
+<p class="caution">\u0426\u0435 \u0441\u043F\u0438\u0441\u043E\u043A \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0430 \u043D\u0435 \u0437\u0432\u0438\u043D\u0443\u0432\u0430\u0447\u0435\u043D\u043D\u044F: \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438 \u043F\u043E\u043A\u0430\u0437\u0443\u044E\u0442\u044C \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0445, \u0430 \u0443\u043C\u0438\u0441\u0435\u043B \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u043B\u0438\u0448\u0435 \u0441\u0443\u0434.</p>
+
+<details class="help">
+  <summary>\u0429\u043E \u043A\u0430\u0436\u0435 \u0441\u0442\u0430\u0442\u0442\u044F ${esc(article.code)}</summary>
+  <div class="inner">
+    <p class="lead">${esc(article.summary)}</p>
+    <p><strong>\u0429\u043E \u043C\u0430\u0454 \u0431\u0443\u0442\u0438 \u0434\u043E\u0432\u0435\u0434\u0435\u043D\u043E:</strong></p>
+    <ul>
+      ${article.elements.map((e) => `<li>${esc(e)}</li>`).join("")}
+    </ul>
+    <p class="faint">\u041D\u0430\u0432\u0435\u0434\u0435\u043D\u043E \u044F\u043A \u0434\u043E\u0432\u0456\u0434\u043A\u0443 \u0434\u043B\u044F \u044E\u0440\u0438\u0441\u0442\u0430. \u0426\u0435 \u043D\u0435 \u043F\u0440\u0430\u0432\u043E\u0432\u0430 \u043A\u043E\u043D\u0441\u0443\u043B\u044C\u0442\u0430\u0446\u0456\u044F \u0456 \u043D\u0435 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F \u0447\u0438\u0457\u0445\u043E\u0441\u044C \u0434\u0456\u0439.</p>
+  </div>
+</details>
+
+<details class="help">
+  <summary>\u0427\u043E\u043C\u0443 \u0441\u0430\u043C\u0435 \u0446\u0456 \u043E\u0437\u043D\u0430\u043A\u0438, \u0430 \u043D\u0435 \u0432\u0441\u0456 \u0447\u043E\u0442\u0438\u0440\u043D\u0430\u0434\u0446\u044F\u0442\u044C</summary>
+  <div class="inner">
+    <p>\u0406\u0437 \u0447\u043E\u0442\u0438\u0440\u043D\u0430\u0434\u0446\u044F\u0442\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u0445 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u0434\u043B\u044F \u0446\u0456\u0454\u0457 \u0441\u0442\u0430\u0442\u0442\u0456 \u0440\u0435\u043B\u0435\u0432\u0430\u043D\u0442\u043D\u0456 ${article.links.length}. \u0420\u0435\u0448\u0442\u0430 \u0441\u0442\u043E\u0441\u0443\u044E\u0442\u044C\u0441\u044F \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u0457 \u0442\u0430 \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0438, \u0430 \u043D\u0435 \u0437\u043C\u0456\u0441\u0442\u0443 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432.</p>
+    ${article.links.map((link) => {
+      const label = RISK_LABELS[link.risk_id];
+      const hits = list.filter((c) => c.risks.includes(link.risk_id)).length;
+      return `<p><strong>${esc(label?.short ?? link.risk_id)}</strong> <span class="faint">\u2014 ${hits} ${plural(hits, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}</span><br>${esc(link.why)}</p>`;
+    }).join("")}
+  </div>
+</details>
+
+<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438</h2>
+<form class="filters" method="get" action="/article/${esc(article.code)}">
+  <label class="check"><input type="checkbox" name="at" value="1"${jointOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0430\u043A\u0446\u0456\u043E\u043D\u0435\u0440\u043D\u0456 \u0442\u043E\u0432\u0430\u0440\u0438\u0441\u0442\u0432\u0430 (\u0410\u0422)</label>
+  <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
+  ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438</a>` : ""}
+</form>
+<p class="hint">\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0442\u0456, \u0434\u0435 \u0437\u0431\u0456\u0433\u043B\u043E\u0441\u044F \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0435 \u0440\u0435\u043B\u0435\u0432\u0430\u043D\u0442\u043D\u0438\u0445 \u043E\u0437\u043D\u0430\u043A.</p>
+${sorted.length === 0 ? '<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F.</div>' : `<div class="rows">${sorted.slice(0, 60).map((c) => caseRow(c)).join("")}</div>`}
+${sorted.length > 60 ? `<p class="hint" style="margin-top:.8rem">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 60 \u0456\u0437 ${sorted.length}.</p>` : ""}
+
+<p class="note">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u0441\u0444\u043E\u0440\u043C\u043E\u0432\u0430\u043D\u043E \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E \u0437\u0430 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0412\u0456\u043D \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u0444\u0430\u043A\u0442 \u043F\u0440\u0430\u0432\u043E\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0456 \u043D\u0435 \u0454 \u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F\u043C \u0449\u043E\u0434\u043E \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u043D\u0430\u0437\u0432\u0430\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438 \u0447\u0438 \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457. \u041D\u0430\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u043A\u0440\u043E\u043A \u2014 \u0432\u0438\u0442\u0440\u0435\u0431\u0443\u0432\u0430\u0442\u0438 \u0441\u0430\u043C\u0456 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0439 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0457\u0445.</p>
+`
+  });
+}
+function updatesPage() {
+  const runs = [...db.runs].sort((a, b) => b.started_at.localeCompare(a.started_at));
+  const latest = runs[0];
+  const newIds = new Set(latest?.new_tender_ids ?? []);
+  const fresh = db.cases.filter((c) => newIds.has(c.tender_id)).sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0));
+  return layout({
+    title: "\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F",
+    nav: "updates",
+    body: `
+<h1>\u0429\u043E \u0437\u043C\u0456\u043D\u0438\u043B\u043E\u0441\u044F</h1>
+<p class="sub">\u0421\u0438\u0441\u0442\u0435\u043C\u0430 \u0449\u043E\u0434\u043D\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u0439 \u043C\u0430\u0441\u0438\u0432 \u0440\u0438\u0437\u0438\u043A-\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u0456 \u043F\u0456\u0434\u0442\u044F\u0433\u0443\u0454 \u043D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0439 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456.</p>
+
+${latest ? `<p class="statline">
+  <b>${latest.new_tenders}</b> \u043D\u043E\u0432\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0432\u043E\u0441\u0442\u0430\u043D\u043D\u0454 \xB7
+  <b>${latest.new_flags}</b> \u043D\u043E\u0432\u0438\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u044C \xB7
+  <b>${date(latest.started_at)}</b> \u043E\u0441\u0442\u0430\u043D\u043D\u0454 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \xB7
+  <b>${runs.length}</b> ${plural(runs.length, "\u0437\u0430\u043F\u0443\u0441\u043A", "\u0437\u0430\u043F\u0443\u0441\u043A\u0438", "\u0437\u0430\u043F\u0443\u0441\u043A\u0456\u0432")}
+</p>` : '<div class="empty">\u0416\u043E\u0434\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0443 \u0449\u0435 \u043D\u0435 \u0431\u0443\u043B\u043E. \u0412\u0438\u043A\u043E\u043D\u0430\u0439\u0442\u0435 <code>npm run daily</code>.</div>'}
+
+${fresh.length > 0 ? `<h2>\u041D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0441\u0442\u0430\u043D\u043D\u044C\u043E\u0433\u043E \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F</h2>
+<div class="rows">${fresh.slice(0, 40).map((c) => caseRow(c)).join("")}</div>
+${fresh.length > 40 ? `<p class="hint" style="margin-top:.8rem">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 40 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${fresh.length}.</p>` : ""}` : latest ? `<h2>\u041D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0441\u0442\u0430\u043D\u043D\u044C\u043E\u0433\u043E \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F</h2><div class="empty">\u041D\u043E\u0432\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043D\u0435 \u0437\u2019\u044F\u0432\u0438\u043B\u043E\u0441\u044F. \u0426\u0435 \u043D\u043E\u0440\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u2014 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043D\u0435 \u0449\u043E\u0434\u043D\u044F \u0434\u043E\u0434\u0430\u0454 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438.</div>` : ""}
+
+<h2>\u0406\u0441\u0442\u043E\u0440\u0456\u044F \u0437\u0430\u043F\u0443\u0441\u043A\u0456\u0432</h2>
+<div class="rows">
+${runs.slice(0, 30).map(
+      (r) => `<div class="row">
+  <div class="who">
+    <div class="name">${date(r.started_at)}${r.status === "failed" ? ' <span class="flag alarm">\u0437\u0431\u0456\u0439</span>' : ""}</div>
+    <div class="meta">${r.new_tenders} ${plural(r.new_tenders, "\u043D\u043E\u0432\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u043D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u043D\u043E\u0432\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \xB7 ${r.new_flags} ${plural(r.new_flags, "\u043D\u043E\u0432\u0435 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u043D\u044F", "\u043D\u043E\u0432\u0456 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u043D\u044F", "\u043D\u043E\u0432\u0438\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u044C")} \xB7 ${r.details_fetched} ${plural(r.details_fetched, "\u043A\u0430\u0440\u0442\u043A\u0430", "\u043A\u0430\u0440\u0442\u043A\u0438", "\u043A\u0430\u0440\u0442\u043E\u043A")} \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E${r.errors ? ` \xB7 ${r.errors} ${plural(r.errors, "\u043F\u043E\u043C\u0438\u043B\u043A\u0430", "\u043F\u043E\u043C\u0438\u043B\u043A\u0438", "\u043F\u043E\u043C\u0438\u043B\u043E\u043A")}` : ""}</div>
+    ${r.message ? `<div class="meta">${esc(r.message)}</div>` : ""}
+  </div>
+  <div class="amount"><span class="big">${r.status === "ok" ? "\u2713" : "\u2715"}</span></div>
+</div>`
+    ).join("")}
+</div>
+
+<p class="note">\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0432\u0438\u043A\u043E\u043D\u0443\u0454 \u0441\u043A\u0440\u0438\u043F\u0442 <code>npm run daily</code>. \u0412\u0456\u043D \u0431\u0435\u0437\u043F\u0435\u0447\u043D\u0438\u0439 \u0434\u043E \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0443: \u0443\u0441\u0435, \u0449\u043E \u0432\u0436\u0435 \u0454, \u043D\u0435 \u0434\u0443\u0431\u043B\u044E\u0454\u0442\u044C\u0441\u044F, \u0430 \u043F\u0435\u0440\u0435\u0440\u0432\u0430\u043D\u0438\u0439 \u0437\u0430\u043F\u0443\u0441\u043A \u0434\u043E\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u0442\u044C\u0441\u044F \u043D\u0430\u0441\u0442\u0443\u043F\u043D\u043E\u0433\u043E \u0440\u0430\u0437\u0443.</p>
+`
+  });
+}
+function pricesPage() {
+  const withFindings = db.cases.filter((c) => c.findings.length > 0);
+  const sum2 = (c) => c.findings.reduce((total, f) => {
+    const e = f.evidence;
+    return total + (e.overpayment ?? e.extra_cost ?? 0);
+  }, 0);
+  const sorted = [...withFindings].sort((a, b) => sum2(b) - sum2(a));
+  const totalGap = withFindings.reduce((t, c) => t + sum2(c), 0);
+  const peer = withFindings.filter((c) => c.findings.some((f) => f.detector_key === "peer_price")).length;
+  const growth = withFindings.filter((c) => c.findings.some((f) => f.detector_key === "own_price_growth")).length;
+  return layout({
+    title: "\u0417\u0430\u0432\u0438\u0449\u0435\u043D\u0456 \u0446\u0456\u043D\u0438",
+    nav: "prices",
+    body: `
+<h1>\u0414\u0435 \u0446\u0456\u043D\u0430 \u0432\u0438\u0433\u043B\u044F\u0434\u0430\u0454 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u043E\u044E</h1>
+<p class="sub">\u0422\u0443\u0442 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0440\u0430\u0445\u0443\u0454 \u0441\u0430\u043C\u0430, \u0430 \u043D\u0435 \u043F\u0435\u0440\u0435\u043A\u0430\u0437\u0443\u0454 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0434\u0435\u0440\u0436\u0430\u0432\u0438. \u0412\u043E\u043D\u0430 \u0431\u0435\u0440\u0435 \u0446\u0456\u043D\u0443 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E \u0439 \u043F\u043E\u0440\u0456\u0432\u043D\u044E\u0454 \u0437 \u0442\u0438\u043C, \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0442\u0435 \u0441\u0430\u043C\u0435 \u043A\u043E\u0448\u0442\u0443\u0432\u0430\u043B\u043E \u0456\u043D\u0448\u0438\u043C \u2014 \u0456 \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u043A\u043E\u0448\u0442\u0443\u0432\u0430\u043B\u043E \u0446\u044C\u043E\u043C\u0443 \u0436 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0443 \u0440\u0430\u043D\u0456\u0448\u0435.</p>
+
+<p class="statline">
+  <b>${withFindings.length}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u043E\u044E \u0446\u0456\u043D\u043E\u044E \xB7
+  <b>${shortMoney(totalGap)}</b> \u0440\u0456\u0437\u043D\u0438\u0446\u044F \u043F\u0440\u043E\u0442\u0438 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u043E\u0457 \u0446\u0456\u043D\u0438 \xB7
+  <b>${peer}</b> \u0434\u043E\u0440\u043E\u0436\u0447\u0435, \u043D\u0456\u0436 \u0432 \u0456\u043D\u0448\u0438\u0445 \xB7
+  <b>${growth}</b> \u0434\u043E\u0440\u043E\u0436\u0447\u0435, \u043D\u0456\u0436 \u0431\u0443\u043B\u043E \u0442\u043E\u0440\u0456\u043A
+</p>
+
+<details class="help">
+  <summary>\u042F\u043A \u043C\u0438 \u0446\u0435 \u0440\u0430\u0445\u0443\u0454\u043C\u043E</summary>
+  <div class="inner">
+    <p>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0440\u0430\u0445\u0443\u0454\u043C\u043E <strong>\u0446\u0456\u043D\u0443 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E</strong>: \u0441\u0443\u043C\u0443 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443 \u0434\u0456\u043B\u0438\u043C\u043E \u043D\u0430 \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C. \u041D\u0430\u043F\u0440\u0438\u043A\u043B\u0430\u0434, 4 \u043C\u043B\u043D \u0433\u0440\u043D \u0437\u0430 200 \u0445\u043E\u043B\u043E\u0434\u0438\u043B\u044C\u043D\u0438\u043A\u0456\u0432 \u2014 \u0446\u0435 20 \u0442\u0438\u0441\u044F\u0447 \u0437\u0430 \u0448\u0442\u0443\u043A\u0443.</p>
+    <p>\u0414\u0430\u043B\u0456 \u0448\u0443\u043A\u0430\u0454\u043C\u043E, \u0437\u0430 \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0442\u0435 \u0441\u0430\u043C\u0435 \u043A\u0443\u043F\u0443\u0432\u0430\u043B\u0438 \u0456\u043D\u0448\u0456, \u0456 \u0431\u0435\u0440\u0435\u043C\u043E \u0441\u0435\u0440\u0435\u0434\u0438\u043D\u0443. \u042F\u043A\u0449\u043E \u0446\u0456\u043D\u0430 \u043F\u043E\u043C\u0456\u0442\u043D\u043E \u0432\u0438\u0449\u0430 \u0437\u0430 \u0441\u0435\u0440\u0435\u0434\u0438\u043D\u0443 \u2014 \u043F\u043E\u043A\u0430\u0437\u0443\u0454\u043C\u043E.</p>
+    <p>\u041E\u043A\u0440\u0435\u043C\u043E \u043F\u043E\u0440\u0456\u0432\u043D\u044E\u0454\u043C\u043E \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430 \u0437 \u043D\u0438\u043C \u0441\u0430\u043C\u0438\u043C: \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0432\u0456\u043D \u043F\u043B\u0430\u0442\u0438\u0432 \u0437\u0430 \u0446\u0435 \u0440\u0430\u043D\u0456\u0448\u0435. \u0422\u0443\u0442 \u043C\u0456\u0441\u0446\u0435\u0432\u0456 \u0443\u043C\u043E\u0432\u0438 \u043E\u0434\u043D\u0430\u043A\u043E\u0432\u0456, \u0442\u043E\u0436 \u0441\u0442\u0440\u0438\u0431\u043E\u043A \u0446\u0456\u043D\u0438 \u0441\u043A\u043B\u0430\u0434\u043D\u0456\u0448\u0435 \u043F\u043E\u044F\u0441\u043D\u0438\u0442\u0438.</p>
+    <p><strong>\u041C\u0438 \u043C\u043E\u0432\u0447\u0438\u043C\u043E, \u043A\u043E\u043B\u0438 \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u0442\u0438 \u0447\u0435\u0441\u043D\u043E \u043D\u0435 \u043C\u043E\u0436\u043D\u0430.</strong> \u0420\u0435\u043C\u043E\u043D\u0442\u0438 \u0439 \u043F\u043E\u0441\u043B\u0443\u0433\u0438 \u043D\u0435 \u043F\u043E\u0440\u0456\u0432\u043D\u044E\u0454\u043C\u043E \u2014 \u043A\u043E\u0436\u0435\u043D \u043E\u0431'\u0454\u043A\u0442 \u0441\u0432\u0456\u0439. \u041D\u0435 \u043F\u043E\u0440\u0456\u0432\u043D\u044E\u0454\u043C\u043E \u0439 \u0442\u043E\u0432\u0430\u0440\u0438 \u0432\u0441\u0435\u0440\u0435\u0434\u0438\u043D\u0456 \u043D\u0430\u0434\u0442\u043E \u0448\u0438\u0440\u043E\u043A\u043E\u0433\u043E \u043A\u043E\u0434\u0443: \u043F\u0456\u0434 \u043E\u0434\u043D\u0438\u043C \u043A\u043E\u0434\u043E\u043C \u043C\u043E\u0436\u0443\u0442\u044C \u0431\u0443\u0442\u0438 \u0456 \u043F\u0440\u043E\u043A\u043B\u0430\u0434\u043A\u0430 \u0437\u0430 400 \u0433\u0440\u043D, \u0456 \u0440\u0435\u0434\u0443\u043A\u0442\u043E\u0440 \u0437\u0430 \u043C\u0456\u043B\u044C\u0439\u043E\u043D.</p>
+  </div>
+</details>
+
+${sorted.length === 0 ? '<div class="empty">\u041F\u043E\u043A\u0438 \u0449\u043E \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u0438\u0445 \u0446\u0456\u043D \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E.</div>' : `<div class="rows">${sorted.map((c) => caseRow(c)).join("")}</div>`}
+
+<p class="note">\u0420\u0456\u0437\u043D\u0438\u0446\u044F \u0432 \u0446\u0456\u043D\u0456 \u2014 \u0446\u0435 \u0449\u0435 \u043D\u0435 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F. \u0412\u043E\u043D\u0430 \u043C\u043E\u0436\u0435 \u043C\u0430\u0442\u0438 \u043F\u043E\u044F\u0441\u043D\u0435\u043D\u043D\u044F: \u0456\u043D\u0448\u0456 \u0443\u043C\u043E\u0432\u0438 \u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043D\u043D\u044F, \u0456\u043D\u0448\u0438\u0439 \u0447\u0430\u0441, \u0456\u043D\u0448\u0430 \u044F\u043A\u0456\u0441\u0442\u044C. \u041D\u0430\u0448\u0435 \u0437\u0430\u0432\u0434\u0430\u043D\u043D\u044F \u2014 \u043F\u043E\u043A\u0430\u0437\u0430\u0442\u0438, \u0434\u0435 \u0446\u0435 \u043F\u043E\u044F\u0441\u043D\u0435\u043D\u043D\u044F \u0432\u0430\u0440\u0442\u043E \u0437\u0430\u043F\u0438\u0442\u0430\u0442\u0438.</p>
+`
+  });
+}
+function indicatorsPage() {
+  const counted = new Map(rankRisks(db.cases));
+  const ranked = db.rules.map((r) => [r.risk_id, counted.get(r.risk_id) ?? 0]).sort((a, b) => b[1] - a[1]);
+  return layout({
+    title: "\u0429\u043E \u043C\u0438 \u0448\u0443\u043A\u0430\u0454\u043C\u043E",
+    nav: "indicators",
+    body: `
+<h1>\u0429\u043E \u043C\u0438 \u0448\u0443\u043A\u0430\u0454\u043C\u043E</h1>
+<p class="sub">\u0427\u043E\u0442\u0438\u0440\u043D\u0430\u0434\u0446\u044F\u0442\u044C \u043E\u0437\u043D\u0430\u043A, \u0437\u0430 \u044F\u043A\u0438\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u043A\u043E\u0436\u043D\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0449\u043E \u043A\u043E\u0436\u043D\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u043E\u044E \u043C\u043E\u0432\u043E\u044E \u0456 \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0440\u0430\u0437\u0456\u0432 \u0432\u043E\u043D\u0430 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0430 \u0432 ${esc(REGION)} \u0442\u0430 \u043D\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456.</p>
+${groupedRiskCards(ranked)}
+`
+  });
+}
+function aboutPage() {
+  return layout({
+    title: "\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443",
+    nav: "about",
+    body: `
+<h1>\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443</h1>
+<p class="sub">\u0429\u043E \u043F\u043E\u043A\u0430\u0437\u0443\u0454 \u0446\u0435\u0439 \u0441\u0430\u0439\u0442, \u0437\u0432\u0456\u0434\u043A\u0438 \u0431\u0435\u0440\u0435 \u0434\u0430\u043D\u0456 \u0456 \u0447\u043E\u0433\u043E \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C.</p>
+
+<div class="card">
+  <h3>\u0417\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456</h3>
+  <p class="lead">\u0414\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u0438\u0445 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u0440\u0438\u0437\u0438\u043A\u0443 Prozorro \u2014 \u043D\u0430\u043A\u0430\u0437 \u041C\u0456\u043D\u0444\u0456\u043D\u0443 \u2116 476 \u0432\u0456\u0434 27 \u0432\u0435\u0440\u0435\u0441\u043D\u044F 2024 \u0440\u043E\u043A\u0443. \u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u043A\u043E\u0436\u043D\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u0437\u0430 \u0447\u0438\u043D\u043D\u0438\u043C \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u043E\u043C \u043E\u0437\u043D\u0430\u043A \u0456 \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u043E.</p>
+  <p>\u041C\u0438 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u043C\u043E \u0446\u0435\u0439 \u043C\u0430\u0441\u0438\u0432, \u0432\u0456\u0434\u0431\u0438\u0440\u0430\u0454\u043C\u043E ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0457 \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB, \u0434\u043E\u043F\u043E\u0432\u043D\u044E\u0454\u043C\u043E \u043A\u0430\u0440\u0442\u043A\u0430\u043C\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 Prozorro \u2014 \u0437\u0432\u0456\u0434\u043A\u0438 \u0431\u0435\u0440\u0435\u043C\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0443 \u043E\u0441\u043E\u0431\u0443, \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432 \u0456 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u2014 \u0456 \u043F\u043E\u0434\u0430\u0454\u043C\u043E \u0442\u0430\u043A, \u0449\u043E\u0431 \u0437 \u0446\u0438\u043C \u043C\u043E\u0436\u043D\u0430 \u0431\u0443\u043B\u043E \u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0442\u0438.</p>
+</div>
+
+<div class="card">
+  <h3>\u0422\u0440\u0438 \u0440\u0456\u0432\u043D\u0456 \u0434\u043E\u0441\u0442\u043E\u0432\u0456\u0440\u043D\u043E\u0441\u0442\u0456</h3>
+  <p><span class="tier confirmed">\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430</span> &nbsp;\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u043F\u0440\u043E\u0432\u0435\u043B\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u0456 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
+  <p><span class="tier state">\u041F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430</span> &nbsp;\u0421\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438. \u0426\u0435 \u043F\u0456\u0434\u043E\u0437\u0440\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0438 \u0437 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F\u043C \u043D\u0430 \u043D\u043E\u0440\u043C\u0443 \u0437\u0430\u043A\u043E\u043D\u0443 \u2014 \u0441\u0430\u043C\u0435 \u0446\u0435 \u043F\u043E\u043A\u0430\u0437\u0430\u043D\u043E \u043D\u0430 \u0441\u0430\u0439\u0442\u0456 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456.</p>
+  <p><span class="tier own">\u041F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043C\u0438</span> &nbsp;\u041D\u0430\u0448 \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A: \u0446\u0456\u043D\u0430 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E \u043F\u0440\u043E\u0442\u0438 \u043A\u0430\u0442\u0430\u043B\u043E\u0436\u043D\u043E\u0457. \u041F\u0456\u0434\u043A\u043B\u044E\u0447\u0430\u0454\u0442\u044C\u0441\u044F \u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0438\u043C \u0435\u0442\u0430\u043F\u043E\u043C.</p>
+  <p>\u041D\u0438\u0436\u0447\u0438\u0439 \u0440\u0456\u0432\u0435\u043D\u044C \u043D\u0456\u043A\u043E\u043B\u0438 \u043D\u0435 \u043F\u043E\u0434\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A \u0432\u0438\u0449\u0438\u0439.</p>
+</div>
+
+<div class="card">
+  <h3>\u041F\u0440\u043E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456\u0432</h3>
+  <p>\u0406\u043C'\u044F, \u043F\u043E\u0448\u0442\u0430 \u0439 \u0442\u0435\u043B\u0435\u0444\u043E\u043D \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438 \u0432\u0437\u044F\u0442\u0456 \u0437 \u043A\u0430\u0440\u0442\u043A\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432 Prozorro, \u0434\u0435 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0441\u0430\u043C \u0457\u0445 \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454. \u041E\u0434\u043D\u0443 \u043B\u044E\u0434\u0438\u043D\u0443 \u043C\u0456\u0436 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438 \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043E \u0437\u0430 \u043F\u043E\u0448\u0442\u043E\u044E, \u0431\u043E \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044F \u0456\u043C\u0435\u043D\u0456 \u0440\u0456\u0437\u043D\u0438\u0442\u044C\u0441\u044F.</p>
+  <p>\u0421\u0442\u043E\u0440\u0456\u043D\u043A\u0430 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u044F \u043F\u043E\u043A\u0430\u0437\u0443\u0454, \u0443 \u0441\u043A\u0456\u043B\u044C\u043A\u043E\u0445 \u0439\u043E\u0433\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0456 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438 \u0456 \u0437\u0430 \u044F\u043A\u0438\u043C\u0438 \u043D\u043E\u0440\u043C\u0430\u043C\u0438 \u0437\u0430\u043A\u043E\u043D\u0443. <strong>\u0426\u0435 \u043D\u0435 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432\u0438\u043D\u0430.</strong></p>
+</div>
+
+<div class="card">
+  <h3>\u0427\u043E\u043C\u0443 \u0442\u0443\u0442 \u043D\u0435\u043C\u0430\u0454 \u0441\u0443\u0434\u0438\u043C\u043E\u0441\u0442\u0435\u0439</h3>
+  <p>\u0404\u0434\u0438\u043D\u0438\u0439 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u0439 \u0440\u0435\u0454\u0441\u0442\u0440 \u0441\u0443\u0434\u043E\u0432\u0438\u0445 \u0440\u0456\u0448\u0435\u043D\u044C \u0437\u0430\u043A\u0440\u0438\u0442\u0438\u0439 CAPTCHA, \u0430 \u0432 \u0442\u0435\u043A\u0441\u0442\u0430\u0445 \u043A\u0440\u0438\u043C\u0456\u043D\u0430\u043B\u044C\u043D\u0438\u0445 \u0440\u0456\u0448\u0435\u043D\u044C \u0456\u043C\u0435\u043D\u0430 \u0437\u0430\u043C\u0456\u043D\u0435\u043D\u0456 \u043D\u0430 \xAB\u041E\u0421\u041E\u0411\u0410_1\xBB \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u043D\u043E \u0434\u043E \u0437\u0430\u043A\u043E\u043D\u043E\u0434\u0430\u0432\u0441\u0442\u0432\u0430 \u043F\u0440\u043E \u0437\u0430\u0445\u0438\u0441\u0442 \u043F\u0435\u0440\u0441\u043E\u043D\u0430\u043B\u044C\u043D\u0438\u0445 \u0434\u0430\u043D\u0438\u0445. \u0417\u0456\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456\u0437 \u043B\u044E\u0434\u0438\u043D\u043E\u044E \u0437\u0430 \u0437\u0431\u0456\u0433\u043E\u043C \u043F\u0440\u0456\u0437\u0432\u0438\u0449\u0430 \u043D\u0435\u043C\u043E\u0436\u043B\u0438\u0432\u043E \u043D\u0430\u0434\u0456\u0439\u043D\u043E, \u0430 \u043F\u043E\u043C\u0438\u043B\u043A\u0430 \u0442\u0443\u0442 \u2014 \u0446\u0435 \u0437\u0432\u0438\u043D\u0443\u0432\u0430\u0447\u0435\u043D\u043D\u044F \u043D\u0435\u0432\u0438\u043D\u043D\u043E\u0433\u043E.</p>
+  <p>\u0422\u043E\u043C\u0443 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454 \u043B\u0438\u0448\u0435 \u0442\u0435, \u0449\u043E \u043C\u043E\u0436\u043D\u0430 \u0434\u043E\u0432\u0435\u0441\u0442\u0438: \u044F\u043A\u0456 \u043E\u0437\u043D\u0430\u043A\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0432\u0438\u044F\u0432\u0438\u043B\u0430 \u0432 \u043A\u043E\u043D\u043A\u0440\u0435\u0442\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u043A\u043E\u043D\u043A\u0440\u0435\u0442\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438.</p>
+</div>
+
+<div class="card">
+  <h3>\u0427\u043E\u0433\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C</h3>
+  <p>\u0412\u043E\u043D\u0430 \u043D\u0435 \u043E\u0433\u043E\u043B\u043E\u0448\u0443\u0454 \u0432\u0438\u043D\u0443 \u0456 \u043D\u0435 \u043D\u0430\u0437\u0438\u0432\u0430\u0454 \u0436\u043E\u0434\u043D\u0443 \u0444\u0456\u0440\u043C\u0443 \u0447\u0438 \u043B\u044E\u0434\u0438\u043D\u0443 \u0437\u043B\u043E\u0447\u0438\u043D\u0446\u0435\u043C. \u0412\u043E\u043D\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454 \u043E\u0437\u043D\u0430\u043A\u0438 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0456 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u044E\u0442\u044C \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0456 \u0437\u0430\u0432\u0436\u0434\u0438 \u0434\u0430\u0454 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u043D\u0430 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E, \u0449\u043E\u0431 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u043C\u043E\u0436\u043D\u0430 \u0431\u0443\u043B\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0432\u0440\u0443\u0447\u043D\u0443.</p>
+</div>
+`
+  });
+}
+function notFound() {
+  return layout({
+    title: "\u041D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E",
+    body: `<h1>\u041D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E</h1><p class="sub">\u0422\u0430\u043A\u043E\u0457 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438 \u043D\u0435\u043C\u0430\u0454. <a href="/">\u0414\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u043D\u0430\u0445\u0456\u0434\u043E\u043A \u2192</a></p>`
+  });
+}
+function render(url) {
+  const path = decodeURIComponent(url.pathname);
+  if (path === "/") return { status: 200, body: feedPage(url) };
+  if (path === "/entities") return { status: 200, body: entitiesPage() };
+  if (path === "/officers") return { status: 200, body: officersPage() };
+  if (path === "/suppliers") return { status: 200, body: suppliersPage() };
+  if (path === "/railway") return { status: 200, body: railwayPage() };
+  if (path === "/updates") return { status: 200, body: updatesPage() };
+  if (path === "/prices") return { status: 200, body: pricesPage() };
+  if (path === "/indicators") return { status: 200, body: indicatorsPage() };
+  if (path === "/about") return { status: 200, body: aboutPage() };
+  if (path.startsWith("/article/")) return { status: 200, body: articlePage(path.slice("/article/".length), url) };
+  if (path.startsWith("/tender/")) return { status: 200, body: tenderPage(path.slice("/tender/".length)) };
+  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length)) };
+  if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length)) };
+  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length)) };
+  return { status: 404, body: notFound() };
+}
+
+// api-src/handler.ts
+function handler(req, res) {
+  const host = req.headers["x-forwarded-host"] ?? req.headers.host ?? "localhost";
+  const url = new URL(req.url ?? "/", `https://${host}`);
+  const { status, body } = render(url);
+  res.statusCode = status;
+  res.setHeader("content-type", "text/html; charset=utf-8");
+  res.setHeader("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=600");
+  res.end(body);
+}
+export {
+  handler as default
+};
