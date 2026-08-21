@@ -432,6 +432,20 @@ form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
 .filters-more[open] summary{border-bottom:1px solid var(--line-soft)}
 .filters-more summary:hover{background:var(--surface-3)}
 .filters-more .inner{padding:.9rem;display:flex;flex-direction:column;gap:.6rem}
+.verdict{border-left:4px solid var(--ink-faint)}
+.verdict.high{border-left-color:var(--alarm)}
+.verdict.medium{border-left-color:var(--warn)}
+.verdict.low{border-left-color:var(--ink-faint)}
+.verdict-tag{display:inline-block;font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:.24rem .55rem;border-radius:2px;margin-right:.5rem;vertical-align:middle}
+.verdict.high .verdict-tag{color:var(--alarm);background:var(--alarm-bg);border:1px solid var(--alarm)}
+.verdict.medium .verdict-tag{color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn)}
+.verdict.low .verdict-tag{color:var(--ink-faint);background:var(--surface-2);border:1px solid var(--line)}
+ol.findings{margin:.4rem 0 1rem;padding-left:1.4rem;display:flex;flex-direction:column;gap:.7rem}
+ol.findings li{max-width:68ch}
+ol.findings li strong{display:block;margin-bottom:.15rem}
+ol.findings li span{color:var(--ink-soft);font-size:.96rem}
+ol.findings li.w-high::marker{color:var(--alarm);font-weight:700}
+ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 .actions{display:flex;flex-wrap:wrap;gap:.55rem;margin:0 0 1.75rem}
 .action{display:inline-flex;align-items:center;gap:.45rem;text-decoration:none;font-size:.95rem;color:var(--accent);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:.55rem 1rem}
 .action:hover{border-color:var(--accent);background:var(--accent-bg)}
@@ -1045,11 +1059,128 @@ function favouritesCookie(favourites, secure) {
   return value.length === 0 ? `${FAVOURITES_COOKIE}=; ${attrs}; Max-Age=0` : `${FAVOURITES_COOKIE}=${value}; ${attrs}; Max-Age=${TTL_SECONDS}`;
 }
 
+// server/conclusion.ts
+function fmt(n, digits = 0) {
+  return new Intl.NumberFormat("uk-UA", { maximumFractionDigits: digits }).format(n);
+}
+function money2(n) {
+  return n === null || !Number.isFinite(n) ? "\u2014" : `${fmt(n)} \u0433\u0440\u043D`;
+}
+function dominantPattern(entry) {
+  const counts = /* @__PURE__ */ new Map();
+  for (const id of entry.risks) {
+    const group = RISK_LABELS[id]?.group;
+    if (!group) continue;
+    counts.set(group, (counts.get(group) ?? 0) + 1);
+  }
+  let best = null;
+  for (const [group, count] of counts) {
+    if (!best || count > best.count) best = { group, count };
+  }
+  return best;
+}
+function buildConclusion(input) {
+  const { entry, sameEntity, sameOfficer, sameWinner } = input;
+  const observations = [];
+  const nextSteps = [];
+  for (const finding of entry.findings) {
+    const e = finding.evidence;
+    const gap = typeof e.overpayment === "number" ? e.overpayment : typeof e.extra_cost === "number" ? e.extra_cost : null;
+    if (finding.detector_key === "peer_price" && typeof e.peer_median === "number" && typeof e.unit_price === "number") {
+      observations.push({
+        weight: finding.severity === "low" ? "medium" : "high",
+        aboutThisTender: true,
+        title: "\u0426\u0456\u043D\u0430 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E \u0432\u0438\u0449\u0430 \u0437\u0430 \u0440\u0438\u043D\u043A\u043E\u0432\u0443",
+        detail: `\u0417\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E \u043F\u043B\u0430\u0442\u044F\u0442\u044C ${fmt(e.unit_price, 2)} \u0433\u0440\u043D, \u0442\u043E\u0434\u0456 \u044F\u043A \u0443 ${e.peer_count ?? "\u0456\u043D\u0448\u0438\u0445"} \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0442\u043E\u0433\u043E \u0441\u0430\u043C\u043E\u0433\u043E \u043F\u0440\u0435\u0434\u043C\u0435\u0442\u0430 \u043C\u0435\u0434\u0456\u0430\u043D\u0430 \u2014 ${fmt(e.peer_median, 2)} \u0433\u0440\u043D. ` + (gap !== null ? `\u041D\u0430 \u0432\u0435\u0441\u044C \u043E\u0431\u0441\u044F\u0433 \u0440\u0456\u0437\u043D\u0438\u0446\u044F \u0441\u043A\u043B\u0430\u0434\u0430\u0454 ${money2(gap)}.` : "")
+      });
+      nextSteps.push("\u0417\u0430\u043F\u0440\u043E\u0441\u0438\u0442\u0438 \u043E\u0431\u0491\u0440\u0443\u043D\u0442\u0443\u0432\u0430\u043D\u043D\u044F \u043E\u0447\u0456\u043A\u0443\u0432\u0430\u043D\u043E\u0457 \u0432\u0430\u0440\u0442\u043E\u0441\u0442\u0456 \u0442\u0430 \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0446\u0456\u043D\u0438 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E.");
+    }
+    if (finding.detector_key === "own_price_growth" && typeof e.previous_price === "number" && typeof e.growth === "number") {
+      observations.push({
+        weight: e.growth >= 1 ? "high" : "medium",
+        aboutThisTender: true,
+        title: "\u0422\u043E\u0439 \u0441\u0430\u043C\u0438\u0439 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u043F\u0456\u0434\u043D\u044F\u0432 \u0446\u0456\u043D\u0443",
+        detail: `\u0420\u0430\u043D\u0456\u0448\u0435 \u0446\u0435\u0439 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u043A\u0443\u043F\u0443\u0432\u0430\u0432 \u0442\u0435 \u0441\u0430\u043C\u0435 \u043F\u043E ${fmt(e.previous_price, 2)} \u0433\u0440\u043D \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E, \u0442\u0435\u043F\u0435\u0440 \u2014 \u043F\u043E ${fmt(Number(e.unit_price ?? 0), 2)} \u0433\u0440\u043D, \u0442\u043E\u0431\u0442\u043E \u043D\u0430 ${Math.round(e.growth * 100)}% \u0431\u0456\u043B\u044C\u0448\u0435. ` + (gap !== null ? `\u0420\u0456\u0437\u043D\u0438\u0446\u044F \u043D\u0430 \u0446\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u2014 ${money2(gap)}. ` : "") + "\u041F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F \u0432\u0441\u0435\u0440\u0435\u0434\u0438\u043D\u0456 \u043E\u0434\u043D\u043E\u0433\u043E \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430, \u0442\u043E\u0436 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u043D\u0430 \u043C\u0456\u0441\u0446\u0435\u0432\u0456 \u0443\u043C\u043E\u0432\u0438 \u0442\u0443\u0442 \u043D\u0435 \u043F\u0440\u0430\u0446\u044E\u0454."
+      });
+      nextSteps.push("\u041F\u043E\u0440\u0456\u0432\u043D\u044F\u0442\u0438 \u0442\u0435\u0445\u043D\u0456\u0447\u043D\u0456 \u0432\u0438\u043C\u043E\u0433\u0438 \u043E\u0431\u043E\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u2014 \u0447\u0438 \u0441\u043F\u0440\u0430\u0432\u0434\u0456 \u0437\u043C\u0456\u043D\u0438\u0432\u0441\u044F \u043F\u0440\u0435\u0434\u043C\u0435\u0442.");
+    }
+  }
+  if (entry.detailed && entry.bidders === 1) {
+    const big = (entry.value_amount ?? 0) >= 1e7;
+    observations.push({
+      weight: big ? "high" : "medium",
+      aboutThisTender: true,
+      title: "\u041A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u0457 \u043D\u0435 \u0431\u0443\u043B\u043E",
+      detail: `\u041D\u0430 \u0442\u043E\u0440\u0433\u0438 \u043F\u043E\u0434\u0430\u0432\u0441\u044F \u043E\u0434\u0438\u043D \u0443\u0447\u0430\u0441\u043D\u0438\u043A, \u0456 \u0432\u0456\u043D \u0436\u0435 \u043F\u0435\u0440\u0435\u043C\u0456\u0433. \u0421\u0443\u043C\u0430 \u2014 ${money2(entry.value_amount)}. \u0411\u0435\u0437 \u0434\u0440\u0443\u0433\u043E\u0457 \u043F\u0440\u043E\u043F\u043E\u0437\u0438\u0446\u0456\u0457 \u0446\u0456\u043D\u0443 \u043D\u0435\u043C\u0430\u0454 \u0437 \u0447\u0438\u043C \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u0442\u0438 \u0432 \u043C\u0435\u0436\u0430\u0445 \u0441\u0430\u043C\u043E\u0457 \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0438.`
+    });
+    nextSteps.push("\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0432\u0438\u043C\u043E\u0433\u0438 \u0442\u0435\u043D\u0434\u0435\u0440\u043D\u043E\u0457 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0456\u0457 \u2014 \u0447\u0438 \u043D\u0435 \u0437\u0432\u0443\u0436\u0443\u0432\u0430\u043B\u0438 \u0432\u043E\u043D\u0438 \u043A\u043E\u043B\u043E \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432.");
+  }
+  if (entry.value_amount && entry.winner_amount && entry.value_amount > 0) {
+    const discount = 1 - entry.winner_amount / entry.value_amount;
+    if (discount >= 0 && discount < 0.01 && entry.value_amount >= 1e6) {
+      observations.push({
+        weight: "medium",
+        aboutThisTender: true,
+        title: "\u0422\u043E\u0440\u0433\u0438 \u043D\u0435 \u0437\u0431\u0438\u043B\u0438 \u0446\u0456\u043D\u0443",
+        detail: `\u0414\u043E\u0433\u043E\u0432\u0456\u0440 \u0443\u043A\u043B\u0430\u0434\u0435\u043D\u043E \u043D\u0430 ${money2(entry.winner_amount)} \u043F\u0440\u043E\u0442\u0438 \u043E\u0447\u0456\u043A\u0443\u0432\u0430\u043D\u0438\u0445 ${money2(entry.value_amount)} \u2014 \u0437\u043D\u0438\u0436\u043A\u0430 ${(discount * 100).toFixed(2)}%. \u0424\u0430\u043A\u0442\u0438\u0447\u043D\u043E \u0430\u0443\u043A\u0446\u0456\u043E\u043D \u043D\u0435 \u0432\u0456\u0434\u0431\u0443\u0432\u0441\u044F.`
+      });
+    }
+  }
+  const pattern = dominantPattern(entry);
+  if (pattern && pattern.count >= 2) {
+    observations.push({
+      weight: "medium",
+      aboutThisTender: true,
+      title: `\u041E\u0437\u043D\u0430\u043A\u0438 \u0441\u043A\u043B\u0430\u0434\u0430\u044E\u0442\u044C\u0441\u044F \u0432 \u043E\u0434\u0438\u043D \u0441\u044E\u0436\u0435\u0442: ${pattern.group.toLowerCase()}`,
+      detail: `${pattern.count} \u0437 ${entry.risks.length} \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u043D\u0430\u043B\u0435\u0436\u0430\u0442\u044C \u0434\u043E \u043E\u0434\u043D\u0456\u0454\u0457 \u0433\u0440\u0443\u043F\u0438. \u0426\u0435 \u043D\u0435 \u0437\u0431\u0456\u0433 \u043E\u043A\u0440\u0435\u043C\u0438\u0445 \u0444\u043E\u0440\u043C\u0430\u043B\u044C\u043D\u043E\u0441\u0442\u0435\u0439, \u0430 \u043F\u043E\u0432\u0442\u043E\u0440\u044E\u0432\u0430\u043D\u0438\u0439 \u0445\u0456\u0434 \u0443 \u043C\u0435\u0436\u0430\u0445 \u043E\u0434\u043D\u0456\u0454\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456.`
+    });
+  }
+  const pair = sameWinner.filter((c) => c.entity_edrpou === entry.entity_edrpou).length;
+  if (pair >= 3 && entry.winner_name) {
+    observations.push({
+      weight: pair >= 6 ? "high" : "medium",
+      aboutThisTender: false,
+      title: "\u041F\u043E\u0441\u0442\u0456\u0439\u043D\u0430 \u043F\u0430\u0440\u0430 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u2014 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0435\u0446\u044C",
+      detail: `\u0426\u0435\u0439 \u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A \u0432\u0438\u0433\u0440\u0430\u0432 ${pair} \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0441\u0430\u043C\u0435 \u0446\u044C\u043E\u0433\u043E \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430, \u0456 \u0432\u0441\u0456 \u0432\u043E\u043D\u0438 \u043C\u0430\u044E\u0442\u044C \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0456 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438. \u0423\u0441\u044C\u043E\u0433\u043E \u0432 \u0431\u0430\u0437\u0456 \u0437\u0430 \u043D\u0438\u043C ${sameWinner.length} \u043F\u0435\u0440\u0435\u043C\u043E\u0433.`
+    });
+    nextSteps.push("\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0437\u0430\u0441\u043D\u043E\u0432\u043D\u0438\u043A\u0456\u0432 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u0442\u0430 \u0457\u0445 \u0437\u0432'\u044F\u0437\u043A\u0438 \u0456\u0437 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u043E\u043C.");
+  }
+  if (entry.officer_name && sameOfficer.length >= 5) {
+    const officerSolo = sameOfficer.filter((c) => c.bidders === 1).length;
+    observations.push({
+      weight: sameOfficer.length >= 20 ? "medium" : "low",
+      aboutThisTender: false,
+      title: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0446\u0456\u0454\u0457 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u0430\u044E\u0442\u044C\u0441\u044F \u0441\u0438\u0441\u0442\u0435\u043C\u0430\u0442\u0438\u0447\u043D\u043E",
+      detail: `${entry.officer_name} \u0432\u043A\u0430\u0437\u0430\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E \u0443 ${sameOfficer.length} \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u043C\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438` + (officerSolo > 0 ? `, \u0437 \u043D\u0438\u0445 ${officerSolo} \u2014 \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432` : "") + ". \u0426\u0435 \u0445\u0430\u0440\u0430\u043A\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043A\u0430 \u043F\u043E\u0442\u043E\u043A\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C, \u0430 \u043D\u0435 \u0437\u0432\u0438\u043D\u0443\u0432\u0430\u0447\u0435\u043D\u043D\u044F \u043E\u0441\u043E\u0431\u0438."
+    });
+  }
+  if (sameEntity.length >= 20) {
+    const entityValue = sameEntity.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+    observations.push({
+      weight: "low",
+      aboutThisTender: false,
+      title: "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0443 \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u043E\u0441\u0442\u0456\u0439\u043D\u043E",
+      detail: `\u0417\u0430 \u0446\u0438\u043C \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u043E\u043C \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0430\u043D\u043E ${sameEntity.length} \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u043D\u0430 ${money2(entityValue)}.`
+    });
+  }
+  const own = observations.filter((o) => o.aboutThisTender);
+  const highs = own.filter((o) => o.weight === "high").length;
+  const mediums = own.filter((o) => o.weight === "medium").length;
+  const level = highs >= 1 ? "high" : mediums >= 2 ? "medium" : mediums === 1 ? "medium" : "low";
+  const headline = own.length === 0 ? observations.length === 0 ? "\u041A\u0440\u0456\u043C \u0441\u0430\u043C\u043E\u0457 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438, \u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u0438" : "\u0423 \u0441\u0430\u043C\u0456\u0439 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u0438, \u0430\u043B\u0435 \u043D\u0430\u0432\u043A\u043E\u043B\u043E \u043D\u0435\u0457 \u0454 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442" : level === "high" ? "\u0404 \u0449\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0442\u0438: \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u043D\u0456 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456" : "\u0412\u0430\u0440\u0442\u043E \u043F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F \u0443\u0432\u0430\u0436\u043D\u0456\u0448\u0435";
+  if (own.length === 0) {
+    nextSteps.push("\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E \u0432 Prozorro \u0456 \u0437\u0432\u0456\u0440\u0438\u0442\u0438 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u043F\u0438\u0441\u043E\u043C \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0430.");
+  } else {
+    nextSteps.push("\u0412\u0438\u0442\u0440\u0435\u0431\u0443\u0432\u0430\u0442\u0438 \u0434\u043E\u0433\u043E\u0432\u0456\u0440 \u0456 \u0432\u0441\u0456 \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0456 \u0443\u0433\u043E\u0434\u0438 \u0434\u043E \u043D\u044C\u043E\u0433\u043E.");
+  }
+  return { level, headline, observations, nextSteps: [...new Set(nextSteps)] };
+}
+
 // server/report.ts
 function plainNumber(n, digits = 2) {
   return new Intl.NumberFormat("uk-UA", { maximumFractionDigits: digits }).format(n).replace(/ /g, " ");
 }
-function money2(amount) {
+function money3(amount) {
   if (amount === null || !Number.isFinite(amount)) return "\u2014";
   return plainNumber(amount) + " \u0433\u0440\u043D";
 }
@@ -1072,6 +1203,26 @@ function wrap(text, width = 78, indent = "  ") {
 function sections(ctx) {
   const { entry, rules } = ctx;
   const out = [];
+  const verdict = ctx.conclusion;
+  out.push({
+    heading: "\u0412\u0418\u0421\u041D\u041E\u0412\u041E\u041A \u0421\u0418\u0421\u0422\u0415\u041C\u0418",
+    lines: [
+      verdict.headline,
+      "",
+      ...verdict.observations.length > 0 ? verdict.observations.flatMap((o, i) => [`${i + 1}. ${o.title}`, wrap(o.detail), ""]) : [
+        wrap(
+          "\u0414\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0446\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E, \u0430\u043B\u0435 \u043D\u0430\u0448\u0456 \u0432\u043B\u0430\u0441\u043D\u0456 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u2014 \u0446\u0456\u043D\u0430 \u043F\u0440\u043E\u0442\u0438 \u0440\u0438\u043D\u043A\u0443, \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u044F, \u043F\u043E\u0432\u0442\u043E\u0440\u044E\u0432\u0430\u043D\u0456\u0441\u0442\u044C \u0437\u0432'\u044F\u0437\u043A\u0456\u0432 \u2014 \u043D\u0456\u0447\u043E\u0433\u043E \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u043E\u0433\u043E \u043D\u0435 \u043F\u043E\u043A\u0430\u0437\u0430\u043B\u0438."
+        ),
+        ""
+      ],
+      "\u0429\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0434\u0430\u043B\u0456:",
+      ...verdict.nextSteps.map((step) => wrap(`\u2014 ${step}`)),
+      "",
+      wrap(
+        "\u0426\u0435\u0439 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0441\u043A\u043B\u0430\u043B\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0437 \u0447\u0438\u0441\u0435\u043B, \u043D\u0430\u0432\u0435\u0434\u0435\u043D\u0438\u0445 \u043D\u0438\u0436\u0447\u0435. \u0412\u0456\u043D \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0456 \u043D\u0435 \u0454 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u0454\u044E \u0434\u0456\u0439 \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u043E\u0441\u043E\u0431\u0438."
+      )
+    ]
+  });
   out.push({
     heading: "\u0417\u0410\u041A\u0423\u041F\u0406\u0412\u041B\u042F",
     lines: [
@@ -1079,7 +1230,7 @@ function sections(ctx) {
       `\u041D\u043E\u043C\u0435\u0440: ${entry.tender_ref || entry.tender_id}`,
       `\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456: ${day(entry.tender_date)}`,
       `\u0414\u0430\u0442\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u0438: ${day(entry.date_assessed)}`,
-      `\u0421\u0443\u043C\u0430: ${money2(entry.value_amount)}`,
+      `\u0421\u0443\u043C\u0430: ${money3(entry.value_amount)}`,
       `\u0420\u0435\u0433\u0456\u043E\u043D: ${entry.region ?? "\u2014"}`,
       entry.method ? `\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0430: ${procedureLabel(entry.method) ?? entry.method}` : "",
       entry.detailed ? `\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432: ${entry.bidders === 1 ? "\u043E\u0434\u0438\u043D \u2014 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u0457 \u043D\u0435 \u0431\u0443\u043B\u043E" : entry.bidders || "\u2014"}` : "",
@@ -1115,7 +1266,7 @@ function sections(ctx) {
       lines: [
         `\u041D\u0430\u0437\u0432\u0430: ${readableName(entry.winner_name)}`,
         `\u0404\u0414\u0420\u041F\u041E\u0423: ${entry.winner_edrpou ?? "\u2014"}`,
-        `\u0421\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443: ${money2(entry.winner_amount)}`,
+        `\u0421\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443: ${money3(entry.winner_amount)}`,
         `\u041F\u0435\u0440\u0435\u043C\u043E\u0433 \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438: ${ctx.sameWinner}`
       ]
     });
@@ -1602,6 +1753,22 @@ ${listBody(list, c, "/")}
 `
   });
 }
+function conclusionBlock(entry, sameEntity, sameOfficer, sameWinner) {
+  const c = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
+  const levelLabel = c.level === "high" ? "\u0412\u0438\u0441\u043E\u043A\u0438\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442" : c.level === "medium" ? "\u0421\u0435\u0440\u0435\u0434\u043D\u0456\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442" : "\u041D\u0438\u0437\u044C\u043A\u0438\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442";
+  return `<div class="card verdict ${esc(c.level)}">
+  <h3><span class="verdict-tag">${esc(levelLabel)}</span> ${esc(c.headline)}</h3>
+  ${c.observations.length > 0 ? `<ol class="findings">${c.observations.map(
+    (o) => `<li class="w-${esc(o.weight)}">
+    <strong>${esc(o.title)}</strong>
+    <span>${esc(o.detail)}</span>
+  </li>`
+  ).join("")}</ol>` : `<p class="lead">\u0414\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0446\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E, \u0430\u043B\u0435 \u043D\u0430\u0448\u0456 \u0432\u043B\u0430\u0441\u043D\u0456 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u2014 \u0446\u0456\u043D\u0430 \u043F\u0440\u043E\u0442\u0438 \u0440\u0438\u043D\u043A\u0443, \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u044F, \u043F\u043E\u0432\u0442\u043E\u0440\u044E\u0432\u0430\u043D\u0456\u0441\u0442\u044C \u0437\u0432'\u044F\u0437\u043A\u0456\u0432 \u2014 \u043D\u0456\u0447\u043E\u0433\u043E \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u043E\u0433\u043E \u043D\u0435 \u043F\u043E\u043A\u0430\u0437\u0430\u043B\u0438.</p>`}
+  <p><strong>\u0429\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0434\u0430\u043B\u0456:</strong></p>
+  <ul>${c.nextSteps.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
+  <p class="faint">\u0426\u0435\u0439 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0441\u043A\u043B\u0430\u043B\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0437 \u0447\u0438\u0441\u0435\u043B, \u043D\u0430\u0432\u0435\u0434\u0435\u043D\u0438\u0445 \u0432\u0438\u0449\u0435. \u0412\u0456\u043D \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0456 \u043D\u0435 \u0454 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u0454\u044E \u0434\u0456\u0439 \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u043E\u0441\u043E\u0431\u0438.</p>
+</div>`;
+}
 function tenderPage(tenderId) {
   const entry = db.byTender.get(tenderId);
   if (!entry) return notFound();
@@ -1687,6 +1854,9 @@ ${entry.findings.map((f) => {
 <h2>\u0429\u043E \u0442\u0443\u0442 \u043D\u0435 \u0442\u0430\u043A</h2>
 <p class="hint">\u0421\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u043E ${entry.risks.length} ${plural(entry.risks.length, "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432")} \u0456\u0437 \u0447\u043E\u0442\u0438\u0440\u043D\u0430\u0434\u0446\u044F\u0442\u0438 \u0447\u0438\u043D\u043D\u0438\u0445.</p>
 ${entry.risks.map((r) => riskCard(r)).join("")}
+
+<h2>\u041D\u0430\u0448 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A</h2>
+${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
 
 <h2>\u0426\u0435\u0439 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0437\u0430\u0433\u0430\u043B\u043E\u043C</h2>
 <div class="card">
@@ -2433,12 +2603,16 @@ function render(url, saved = []) {
       const id = rest.slice(0, rest.lastIndexOf("/report"));
       const entry = db.byTender.get(id);
       if (!entry) return { status: 404, body: notFound() };
+      const sameEntity = db.cases.filter((x) => x.entity_edrpou && x.entity_edrpou === entry.entity_edrpou);
+      const sameOfficer = entry.officer_key ? db.cases.filter((x) => x.officer_key === entry.officer_key) : [];
+      const sameWinner = entry.winner_edrpou ? db.cases.filter((x) => x.winner_edrpou === entry.winner_edrpou) : [];
       const ctx = {
         entry,
         rules: db.ruleById,
-        sameEntity: db.cases.filter((x) => x.entity_edrpou && x.entity_edrpou === entry.entity_edrpou).length,
-        sameOfficer: entry.officer_key ? db.cases.filter((x) => x.officer_key === entry.officer_key).length : 0,
-        sameWinner: entry.winner_edrpou ? db.cases.filter((x) => x.winner_edrpou === entry.winner_edrpou).length : 0,
+        sameEntity: sameEntity.length,
+        sameOfficer: sameOfficer.length,
+        sameWinner: sameWinner.length,
+        conclusion: buildConclusion({ entry, sameEntity, sameOfficer, sameWinner }),
         generatedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
       return asText ? {

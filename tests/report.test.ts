@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { reportText, reportHtml, type ReportContext } from "../server/report.ts";
+import { buildConclusion } from "../server/conclusion.ts";
 import type { Case } from "../server/data.ts";
 import type { RiskRuleRow, FindingRow } from "../src/store/types.ts";
 
@@ -44,7 +45,15 @@ function ctx(over: Partial<Case> = {}): ReportContext {
     bidders: 1, detailed: true, findings: [finding],
     ...over,
   };
-  return { entry, rules, sameEntity: 38, sameOfficer: 12, sameWinner: 171, generatedAt: "2026-08-21T00:00:00Z" };
+  return {
+    entry,
+    rules,
+    sameEntity: 38,
+    sameOfficer: 12,
+    sameWinner: 171,
+    conclusion: buildConclusion({ entry, sameEntity: [entry], sameOfficer: [entry], sameWinner: [entry] }),
+    generatedAt: "2026-08-21T00:00:00Z",
+  };
 }
 
 test("the text report carries the tender, buyer, official and winner", () => {
@@ -123,4 +132,14 @@ test("the printable report offers printing and the text download", () => {
   assert.match(html, /window\.print\(\)/);
   assert.match(html, /\/report\.txt/);
   assert.match(html, /@media print/);
+});
+
+test("the report opens with the system's own conclusion", () => {
+  const text = reportText(ctx());
+  assert.ok(text.indexOf("ВИСНОВОК СИСТЕМИ") < text.indexOf("ЗАКУПІВЛЯ"));
+  const flat = text.replace(/\s+/g, " ");
+  // The tender in this fixture has a single bidder and a price finding.
+  assert.match(flat, /Конкуренції не було/);
+  assert.match(flat, /Що перевірити далі/);
+  assert.match(flat, /не встановлює порушення/);
 });

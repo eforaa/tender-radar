@@ -7,6 +7,7 @@ import { loadDataset, type Case, type Dataset } from "./data.ts";
 import { DIMENSIONS, buildGroups, isDimension, type Dimension, type Group } from "./grouping.ts";
 import { normaliseEdrpou, isStarred, type Favourite, type FavKind } from "./favourites.ts";
 import { reportText, reportHtml, type ReportContext } from "./report.ts";
+import { buildConclusion } from "./conclusion.ts";
 import {
   readControls, applyControls, activeCount, isFiltered, keepControls,
   type Controls, type ControlOptions,
@@ -369,6 +370,32 @@ ${listBody(list, c, "/")}
   });
 }
 
+/** The system's own reading of one tender, rendered for the page. */
+function conclusionBlock(entry: Case, sameEntity: Case[], sameOfficer: Case[], sameWinner: Case[]): string {
+  const c = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
+  // The tag states the priority; the headline says why. They must not repeat.
+  const levelLabel = c.level === "high" ? "Високий пріоритет" : c.level === "medium" ? "Середній пріоритет" : "Низький пріоритет";
+
+  return `<div class="card verdict ${esc(c.level)}">
+  <h3><span class="verdict-tag">${esc(levelLabel)}</span> ${esc(c.headline)}</h3>
+  ${
+    c.observations.length > 0
+      ? `<ol class="findings">${c.observations
+          .map(
+            (o) => `<li class="w-${esc(o.weight)}">
+    <strong>${esc(o.title)}</strong>
+    <span>${esc(o.detail)}</span>
+  </li>`,
+          )
+          .join("")}</ol>`
+      : `<p class="lead">Державна система позначила цю закупівлю, але наші власні перевірки — ціна проти ринку, конкуренція, повторюваність зв'язків — нічого додаткового не показали.</p>`
+  }
+  <p><strong>Що перевірити далі:</strong></p>
+  <ul>${c.nextSteps.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
+  <p class="faint">Цей висновок склала система з чисел, наведених вище. Він не встановлює порушення і не є кваліфікацією дій будь-якої особи.</p>
+</div>`;
+}
+
 function tenderPage(tenderId: string): string {
   const entry = db.byTender.get(tenderId);
   if (!entry) return notFound();
@@ -471,6 +498,9 @@ ${entry.findings
 <h2>Що тут не так</h2>
 <p class="hint">Спрацювало ${entry.risks.length} ${plural(entry.risks.length, "індикатор", "індикатори", "індикаторів")} із чотирнадцяти чинних.</p>
 ${entry.risks.map((r) => riskCard(r)).join("")}
+
+<h2>Наш висновок</h2>
+${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
 
 <h2>Цей замовник загалом</h2>
 <div class="card">
@@ -1408,12 +1438,16 @@ export function render(url: URL, saved: Favourite[] = []): Rendered {
       const id = rest.slice(0, rest.lastIndexOf("/report"));
       const entry = db.byTender.get(id);
       if (!entry) return { status: 404, body: notFound() };
+      const sameEntity = db.cases.filter((x) => x.entity_edrpou && x.entity_edrpou === entry.entity_edrpou);
+      const sameOfficer = entry.officer_key ? db.cases.filter((x) => x.officer_key === entry.officer_key) : [];
+      const sameWinner = entry.winner_edrpou ? db.cases.filter((x) => x.winner_edrpou === entry.winner_edrpou) : [];
       const ctx: ReportContext = {
         entry,
         rules: db.ruleById,
-        sameEntity: db.cases.filter((x) => x.entity_edrpou && x.entity_edrpou === entry.entity_edrpou).length,
-        sameOfficer: entry.officer_key ? db.cases.filter((x) => x.officer_key === entry.officer_key).length : 0,
-        sameWinner: entry.winner_edrpou ? db.cases.filter((x) => x.winner_edrpou === entry.winner_edrpou).length : 0,
+        sameEntity: sameEntity.length,
+        sameOfficer: sameOfficer.length,
+        sameWinner: sameWinner.length,
+        conclusion: buildConclusion({ entry, sameEntity, sameOfficer, sameWinner }),
         generatedAt: new Date().toISOString(),
       };
       return asText

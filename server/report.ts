@@ -10,6 +10,7 @@ import type { RiskRuleRow } from "../src/store/types.ts";
 import { RISK_LABELS, procedureLabel, readableName } from "../src/labels.ts";
 import { INDICATOR_LEGAL, ARTICLES } from "../src/legal.ts";
 import { esc, shortDate } from "./html.ts";
+import { buildConclusion, type Conclusion } from "./conclusion.ts";
 
 export type ReportContext = {
   entry: Case;
@@ -18,6 +19,8 @@ export type ReportContext = {
   sameEntity: number;
   sameOfficer: number;
   sameWinner: number;
+  /** The system's own reading, so the file carries the same verdict as the page. */
+  conclusion: Conclusion;
   generatedAt: string;
 };
 
@@ -54,6 +57,31 @@ function wrap(text: string, width = 78, indent = "  "): string {
 function sections(ctx: ReportContext): { heading: string; lines: string[] }[] {
   const { entry, rules } = ctx;
   const out: { heading: string; lines: string[] }[] = [];
+
+  const verdict = ctx.conclusion;
+  out.push({
+    heading: "ВИСНОВОК СИСТЕМИ",
+    lines: [
+      verdict.headline,
+      "",
+      ...(verdict.observations.length > 0
+        ? verdict.observations.flatMap((o, i) => [`${i + 1}. ${o.title}`, wrap(o.detail), ""])
+        : [
+            wrap(
+              "Державна система позначила цю закупівлю, але наші власні перевірки — ціна проти ринку, " +
+                "конкуренція, повторюваність зв'язків — нічого додаткового не показали.",
+            ),
+            "",
+          ]),
+      "Що перевірити далі:",
+      ...verdict.nextSteps.map((step) => wrap(`— ${step}`)),
+      "",
+      wrap(
+        "Цей висновок склала система з чисел, наведених нижче. Він не встановлює порушення " +
+          "і не є кваліфікацією дій будь-якої особи.",
+      ),
+    ],
+  });
 
   out.push({
     heading: "ЗАКУПІВЛЯ",
