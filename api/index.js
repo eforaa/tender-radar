@@ -869,7 +869,7 @@ function feedPage(url) {
   const rawThen = url.searchParams.get("then") ?? "";
   const group = isDimension(rawGroup) ? rawGroup : "";
   const then = isDimension(rawThen) ? rawThen : "";
-  const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
+  const page2 = Math.max(1, Number(url.searchParams.get("page") ?? 1));
   const years = [...new Set(db.cases.map((c) => (c.date_assessed ?? "").slice(0, 4)).filter(Boolean))].sort().reverse();
   let list = db.cases;
   if (q) {
@@ -889,7 +889,7 @@ function feedPage(url) {
   const shownValue = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
   const groups = group ? buildGroups(list, group, then, shortRisk) : [];
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
-  const slice = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const slice = list.slice((page2 - 1) * PAGE_SIZE, page2 * PAGE_SIZE);
   const keep = (over) => {
     const p = new URLSearchParams();
     if (q) p.set("q", q);
@@ -978,9 +978,9 @@ ${risk ? riskCard(risk) : ""}
 ${list.length === 0 ? `<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0447\u0430\u0441\u0442\u0438\u043D\u0443 \u0444\u0456\u043B\u044C\u0442\u0440\u0456\u0432.</div>` : group ? groups.map((g) => groupBlock(g, 0)).join("") : `<div class="rows">${slice.map((c) => caseRow(c)).join("")}</div>`}
 
 ${!group && pages > 1 ? `<div class="pager">
-  ${page > 1 ? `<a href="${keep({ page: String(page - 1) })}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
-  <span>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 ${page} \u0437 ${pages}</span>
-  ${page < pages ? `<a href="${keep({ page: String(page + 1) })}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a>` : ""}
+  ${page2 > 1 ? `<a href="${keep({ page: String(page2 - 1) })}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
+  <span>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 ${page2} \u0437 ${pages}</span>
+  ${page2 < pages ? `<a href="${keep({ page: String(page2 + 1) })}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a>` : ""}
 </div>` : ""}
 
 <p class="note">\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0426\u0435 \u043E\u0437\u043D\u0430\u043A\u0430 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0430 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0430 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0439 \u0444\u0430\u043A\u0442 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
@@ -1662,14 +1662,210 @@ function render(url) {
   return { status: 404, body: notFound() };
 }
 
+// server/auth-pages.ts
+var SHELL_STYLES = `
+:root{color-scheme:light;--paper:#F6F8F9;--surface:#FFFFFF;--ink:#17222B;--ink-soft:#4A5966;
+--line:#DDE4E8;--accent:#17607F;--accent-bg:#E6F0F4;--alarm:#A03A2B;--alarm-bg:#FBE9E5;
+--shadow:0 1px 2px rgba(23,34,43,.04),0 8px 24px -18px rgba(23,34,43,.26);--radius:5px;
+--f-display:"Literata",Georgia,serif;--f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+background:var(--paper);color:var(--ink);font-family:var(--f-body);padding:1.5rem}
+.box{max-width:26rem;width:100%;background:var(--surface);border:1px solid var(--line);
+border-radius:var(--radius);box-shadow:var(--shadow);padding:2rem 1.75rem;text-align:center}
+h1{font-family:var(--f-display);font-weight:700;font-size:1.4rem;margin:0 0 .6rem}
+p{color:var(--ink-soft);font-size:.96rem;line-height:1.55;margin:0 0 1.5rem}
+p.denied{background:var(--alarm-bg);color:var(--alarm);border-radius:var(--radius);padding:.7rem 1rem;font-size:.9rem}
+a.btn{display:inline-flex;align-items:center;gap:.6rem;background:var(--accent);color:#fff;
+text-decoration:none;font-weight:500;padding:.7rem 1.4rem;border-radius:var(--radius)}
+a.btn:hover{filter:brightness(1.08)}
+`;
+function shell(title, body) {
+  return `<!doctype html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)} \u2014 Tender Radar</title><style>${SHELL_STYLES}</style></head>
+<body><div class="box">${body}</div></body></html>`;
+}
+function loginPage() {
+  return shell(
+    "\u0412\u0445\u0456\u0434",
+    `<h1>Tender Radar</h1>
+<p>\u0414\u043E\u0441\u0442\u0443\u043F \u0434\u043E \u0441\u0430\u0439\u0442\u0443 \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u043E \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043D\u0438\u0445 \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0438\u0445 \u0437\u0430\u043F\u0438\u0441\u0456\u0432. \u0423\u0432\u0456\u0439\u0434\u0456\u0442\u044C \u0447\u0435\u0440\u0435\u0437 Google, \u0449\u043E\u0431 \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0438\u0442\u0438.</p>
+<a class="btn" href="/auth/login">\u0423\u0432\u0456\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 Google</a>`
+  );
+}
+function deniedPage(message) {
+  return shell(
+    "\u0414\u043E\u0441\u0442\u0443\u043F \u043D\u0435 \u043D\u0430\u0434\u0430\u043D\u043E",
+    `<h1>\u0414\u043E\u0441\u0442\u0443\u043F \u043D\u0435 \u043D\u0430\u0434\u0430\u043D\u043E</h1>
+<p class="denied">${esc(message)}</p>
+<a class="btn" href="/auth/login">\u0421\u043F\u0440\u043E\u0431\u0443\u0432\u0430\u0442\u0438 \u0449\u0435 \u0440\u0430\u0437</a>`
+  );
+}
+
+// server/auth.ts
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+var SESSION_COOKIE = "tr_session";
+var STATE_COOKIE = "tr_oauth_state";
+var SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
+var STATE_TTL_SECONDS = 600;
+function loadAuthConfig(env = process.env) {
+  const clientId = env.GOOGLE_CLIENT_ID;
+  const clientSecret = env.GOOGLE_CLIENT_SECRET;
+  const sessionSecret = env.SESSION_SECRET;
+  const allowedRaw = env.ALLOWED_EMAILS;
+  if (!clientId || !clientSecret || !sessionSecret || !allowedRaw) return null;
+  const allowedEmails = new Set(
+    allowedRaw.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
+  );
+  if (allowedEmails.size === 0) return null;
+  return { clientId, clientSecret, sessionSecret, allowedEmails };
+}
+function sign(value, secret) {
+  return createHmac("sha256", secret).update(value).digest("base64url");
+}
+function readCookie(cookieHeader, name) {
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() === name) return decodeURIComponent(part.slice(eq + 1).trim());
+  }
+  return null;
+}
+function cookieAttrs(secure) {
+  return `HttpOnly; SameSite=Lax; Path=/${secure ? "; Secure" : ""}`;
+}
+function randomState() {
+  return randomBytes(16).toString("base64url");
+}
+function setStateCookie(state, secure) {
+  return `${STATE_COOKIE}=${state}; ${cookieAttrs(secure)}; Max-Age=${STATE_TTL_SECONDS}`;
+}
+function clearStateCookie(secure) {
+  return `${STATE_COOKIE}=; ${cookieAttrs(secure)}; Max-Age=0`;
+}
+function createSessionCookie(email, secret, secure) {
+  const expires = Date.now() + SESSION_TTL_MS;
+  const payload = `${email}|${expires}`;
+  const value = encodeURIComponent(`${payload}|${sign(payload, secret)}`);
+  return `${SESSION_COOKIE}=${value}; ${cookieAttrs(secure)}; Max-Age=${Math.floor(SESSION_TTL_MS / 1e3)}`;
+}
+function clearSessionCookie(secure) {
+  return `${SESSION_COOKIE}=; ${cookieAttrs(secure)}; Max-Age=0`;
+}
+function readSessionEmail(cookieHeader, secret) {
+  const raw = readCookie(cookieHeader, SESSION_COOKIE);
+  if (!raw) return null;
+  const parts = raw.split("|");
+  if (parts.length !== 3) return null;
+  const [email, expiresStr, signature] = parts;
+  const expected = sign(`${email}|${expiresStr}`, secret);
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  if (!Number.isFinite(Number(expiresStr)) || Date.now() > Number(expiresStr)) return null;
+  return email;
+}
+function authorizeUrl(config, redirectUri, state) {
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email",
+    state,
+    prompt: "select_account"
+  });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+async function exchangeCode(config, code, redirectUri) {
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code"
+    })
+  });
+  if (!tokenRes.ok) return null;
+  const token = await tokenRes.json();
+  if (!token.id_token) return null;
+  const infoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token.id_token)}`);
+  if (!infoRes.ok) return null;
+  const claims = await infoRes.json();
+  if (claims.aud !== config.clientId || !claims.email) return null;
+  return { email: claims.email.toLowerCase(), emailVerified: claims.email_verified === "true" };
+}
+
+// server/router.ts
+function page(status, body, headers = {}) {
+  return { status, body, headers: { "content-type": "text/html; charset=utf-8", ...headers } };
+}
+function redirect(location, setCookie) {
+  const headers = { location };
+  if (setCookie) headers["set-cookie"] = setCookie;
+  return { status: 302, body: "", headers };
+}
+async function handle(req) {
+  const config = loadAuthConfig();
+  if (!config) {
+    const { status: status2, body: body2 } = render(req.url);
+    return page(status2, body2);
+  }
+  const secure = req.url.protocol === "https:";
+  const redirectUri = `${req.url.origin}/auth/callback`;
+  if (req.url.pathname === "/auth/login") {
+    const state = randomState();
+    return redirect(authorizeUrl(config, redirectUri, state), setStateCookie(state, secure));
+  }
+  if (req.url.pathname === "/auth/logout") {
+    return redirect("/auth/login", clearSessionCookie(secure));
+  }
+  if (req.url.pathname === "/auth/callback") {
+    const code = req.url.searchParams.get("code");
+    const returnedState = req.url.searchParams.get("state");
+    const expectedState = readCookie(req.cookieHeader, STATE_COOKIE);
+    if (!code || !returnedState || !expectedState || returnedState !== expectedState) {
+      return page(400, deniedPage("\u041D\u0435\u0434\u0456\u0439\u0441\u043D\u0438\u0439 \u0437\u0430\u043F\u0438\u0442 \u043D\u0430 \u0432\u0445\u0456\u0434. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0449\u0435 \u0440\u0430\u0437."), {
+        "set-cookie": clearStateCookie(secure)
+      });
+    }
+    const identity = await exchangeCode(config, code, redirectUri);
+    const clearState = clearStateCookie(secure);
+    if (!identity || !identity.emailVerified) {
+      return page(403, deniedPage("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u043F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0438 \u043F\u043E\u0448\u0442\u0443 Google."), { "set-cookie": clearState });
+    }
+    if (!config.allowedEmails.has(identity.email)) {
+      return page(403, deniedPage(`\u0414\u043E\u0441\u0442\u0443\u043F \u0434\u043B\u044F ${identity.email} \u043D\u0435 \u043D\u0430\u0434\u0430\u043D\u043E. \u0417\u0432\u0435\u0440\u043D\u0456\u0442\u044C\u0441\u044F \u0434\u043E \u0432\u043B\u0430\u0441\u043D\u0438\u043A\u0430 \u0441\u0430\u0439\u0442\u0443.`), {
+        "set-cookie": clearState
+      });
+    }
+    return redirect("/", [createSessionCookie(identity.email, config.sessionSecret, secure), clearState]);
+  }
+  const email = readSessionEmail(req.cookieHeader, config.sessionSecret);
+  if (!email || !config.allowedEmails.has(email)) {
+    return page(200, loginPage());
+  }
+  const { status, body } = render(req.url);
+  return page(status, body);
+}
+
 // api-src/handler.ts
-function handler(req, res) {
+async function handler(req, res) {
+  const proto = req.headers["x-forwarded-proto"] ?? "https";
   const host = req.headers["x-forwarded-host"] ?? req.headers.host ?? "localhost";
-  const url = new URL(req.url ?? "/", `https://${host}`);
-  const { status, body } = render(url);
+  const url = new URL(req.url ?? "/", `${proto}://${host}`);
+  const { status, body, headers } = await handle({ url, cookieHeader: req.headers.cookie ?? null });
   res.statusCode = status;
-  res.setHeader("content-type", "text/html; charset=utf-8");
-  res.setHeader("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=600");
+  for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
+  if (status === 200 && !headers["set-cookie"]) {
+    res.setHeader("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=600");
+  } else {
+    res.setHeader("cache-control", "no-store");
+  }
   res.end(body);
 }
 export {

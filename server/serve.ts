@@ -3,7 +3,8 @@
 import { createServer } from "node:http";
 import { watch } from "node:fs";
 import { dataDir } from "../src/config.ts";
-import { render, reload } from "./app.ts";
+import { reload } from "./app.ts";
+import { handle } from "./router.ts";
 
 const PORT = Number(process.env.PORT ?? 3120);
 
@@ -25,8 +26,8 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  const { status, body } = render(url);
-  res.writeHead(status, { "content-type": "text/html; charset=utf-8" });
+  const { status, body, headers } = await handle({ url, cookieHeader: req.headers.cookie ?? null });
+  res.writeHead(status, headers);
   res.end(body);
 });
 

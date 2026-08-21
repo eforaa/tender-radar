@@ -1,18 +1,27 @@
-// Vercel entry point. Every route is rewritten here by vercel.json, and the
-// page itself is rendered by the same code the local server uses.
+// Vercel entry point. Every route is rewritten here by vercel.json; the
+// Google auth gate and page rendering both happen in server/router.ts, so
+// this stays a thin adapter to the platform's request/response shapes.
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { render } from "../server/app.ts";
+import { handle } from "../server/router.ts";
 
-export default function handler(req: IncomingMessage, res: ServerResponse): void {
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
   const host = (req.headers["x-forwarded-host"] as string) ?? req.headers.host ?? "localhost";
-  const url = new URL(req.url ?? "/", `https://${host}`);
+  const url = new URL(req.url ?? "/", `${proto}://${host}`);
 
-  const { status, body } = render(url);
+  const { status, body, headers } = await handle({ url, cookieHeader: req.headers.cookie ?? null });
 
   res.statusCode = status;
-  res.setHeader("content-type", "text/html; charset=utf-8");
-  // The dataset only changes when the daily job redeploys, so let the edge
-  // hold pages for a minute and serve a stale one while it refreshes.
-  res.setHeader("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=600");
+  for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
+
+  // A signed-in visitor sees the same HTML as any other, so a successful
+  // page is safe to cache at the edge; auth redirects, denials and the
+  // login screen itself must always be evaluated fresh.
+  if (status === 200 && !headers["set-cookie"]) {
+    res.setHeader("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=600");
+  } else {
+    res.setHeader("cache-control", "no-store");
+  }
+
   res.end(body);
 }
