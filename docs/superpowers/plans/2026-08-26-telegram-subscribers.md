@@ -535,18 +535,29 @@ export async function handle(req: HttpRequest): Promise<HttpResponse> {
 In `src/notify/telegram.ts`, expose sending to an arbitrary chat. Replace the body of `sendTelegram` with a delegation so the existing signature and tests keep working:
 
 ```ts
+/**
+ * The raw call, shared by the single-chat notifier and the broadcaster. The
+ * broadcaster needs the Response itself to tell a blocked chat from a
+ * rejected message, so this returns it unwrapped.
+ */
+export function postMessage(
+  config: TelegramConfig, chatId: string | number, text: string,
+): Promise<Response> {
+  return fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true,
+    }),
+  });
+}
+
 /** Posts to one chat. Never throws: a failed notification must not fail the run. */
 export async function sendTelegramTo(
   config: TelegramConfig, chatId: string, text: string,
 ): Promise<SendResult> {
   try {
-    const res = await fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true,
-      }),
-    });
+    const res = await postMessage(config, chatId, text);
     if (!res.ok) return { sent: false, reason: `Telegram returned ${res.status}` };
     const body = (await res.json()) as { ok?: boolean; description?: string };
     return body.ok ? { sent: true } : { sent: false, reason: body.description ?? "Telegram rejected the message" };
@@ -595,7 +606,7 @@ git commit -m "feat(telegram): accept /start on a webhook ahead of the auth gate
 - Test: `tests/broadcast.test.ts`
 
 **Interfaces:**
-- Consumes: `type TelegramConfig`, `type SendResult` from `src/notify/telegram.ts`.
+- Consumes: nothing. The sender is injected, so this file imports no Telegram code.
 - Produces:
   - `type BroadcastResult = { sent: number; blocked: number[]; failed: number }`
   - `type BroadcastDeps = { send: (chatId: number, text: string) => Promise<Response>; sleep?: (ms: number) => Promise<void> }`
@@ -812,7 +823,7 @@ git commit -m "feat(telegram): send one digest to many chats, pruning blocked on
 In `scripts/daily.ts`, add to the imports at the top:
 
 ```ts
-import { loadTelegramConfig, buildMessage, sendTelegram, sendTelegramTo, pickHighlights } from "../src/notify/telegram.ts";
+import { loadTelegramConfig, buildMessage, sendTelegram, sendTelegramTo, postMessage, pickHighlights } from "../src/notify/telegram.ts";
 import { loadSubscriberConfig, createSubscriberStore } from "../src/store/subscribers.ts";
 import { broadcast } from "../src/notify/broadcast.ts";
 ```
@@ -845,14 +856,7 @@ Replace the body of the `else` branch in step 5 with:
       const store = createSubscriberStore(supabase);
       const chatIds = await store.listActive();
       const outcome = await broadcast(chatIds, text, {
-        send: (chatId, body) =>
-          fetch(`https://api.telegram.org/bot${telegram.token}/sendMessage`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              chat_id: chatId, text: body, parse_mode: "HTML", disable_web_page_preview: true,
-            }),
-          }),
+        send: (chatId, body) => postMessage(telegram, chatId, body),
       });
 
       for (const chatId of outcome.blocked) await store.remove(chatId);
