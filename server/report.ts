@@ -336,20 +336,40 @@ export function reportHtml(ctx: ReportContext): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Звіт — ${esc(entry.tender_ref)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ysabeau:wght@300..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-  :root{color-scheme:light;--ink:#17222B;--soft:#4A5966;--line:#DDE4E8;--accent:#17607F}
+  :root{
+    color-scheme:light;
+    /* Same scale as the site (server/html.ts) — kept local rather than shared
+       because this document has no import path back to that stylesheet. */
+    --s1:.25rem; --s2:.5rem; --s3:.75rem; --s4:1rem;
+    --s5:1.5rem; --s6:2rem;  --s7:3rem;   --s8:4rem;
+    --paper:#FCFCFA; --ink:#14181A; --soft:#565B60; --line:#E4E3DD; --accent:#0F5C8C;
+    --f-body:"Ysabeau","Segoe UI",system-ui,sans-serif;
+    --f-mono:"IBM Plex Mono",Consolas,monospace;
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:#F6F8F9;color:var(--ink);font-family:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;font-size:15px;line-height:1.6}
-  .sheet{max-width:52rem;margin:0 auto;background:#fff;padding:2.5rem 3rem 4rem;min-height:100vh}
-  .toolbar{max-width:52rem;margin:1rem auto 0;padding:0 3rem;display:flex;gap:.75rem;flex-wrap:wrap}
-  .toolbar a,.toolbar button{font:inherit;font-size:.92rem;text-decoration:none;color:var(--accent);background:#fff;border:1px solid var(--line);border-radius:5px;padding:.5rem 1rem;cursor:pointer}
+  /* One voice on screen, same as the site. On paper it doesn't matter — the
+     print rule below forces plain white regardless of this token. */
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+  .sheet{max-width:52rem;margin:0 auto;background:#fff;padding:var(--s7) var(--s7) var(--s8);min-height:100vh}
+  .toolbar{max-width:52rem;margin:var(--s4) auto 0;padding:0 var(--s7);display:flex;gap:var(--s3);flex-wrap:wrap}
+  .toolbar a,.toolbar button{font:inherit;font-size:.92rem;text-decoration:none;color:var(--accent);background:#fff;border:1px solid var(--line);border-radius:5px;padding:var(--s2) var(--s4);cursor:pointer}
   .toolbar a:hover,.toolbar button:hover{border-color:var(--accent)}
-  h1{font-family:Literata,Georgia,serif;font-size:1.5rem;line-height:1.25;margin:0 0 .4rem}
-  .ref{font-family:"IBM Plex Mono",Consolas,monospace;font-size:.85rem;color:var(--soft)}
-  .made{color:var(--soft);font-size:.85rem;margin:.2rem 0 1.5rem;padding-bottom:1.2rem;border-bottom:2px solid var(--ink)}
-  section{margin:0 0 1.6rem;break-inside:avoid}
-  h2{font-family:Literata,Georgia,serif;font-size:1rem;letter-spacing:.04em;margin:0 0 .5rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
-  p{margin:0 0 .4rem;max-width:64ch}
+  /* No serif on paper either: a second voice here would be the same
+     inconsistency the site just dropped. Weight and size still carry the
+     hierarchy, same as the site's own h2. */
+  h1{font-family:var(--f-body);font-weight:700;font-size:1.5rem;line-height:1.25;margin:0 0 var(--s2)}
+  .ref{font-family:var(--f-mono);font-size:.85rem;color:var(--soft)}
+  .made{color:var(--soft);font-size:.85rem;margin:var(--s1) 0 var(--s5);padding-bottom:var(--s4);border-bottom:2px solid var(--ink)}
+  section{margin:0 0 var(--s5);break-inside:avoid}
+  h2{font-family:var(--f-body);font-weight:700;font-size:1rem;letter-spacing:.04em;margin:0 0 var(--s2);padding-bottom:var(--s1);border-bottom:1px solid var(--line)}
+  p{margin:0 0 var(--s2);max-width:64ch}
+  /* The page a person actually holds: plain black text on white, no tint,
+     no brand background — paper is not a screen and shouldn't try to look
+     like one. */
   @media print{
     body{background:#fff;font-size:11pt}
     .toolbar{display:none}
