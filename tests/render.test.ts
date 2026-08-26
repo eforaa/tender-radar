@@ -31,8 +31,8 @@ function page(path: string) {
 // "/updates" - "Що змінилося" (updatesPage line 1421)
 // "/prices" - "Де ціна виглядає завищеною" (pricesPage line 1491)
 // "/indicators" - "Що ми шукаємо" (indicatorsPage line 1720)
-// "/about" - "Про систему" (aboutPage line 1732)
-// "/starred" - "Обране" (starredPage line 1648)
+// "/about" - "Звідки дані" (aboutPage body line 1736, verified absent from server/html.ts)
+// "/starred" - "Список зберігається у вашому браузері" (starredPage body line 1649, verified absent from server/html.ts)
 // "/lookup" - "Пошук підприємства за ЄДРПОУ" (lookupPage line 1551)
 const STATIC_ROUTES = [
   ["/", "Закупівлі, які варто перевірити"],
@@ -43,8 +43,8 @@ const STATIC_ROUTES = [
   ["/updates", "Що змінилося"],
   ["/prices", "Де ціна виглядає завищеною"],
   ["/indicators", "Що ми шукаємо"],
-  ["/about", "Про систему"],
-  ["/starred", "Обране"],
+  ["/about", "Звідки дані"],
+  ["/starred", "Список зберігається у вашому браузері"],
   ["/lookup", "Пошук підприємства за ЄДРПОУ"],
 ] as const;
 
