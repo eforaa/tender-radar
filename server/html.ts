@@ -113,10 +113,6 @@ const STYLES = `
 }
 *{box-sizing:border-box}
 pre,table{overflow-x:auto;max-width:100%}
-/* a wide table scrolls inside its own box instead of pushing the document
-   sideways — used on the prices and article pages, where the content is
-   naturally tabular even where it is not marked up as a <table>. */
-.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
 a{color:var(--accent);text-underline-offset:3px}
@@ -471,9 +467,13 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   .row .flags .flag{font-size:.74rem;padding:var(--s1) var(--s2);line-height:1.35}
   /* the worst tap target on the page before this: a 1.15rem glyph with no
      hit-box padding. It now clears 44px on both sides; float is dropped so
-     the extra hit area does not overlap the title text next to it. */
+     the extra hit area does not overlap the title text next to it. No
+     negative margin: the 44px box already sets .name's own line height (it
+     is the tallest flex item in that row), so pulling it up with a
+     negative margin only ever bleeds into the block above (.amount) —
+     there is no slack to reclaim without doing that. */
   .row .name .star{float:none}
-  .row .star{display:inline-flex;align-items:center;justify-content:center;min-width:2.75rem;min-height:2.75rem;padding:0;margin:-.7rem 0;font-size:1.3rem;flex:none}
+  .row .star{display:inline-flex;align-items:center;justify-content:center;min-width:2.75rem;min-height:2.75rem;padding:0;margin:0;font-size:1.3rem;flex:none}
 
   .group-block summary{padding:var(--s4) var(--s4)}
   .g-name{flex:1 1 100%}
