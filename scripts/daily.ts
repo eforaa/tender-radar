@@ -11,7 +11,9 @@ import { fetchTender } from "../src/sources/openprocurement.ts";
 import { normalizeTender } from "../src/normalize/tender.ts";
 import { pricePoints, priceGroups, detectPeerPrice, detectOwnPriceGrowth } from "../src/analysis/peer-price.ts";
 import { join } from "node:path";
-import { loadTelegramConfig, buildMessage, sendTelegram, pickHighlights } from "../src/notify/telegram.ts";
+import { loadTelegramConfig, buildMessage, sendTelegram, sendTelegramTo, postMessage, pickHighlights } from "../src/notify/telegram.ts";
+import { loadSubscriberConfig, createSubscriberStore } from "../src/store/subscribers.ts";
+import { broadcast } from "../src/notify/broadcast.ts";
 import { openStore, REGION, RAILWAY_EDRPOU } from "../src/config.ts";
 import type { RiskFlagRow, TenderRow, TenderItemRow, BidRow, AwardRow, RunRow, FindingRow } from "../src/store/types.ts";
 
@@ -223,21 +225,48 @@ try {
     const { loadDataset } = await import("../server/data.ts");
     const dataset = await loadDataset();
     const freshIds = new Set(newTenderIds);
-    const result = await sendTelegram(
-      telegram,
-      buildMessage({
-        newTenders: newTenderIds.length,
-        newFlags,
-        cardsFetched: detailsFetched,
-        errors,
-        totalTenders: dataset.cases.length,
-        totalFlags: dataset.flagCount,
-        findings: dataset.findingCount,
-        highlights: pickHighlights(dataset.cases.filter((c) => freshIds.has(c.tender_id))),
-        siteUrl: process.env.SITE_URL ?? "https://tender-radar-five.vercel.app",
-      }),
-    );
-    log(result.sent ? "telegram notification sent" : `telegram notification failed — ${result.reason}`);
+    // Built once: the digest is identical for everyone.
+    const text = buildMessage({
+      newTenders: newTenderIds.length,
+      newFlags,
+      cardsFetched: detailsFetched,
+      errors,
+      totalTenders: dataset.cases.length,
+      totalFlags: dataset.flagCount,
+      findings: dataset.findingCount,
+      highlights: pickHighlights(dataset.cases.filter((c) => freshIds.has(c.tender_id))),
+      siteUrl: process.env.SITE_URL ?? "https://tender-radar-five.vercel.app",
+    });
+
+    const supabase = loadSubscriberConfig();
+    if (!supabase) {
+      // No subscriber store configured: behave exactly as before.
+      const result = await sendTelegram(telegram, text);
+      log(result.sent ? "telegram notification sent" : `telegram notification failed — ${result.reason}`);
+    } else {
+      const store = createSubscriberStore(supabase);
+      const chatIds = await store.listActive();
+      const outcome = await broadcast(chatIds, text, {
+        send: (chatId, body) => postMessage(telegram, chatId, body),
+      });
+
+      for (const chatId of outcome.blocked) await store.remove(chatId);
+
+      log(
+        `telegram broadcast — ${outcome.sent} delivered, ` +
+          `${outcome.blocked.length} unsubscribed, ${outcome.failed} failed`,
+      );
+
+      // The admin chat gets the delivery report. Without it a broken
+      // broadcast is invisible: subscribers do not complain, they just
+      // stop hearing from us.
+      await sendTelegramTo(
+        telegram,
+        telegram.chatId,
+        `<b>Розсилка</b>\nДоставлено: ${outcome.sent}\n` +
+          `Відписалося: ${outcome.blocked.length}\nПомилок: ${outcome.failed}`,
+      );
+    }
   }
 } catch (err) {
   await store.upsertRuns([
