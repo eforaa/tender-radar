@@ -22,13 +22,33 @@ function page(path: string) {
   return render(new URL(`https://x.test${path}`));
 }
 
+// Each route has a distinctive marker that only it renders. Markers found in server/app.ts:
+// "/" - "Закупівлі, які варто перевірити" (feedPage line 544)
+// "/entities" - "Замовники" (directoryPage heading for entitiesPage line 1071)
+// "/officers" - "Відповідальні посадовці" (directoryPage heading for officersPage line 1104)
+// "/suppliers" - "Переможці закупівель" (directoryPage heading for suppliersPage line 1138)
+// "/railway" - "Залізниця Харківської області" (railwayPage line 1221)
+// "/updates" - "Що змінилося" (updatesPage line 1421)
+// "/prices" - "Де ціна виглядає завищеною" (pricesPage line 1491)
+// "/indicators" - "Що ми шукаємо" (indicatorsPage line 1720)
+// "/about" - "Про систему" (aboutPage line 1732)
+// "/starred" - "Обране" (starredPage line 1648)
+// "/lookup" - "Пошук підприємства за ЄДРПОУ" (lookupPage line 1551)
 const STATIC_ROUTES = [
-  "/", "/entities", "/officers", "/suppliers", "/railway",
-  "/updates", "/prices", "/indicators", "/about", "/starred",
-  "/lookup",
-];
+  ["/", "Закупівлі, які варто перевірити"],
+  ["/entities", "Замовники"],
+  ["/officers", "Відповідальні посадовці"],
+  ["/suppliers", "Переможці закупівель"],
+  ["/railway", "Залізниця Харківської області"],
+  ["/updates", "Що змінилося"],
+  ["/prices", "Де ціна виглядає завищеною"],
+  ["/indicators", "Що ми шукаємо"],
+  ["/about", "Про систему"],
+  ["/starred", "Обране"],
+  ["/lookup", "Пошук підприємства за ЄДРПОУ"],
+] as const;
 
-for (const path of STATIC_ROUTES) {
+for (const [path, marker] of STATIC_ROUTES) {
   test(`${path} renders a page`, () => {
     const res = page(path);
     assert.equal(res.status, 200, `${path} did not answer 200`);
@@ -36,6 +56,7 @@ for (const path of STATIC_ROUTES) {
       `${path} did not return a document`);
     assert.ok(res.body.length > 500, `${path} returned a suspiciously short body`);
     assert.ok(!res.body.includes("undefined</"), `${path} rendered a literal undefined`);
+    assert.ok(res.body.includes(marker), `${path} does not contain distinctive marker: "${marker}"`);
   });
 }
 
@@ -97,6 +118,8 @@ test("an article page renders", () => {
   assert.ok(res.body.includes("<!doctype html>") || res.body.includes("<!DOCTYPE html>"),
     "article page did not return a document");
   assert.ok(res.body.length > 500, "article page returned a suspiciously short body");
+  assert.ok(res.body.includes("за статтею 366"), "article page does not contain article marker");
+  assert.ok(!res.body.includes("Такої сторінки немає"), "article page rendered not-found");
 });
 
 test("filters and grouping survive a round trip through the feed", () => {
