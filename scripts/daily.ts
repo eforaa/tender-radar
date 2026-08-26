@@ -244,28 +244,49 @@ try {
       const result = await sendTelegram(telegram, text);
       log(result.sent ? "telegram notification sent" : `telegram notification failed — ${result.reason}`);
     } else {
-      const store = createSubscriberStore(supabase);
-      const chatIds = await store.listActive();
-      const outcome = await broadcast(chatIds, text, {
-        send: (chatId, body) => postMessage(telegram, chatId, body),
-      });
+      // Its own try/catch, mirroring ingest-monitorings and build-web-data
+      // above: everything the ingest already did (tenders, flags, web-data
+      // export) is committed by this point, so a Supabase hiccup here must
+      // not flip step 4's "ok" run record to "failed" via the outer catch.
+      try {
+        const store = createSubscriberStore(supabase);
+        const chatIds = await store.listActive();
+        const outcome = await broadcast(chatIds, text, {
+          send: (chatId, body) => postMessage(telegram, chatId, body),
+        });
 
-      for (const chatId of outcome.blocked) await store.remove(chatId);
+        // Logged right away, before touching the store again: a broadcast
+        // that fully succeeded must leave a record even if an unsubscribe
+        // below throws.
+        log(
+          `telegram broadcast — ${outcome.sent} delivered, ` +
+            `${outcome.blocked.length} unsubscribed, ${outcome.failed} failed`,
+        );
 
-      log(
-        `telegram broadcast — ${outcome.sent} delivered, ` +
-          `${outcome.blocked.length} unsubscribed, ${outcome.failed} failed`,
-      );
+        for (const chatId of outcome.blocked) {
+          try {
+            await store.remove(chatId);
+          } catch (err) {
+            // One chat that won't unsubscribe must not cost the rest their
+            // removal, nor the admin summary that follows.
+            errors++;
+            log(`unsubscribe ${chatId} failed — ${(err as Error).message}`);
+          }
+        }
 
-      // The admin chat gets the delivery report. Without it a broken
-      // broadcast is invisible: subscribers do not complain, they just
-      // stop hearing from us.
-      await sendTelegramTo(
-        telegram,
-        telegram.chatId,
-        `<b>Розсилка</b>\nДоставлено: ${outcome.sent}\n` +
-          `Відписалося: ${outcome.blocked.length}\nПомилок: ${outcome.failed}`,
-      );
+        // The admin chat gets the delivery report. Without it a broken
+        // broadcast is invisible: subscribers do not complain, they just
+        // stop hearing from us.
+        await sendTelegramTo(
+          telegram,
+          telegram.chatId,
+          `<b>Розсилка</b>\nДоставлено: ${outcome.sent}\n` +
+            `Відписалося: ${outcome.blocked.length}\nПомилок: ${outcome.failed}`,
+        );
+      } catch (err) {
+        errors++;
+        log(`telegram broadcast failed — ${(err as Error).message}`);
+      }
     }
   }
 } catch (err) {
