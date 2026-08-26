@@ -18,6 +18,14 @@ assert.ok(withEntity, "no case with an entity_edrpou in the dataset — fixture 
 assert.ok(withOfficer, "no case with an officer_key in the dataset — fixture assumption broken");
 assert.ok(withWinner, "no case with a winner_edrpou in the dataset — fixture assumption broken");
 
+// Capture non-null fixture values for TypeScript type narrowing
+const entityEdrpou = withEntity.entity_edrpou;
+const officerKey = withOfficer.officer_key;
+const winnerEdrpou = withWinner.winner_edrpou;
+assert.ok(entityEdrpou, "entity has no entity_edrpou despite precondition");
+assert.ok(officerKey, "officer has no officer_key despite precondition");
+assert.ok(winnerEdrpou, "winner has no winner_edrpou despite precondition");
+
 function page(path: string) {
   return render(new URL(`https://x.test${path}`));
 }
@@ -68,24 +76,24 @@ test("a tender dossier renders", () => {
 });
 
 test("an entity dossier renders", () => {
-  const res = page(`/entity/${withEntity!.entity_edrpou}`);
+  const res = page(`/entity/${encodeURIComponent(entityEdrpou)}`);
   assert.equal(res.status, 200);
-  assert.ok(res.body.includes(withEntity!.entity_edrpou), "entity page does not contain entity_edrpou");
+  assert.ok(res.body.includes(entityEdrpou), "entity page does not contain entity_edrpou");
   assert.ok(!res.body.includes("Такої сторінки немає"), "entity page rendered not-found");
 });
 
 test("an officer dossier renders", () => {
-  const res = page(`/officer/${encodeURIComponent(withOfficer!.officer_key!)}`);
+  const res = page(`/officer/${encodeURIComponent(officerKey)}`);
   assert.equal(res.status, 200);
-  const identifyingText = withOfficer!.officer_name || withOfficer!.officer_key;
+  const identifyingText = withOfficer.officer_name || officerKey;
   assert.ok(res.body.includes(identifyingText), "officer page does not contain officer name or key");
   assert.ok(!res.body.includes("Такої сторінки немає"), "officer page rendered not-found");
 });
 
 test("a supplier dossier renders", () => {
-  const res = page(`/supplier/${withWinner!.winner_edrpou}`);
+  const res = page(`/supplier/${encodeURIComponent(winnerEdrpou)}`);
   assert.equal(res.status, 200);
-  assert.ok(res.body.includes(withWinner!.winner_edrpou), "supplier page does not contain winner_edrpou");
+  assert.ok(res.body.includes(winnerEdrpou), "supplier page does not contain winner_edrpou");
   assert.ok(!res.body.includes("Такої сторінки немає"), "supplier page rendered not-found");
 });
 
