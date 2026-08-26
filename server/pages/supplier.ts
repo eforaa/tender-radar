@@ -5,7 +5,7 @@ import { readControls, applyControls } from "../controls.ts";
 import { dataset } from "../context.ts";
 import { star } from "../components/case-row.ts";
 import { rankRisks, groupedRiskCards } from "../components/risk.ts";
-import { sortBar, filterPanel, listBody } from "../components/filters.ts";
+import { controlBar, listBody } from "../components/filters.ts";
 import { notFound } from "./static.ts";
 
 export function supplierPage(edrpou: string, url: URL): string {
@@ -41,8 +41,7 @@ ${star("supplier", edrpou, "/supplier/" + encodeURIComponent(edrpou), { label: t
 ${groupedRiskCards(ranked)}
 
 <h2>Закупівлі</h2>
-${sortBar(dossierAction, ctrl)}
-${filterPanel(dossierAction, ctrl)}
+${controlBar(dossierAction, ctrl)}
 ${listBody(shown, ctrl, dossierAction)}
 
 <p class="note">Перелік охоплює лише закупівлі ${esc(REGION)} та філій залізниці, які вже завантажено. Це не повна історія компанії по Україні.</p>

@@ -5,7 +5,7 @@ import { readControls, applyControls } from "../controls.ts";
 import { dataset } from "../context.ts";
 import { star } from "../components/case-row.ts";
 import { rankRisks, groupedRiskCards } from "../components/risk.ts";
-import { sortBar, filterPanel, listBody } from "../components/filters.ts";
+import { controlBar, listBody } from "../components/filters.ts";
 import { notFound } from "./static.ts";
 
 export function officerPage(key: string, url: URL): string {
@@ -54,8 +54,7 @@ ${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
 ${groupedRiskCards(ranked)}
 
 <h2>Закупівлі</h2>
-${sortBar(dossierAction, ctrl)}
-${filterPanel(dossierAction, ctrl)}
+${controlBar(dossierAction, ctrl)}
 ${listBody(shown, ctrl, dossierAction, { showOfficer: false })}
 
 <p class="note">Ця сторінка не є твердженням про правопорушення з боку названої особи. Вона показує, що державна система моніторингу позначила закупівлі, у яких цю особу вказано відповідальною контактною особою.</p>

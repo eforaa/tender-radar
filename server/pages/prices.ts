@@ -3,7 +3,7 @@ import { layout, shortMoney } from "../html.ts";
 import { type Case } from "../data.ts";
 import { readControls, applyControls } from "../controls.ts";
 import { dataset } from "../context.ts";
-import { presetBar, sortBar, filterPanel, listBody } from "../components/filters.ts";
+import { controlBar, listBody } from "../components/filters.ts";
 
 /* ---------- our own price findings ---------- */
 
@@ -47,9 +47,7 @@ export function pricesPage(url: URL): string {
   </div>
 </details>
 
-${presetBar("/prices", url, c)}
-${sortBar("/prices", c)}
-${filterPanel("/prices", c, { hidePrice: true })}
+${controlBar("/prices", c, { hidePrice: true }, { url })}
 
 ${listBody(list, c, "/prices")}
 

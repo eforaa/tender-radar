@@ -3,7 +3,7 @@ import { layout, esc, shortMoney } from "../html.ts";
 import { readControls, applyControls } from "../controls.ts";
 import { dataset } from "../context.ts";
 import { riskCard } from "../components/risk.ts";
-import { presetBar, sortBar, filterPanel, listBody } from "../components/filters.ts";
+import { controlBar, listBody } from "../components/filters.ts";
 
 const HELP = `<details class="help">
   <summary>Як читати цю сторінку</summary>
@@ -44,9 +44,7 @@ export function feedPage(url: URL): string {
 
 ${PRIMER}
 
-${presetBar("/", url, c)}
-${sortBar("/", c)}
-${filterPanel("/", c)}
+${controlBar("/", c, {}, { url })}
 
 ${c.risk ? riskCard(c.risk) : ""}
 

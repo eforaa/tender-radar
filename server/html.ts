@@ -113,6 +113,10 @@ const STYLES = `
 }
 *{box-sizing:border-box}
 pre,table{overflow-x:auto;max-width:100%}
+/* a wide table scrolls inside its own box instead of pushing the document
+   sideways — used on the prices and article pages, where the content is
+   naturally tabular even where it is not marked up as a <table>. */
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
 a{color:var(--accent);text-underline-offset:3px}
@@ -155,7 +159,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
 .drawer a[aria-current]{background:var(--accent-bg);color:var(--accent);font-weight:500;box-shadow:inset 3px 0 0 var(--accent)}
 .drawer small{color:var(--ink-faint);font-size:.82rem;font-weight:400}
 
-@media (prefers-reduced-motion: reduce){.drawer,.scrim{transition-duration:.01ms}}
+@media (prefers-reduced-motion: reduce){.drawer,.scrim,.filters-drawer,.filters-scrim{transition-duration:.01ms}}
 
 .wrap{max-width:72rem;margin:0 auto;padding:clamp(var(--s4),2.5vw,var(--s5)) clamp(var(--s4),3vw,var(--s6)) var(--s8)}
 
@@ -223,6 +227,17 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 .primer b{display:inline-flex;align-items:center;justify-content:center;width:1.15rem;height:1.15rem;border-radius:50%;background:var(--accent);color:#fff;font-size:.7rem;margin-right:var(--s2)}
 .primer span{display:inline-flex;align-items:center;white-space:nowrap}
 .primer a{margin-left:auto;font-size:.88rem}
+
+/* the mobile filter sheet: presets, sort/group and the filter panel share
+   one checkbox-driven drawer, the same mechanism the nav drawer already
+   uses in this file. Above 44rem there is room for all of it inline, so
+   these rules just put the drawer back in normal flow and hide the trigger
+   that only exists for the cramped case. */
+.filters-trigger{display:none}
+.filters-scrim{display:none}
+.filters-drawer{position:static;transform:none;width:auto;box-shadow:none;border:0;background:transparent;overflow:visible}
+.filters-drawer .drawer-head{display:none}
+.filters-drawer-body{padding:0}
 
 /* one-click starting points */
 .presets{display:flex;flex-wrap:wrap;gap:var(--s2);margin:0 0 var(--s3)}
@@ -398,7 +413,7 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   .starred-btn{min-height:2.75rem;padding:var(--s2) var(--s3)}
   .starred-btn span{display:none}
   .drawer{width:min(20rem,88vw)}
-  .drawer a{padding:var(--s4) var(--s4)}
+  .drawer a{padding:var(--s4) var(--s4);min-height:2.75rem}
 
   .wrap{padding:var(--s4) var(--s4) var(--s8)}
   h1{font-size:1.25rem;max-width:none;margin-bottom:var(--s1)}
@@ -414,30 +429,51 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
 
   .sortbar{padding:var(--s2) var(--s2);gap:var(--s2)}
   /* two rows, not four: search shares its row with the button, the two
-     selects share the next one with their captions stacked above them */
-  .sortbar input[type=search]{flex:1 1 58%;min-width:0;min-height:2.6rem;font-size:16px}
-  .sortbar .go{flex:0 0 auto;width:auto;min-height:2.6rem;padding:var(--s2) var(--s4);font-size:16px}
+     selects share the next one with their captions stacked above them.
+     Every control here is a tap target, so none goes below 44px. */
+  .sortbar input[type=search]{flex:1 1 58%;min-width:0;min-height:2.75rem;font-size:16px}
+  .sortbar .go{flex:0 0 auto;width:auto;min-height:2.75rem;padding:var(--s2) var(--s4);font-size:16px}
   .sortbar label{order:1;flex:1 1 calc(50% - .2rem);flex-direction:column;align-items:stretch;gap:var(--s1);font-size:.72rem;letter-spacing:.02em}
   .sortbar.dir label{flex:1 1 100%}
-  .sortbar select{width:100%;max-width:none;min-height:2.5rem;font-size:16px}
+  .sortbar select{width:100%;max-width:none;min-height:2.75rem;font-size:16px}
 
   /* every chip visible: a hidden one may as well not exist */
   .presets{flex-wrap:wrap;gap:var(--s1)}
-  .preset{flex:none;min-height:2.35rem;display:inline-flex;align-items:center;padding:var(--s2) var(--s3);font-size:.86rem}
+  .preset{flex:none;min-height:2.75rem;display:inline-flex;align-items:center;padding:var(--s2) var(--s3);font-size:.86rem}
   .primer{display:none}
+
+  /* the filter sheet: presets, sort/group and the filter panel collapse
+     behind one full-width trigger. The count stays on the trigger itself —
+     state that hides itself is worse than state that crowds. */
+  .filters-trigger{display:flex;align-items:center;justify-content:center;gap:var(--s2);width:100%;min-height:2.75rem;margin:0 0 var(--s3);padding:var(--s2) var(--s4);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--accent);font-size:.95rem;font-weight:500;cursor:pointer}
+  .filters-scrim{display:block}
+  #filters-toggle:checked ~ .filters-scrim{opacity:1;visibility:visible}
+  .filters-drawer{position:fixed;top:0;right:0;bottom:0;left:auto;width:min(22rem,88vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
+  #filters-toggle:checked ~ .filters-drawer{transform:translateX(0)}
+  .filters-drawer .drawer-head{display:flex}
+  .filters-drawer-body{padding:var(--s4)}
 
   /* full-bleed lists: on a phone the card frame is noise, the content is not */
   .rows,.group-block{border-radius:0;border-left:0;border-right:0;margin-inline:calc(-1 * var(--s4));box-shadow:none}
-  .row{grid-template-columns:auto 1fr;padding:var(--s3) var(--s4);gap:var(--s1) var(--s3)}
-  .row .name{font-size:.98rem}
+  /* the amount is what a reader scans for, so it leads the stack; the dot
+     rides along with it instead of floating on its own line. Buyer/title
+     comes next, flags last — nobody scrolls to a chip before the number. */
+  .row{display:flex;flex-direction:column;gap:var(--s1);position:relative;padding:var(--s3) var(--s4) var(--s3) calc(var(--s4) + var(--s4));}
+  .row .dot{position:absolute;left:var(--s4);top:1.1rem;grid-row:auto;margin-top:0}
+  .row .amount{order:-2;text-align:left;margin-top:0;display:flex;align-items:baseline;gap:var(--s2)}
+  .row .amount .big{font-size:1.05rem;font-variant-numeric:tabular-nums}
+  .row .amount .exact{display:inline;margin-left:0}
+  .row .who{order:-1}
+  .row .name{font-size:.98rem;display:flex;align-items:flex-start;gap:var(--s1)}
   .row .name a{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .row .meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .row .amount{grid-column:2;text-align:left;margin-top:var(--s1)}
-  .row .amount .big{font-size:1rem}
-  .row .amount .exact{display:inline;margin-left:var(--s2)}
-  .row .flags{grid-column:1 / -1;margin-top:var(--s2);gap:var(--s1)}
+  .row .flags{order:0;margin-top:var(--s1);gap:var(--s1)}
   .row .flags .flag{font-size:.74rem;padding:var(--s1) var(--s2);line-height:1.35}
-  .row .star{padding:var(--s1) var(--s2) var(--s1) 0;font-size:1.3rem}
+  /* the worst tap target on the page before this: a 1.15rem glyph with no
+     hit-box padding. It now clears 44px on both sides; float is dropped so
+     the extra hit area does not overlap the title text next to it. */
+  .row .name .star{float:none}
+  .row .star{display:inline-flex;align-items:center;justify-content:center;min-width:2.75rem;min-height:2.75rem;padding:0;margin:-.7rem 0;font-size:1.3rem;flex:none}
 
   .group-block summary{padding:var(--s4) var(--s4)}
   .g-name{flex:1 1 100%}

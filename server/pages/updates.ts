@@ -2,7 +2,7 @@ import { RAILWAY_EDRPOU } from "../../src/config.ts";
 import { layout, esc, date, plural } from "../html.ts";
 import { readControls, applyControls } from "../controls.ts";
 import { dataset } from "../context.ts";
-import { sortBar, filterPanel, listBody } from "../components/filters.ts";
+import { controlBar, listBody } from "../components/filters.ts";
 
 /* ---------- what changed ---------- */
 
@@ -35,8 +35,7 @@ ${
 ${
   freshAll.length > 0
     ? `<h2>Нові закупівлі з останнього оновлення</h2>
-${sortBar("/updates", c)}
-${filterPanel("/updates", c)}
+${controlBar("/updates", c)}
 ${listBody(fresh, c, "/updates")}`
     : latest
       ? `<h2>Нові закупівлі з останнього оновлення</h2><div class="empty">Нових закупівель не з’явилося. Це нормальний результат — держава не щодня додає позначки.</div>`

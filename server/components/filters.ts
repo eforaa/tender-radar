@@ -206,6 +206,44 @@ export function filterPanel(action: string, c: Controls, opts: ControlOptions = 
 </form>`;
 }
 
+/**
+ * Presets, sort/group and the filter panel, wrapped as one unit.
+ *
+ * On a wide screen this renders in place, exactly as the three pieces did
+ * before. Below 44rem the CSS turns the same markup into a checkbox-driven
+ * sheet — the same mechanism as the nav drawer in html.ts, just scoped to
+ * this component so the two do not fight over one checkbox. Reusing that
+ * pattern here (instead of a second one) is what step 1 of the phone task
+ * asked for: one interaction model for the whole site.
+ */
+export function controlBar(
+  action: string,
+  c: Controls,
+  opts: ControlOptions = {},
+  params: { url?: URL; extra?: string } = {},
+): string {
+  const active = activeCount(c);
+  const presets = params.url ? presetBar(action, params.url, c) : "";
+  const extra = params.extra ?? "";
+
+  return `<div class="filter-sheet">
+  <input type="checkbox" id="filters-toggle" class="sr-only" aria-label="Фільтри">
+  <label class="filters-trigger" for="filters-toggle">Фільтри${active > 0 ? ` <span class="badge">${active}</span>` : ""}</label>
+  <label class="scrim filters-scrim" for="filters-toggle" aria-hidden="true"></label>
+  <div class="drawer filters-drawer" aria-label="Фільтри">
+    <div class="drawer-head">
+      <strong>Фільтри</strong>
+      <label class="drawer-close" for="filters-toggle" role="button" aria-label="Закрити">&times;</label>
+    </div>
+    <div class="filters-drawer-body">
+      ${presets}
+      ${sortBar(action, c, extra)}
+      ${filterPanel(action, c, opts, extra)}
+    </div>
+  </div>
+</div>`;
+}
+
 /** The result count line, so a folded panel never hides what was applied. */
 export function resultLine(list: Case[], c: Controls, groupCount: number): string {
   const value = list.reduce((sum, x) => sum + (x.value_amount ?? 0), 0);

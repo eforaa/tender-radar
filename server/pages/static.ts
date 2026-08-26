@@ -7,7 +7,7 @@ import { readControls, applyControls } from "../controls.ts";
 import { dataset } from "../context.ts";
 import { star } from "../components/case-row.ts";
 import { rankRisks, groupedRiskCards } from "../components/risk.ts";
-import { sortBar, filterPanel, listBody } from "../components/filters.ts";
+import { controlBar, listBody } from "../components/filters.ts";
 
 export function starredPage(saved: Favourite[], url: URL): string {
   const tenders = saved.filter((f) => f.kind === "tender").map((f) => dataset().byTender.get(f.id)).filter((c): c is Case => Boolean(c));
@@ -76,7 +76,7 @@ ${
 ${section(
   "Закупівлі",
   tenders.length,
-  `${sortBar("/starred", c)}${filterPanel("/starred", c)}${listBody(filteredTenders, c, "/starred")}${
+  `${controlBar("/starred", c)}${listBody(filteredTenders, c, "/starred")}${
     missingTenders > 0
       ? `<p class="note">${missingTenders} ${plural(missingTenders, "позначена закупівля більше не знайдена", "позначені закупівлі більше не знайдені", "позначених закупівель більше не знайдено")} в базі.</p>`
       : ""

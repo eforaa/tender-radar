@@ -6,7 +6,7 @@ import { readControls, applyControls } from "../controls.ts";
 import { dataset } from "../context.ts";
 import { star } from "../components/case-row.ts";
 import { rankRisks, groupedRiskCards } from "../components/risk.ts";
-import { presetBar, sortBar, filterPanel, listBody } from "../components/filters.ts";
+import { controlBar, listBody } from "../components/filters.ts";
 
 /* ---------- railway ---------- */
 
@@ -95,9 +95,7 @@ export function railwayPage(url: URL): string {
 </details>
 
 <h2>Закупівлі залізниці</h2>
-${presetBar("/railway", url, c)}
-${sortBar("/railway", c)}
-${filterPanel("/railway", c, { hideRail: true })}
+${controlBar("/railway", c, { hideRail: true }, { url })}
 ${listBody(filtered, c, "/railway")}
 
 <h2>Хто закуповує</h2>

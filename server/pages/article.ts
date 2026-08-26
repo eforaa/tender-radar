@@ -5,7 +5,7 @@ import { ARTICLES, isJointStock } from "../../src/legal.ts";
 import { type Case } from "../data.ts";
 import { readControls, applyControls } from "../controls.ts";
 import { dataset } from "../context.ts";
-import { sortBar, filterPanel, listBody } from "../components/filters.ts";
+import { controlBar, listBody } from "../components/filters.ts";
 import { notFound } from "./static.ts";
 
 /* ---------- criminal-code screening ---------- */
@@ -94,8 +94,7 @@ export function articlePage(code: string, url: URL): string {
     ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">скинути</a>` : ""}
   </div>
 </form>
-${sortBar(articleAction, ctrl, jointHidden)}
-${filterPanel(articleAction, ctrl, {}, jointHidden)}
+${controlBar(articleAction, ctrl, {}, { extra: jointHidden })}
 ${listBody(shown, ctrl, articleAction)}
 
 <p class="note">Перелік сформовано автоматично за індикаторами державної системи моніторингу закупівель. Він не встановлює факт правопорушення і не є твердженням щодо будь-якої названої особи чи компанії. Наступний крок — витребувати самі документи й перевірити їх.</p>
