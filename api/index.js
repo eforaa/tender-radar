@@ -584,8 +584,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
 /* ---------- chrome ---------- */
 .top{border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:10}
 .top .inner{max-width:72rem;margin:0 auto;padding:var(--s4) clamp(var(--s4),3vw,var(--s6));display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3) var(--s5)}
-.brand{font-family:var(--f-display);font-weight:700;font-size:1.1rem;letter-spacing:-.01em;text-decoration:none;color:var(--ink);white-space:nowrap}
+.brand{display:flex;align-items:center;gap:var(--s2);font-family:var(--f-display);font-weight:700;font-size:1.1rem;letter-spacing:-.01em;text-decoration:none;color:var(--ink);white-space:nowrap}
 .brand span{color:var(--accent)}
+/* radius-sm, not the standard radius: the mark carries its own near-black
+   backdrop, and square-cornered on a light header it reads as a black
+   rectangle rather than a logo. */
+.brand-mark{width:28px;height:28px;border-radius:var(--radius-sm);flex:none}
 .nav{display:flex;flex-wrap:wrap;gap:var(--s1);margin-left:auto}
 .nav a{text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:var(--s1) var(--s3);border-radius:2px}
 .nav a:hover{color:var(--accent);background:var(--surface-2)}
@@ -930,13 +934,13 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   .row .flags .flag{font-size:.74rem;padding:var(--s1) var(--s2);line-height:1.35}
   /* the worst tap target on the page before this: a 1.15rem glyph with no
      hit-box padding. It now clears 44px on both sides; float is dropped so
-     the extra hit area does not overlap the title text next to it. The
-     44px box sets .name's own line height (it is the tallest flex item in
-     that row), so only a small trim is needed to stop it reading as
-     oversized next to a short title \u2014 not enough to push the box out of
-     .name and into the block above (.amount) or below. */
+     the extra hit area does not overlap the title text next to it. No
+     negative margin: the 44px box already sets .name's own line height (it
+     is the tallest flex item in that row), so pulling it up with a
+     negative margin only ever bleeds into the block above (.amount) \u2014
+     there is no slack to reclaim without doing that. */
   .row .name .star{float:none}
-  .row .star{display:inline-flex;align-items:center;justify-content:center;min-width:2.75rem;min-height:2.75rem;padding:0;margin:-.35rem 0;font-size:1.3rem;flex:none}
+  .row .star{display:inline-flex;align-items:center;justify-content:center;min-width:2.75rem;min-height:2.75rem;padding:0;margin:0;font-size:1.3rem;flex:none}
 
   .group-block summary{padding:var(--s4) var(--s4)}
   .g-name{flex:1 1 100%}
@@ -990,6 +994,10 @@ function layout(opts) {
 <meta property="og:locale" content="uk_UA">
 <meta property="og:title" content="${esc(opts.title)} \u2014 Tender Radar">
 <meta property="og:description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta property="og:image" content="/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ysabeau:wght@300..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -998,7 +1006,7 @@ function layout(opts) {
 <body>
 <input type="checkbox" id="menu-toggle" class="sr-only" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0432\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
 <header class="top"><div class="inner">
-  <a class="brand" href="/">Tender<span>&nbsp;Radar</span></a>
+  <a class="brand" href="/"><img class="brand-mark" src="/icon-192.png" alt="" width="28" height="28" decoding="async">Tender<span>&nbsp;Radar</span></a>
   <nav class="nav">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</a>
