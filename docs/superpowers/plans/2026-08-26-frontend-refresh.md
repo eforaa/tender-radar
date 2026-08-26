@@ -14,7 +14,8 @@
 - **The move is mechanical.** Tasks 3 and 4 cut and paste code. Do NOT rename, reformat, "improve", or fix anything while moving. Behaviour changes land in later tasks where they are visible in a small diff.
 - **The 223 existing tests stay green with no edits to the tests themselves.** If a test needs changing to pass, the move was not mechanical — revert and redo it.
 - **Comments explain WHY, not what.** Match the prose style already in `server/html.ts` and `server/app.ts`.
-- **Editorial character stays.** Literata remains the heading face, IBM Plex Sans the body. Do not swap fonts, and do not turn the list into a data table.
+- **Editorial character stays**, but the serif goes: the client asked for a less "printed" look. **Ysabeau** (Google Fonts, already-linked provider) replaces Literata in BOTH display and body roles; IBM Plex Mono stays for codes and numbers. Do not turn the list into a data table.
+- **The logo is the client's, used as given.** Do not redraw it, do not restyle it, do not swap it for an SVG. That was offered and declined.
 - **No dark theme.** Not requested; do not add one.
 - **Test command:** `npm test`. Single file: `node --test tests/<name>.test.ts`. Typecheck: `npm run typecheck`.
 - **Branch:** `feat/frontend-refresh`.
@@ -353,8 +354,10 @@ In `server/html.ts`, replace the current `:root` declarations with:
   --shadow:0 12px 32px -20px rgba(20,24,26,.45);
   --radius:8px; --radius-sm:4px;
 
-  --f-display:"Literata",Georgia,serif;
-  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  /* One voice instead of the safe serif-plus-grotesque pair. Ysabeau is a
+     Garamond-boned sans that carries both display sizes and body copy. */
+  --f-display:"Ysabeau","Segoe UI",system-ui,sans-serif;
+  --f-body:"Ysabeau","Segoe UI",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",Consolas,monospace;
 }
 ```
@@ -380,9 +383,17 @@ Leave `font-size`, `line-height`, `width`, `max-width`, `border-radius` and `top
 
 Two rhythm rules to apply while you are in there, because they are what actually creates the air: a heading sits `var(--s2)` above its text, and a section sits `var(--s7)` below the block before it. Adjust `h1`, `h2` and `.sub` margins to match.
 
-- [ ] **Step 3: Take Literata off the numbers**
+- [ ] **Step 3: Swap the webfont link, and take the display face off the numbers**
 
-`.statline b` currently uses `var(--f-display)`. A display serif is not built for dense figures and it makes the stat line ripple. Change it to `var(--f-body)` with `font-weight:600` and keep `font-variant-numeric:tabular-nums`. Headings keep the serif.
+In `layout()` in `server/html.ts` the stylesheet link currently requests Literata, IBM Plex Sans and IBM Plex Mono. Replace it with Ysabeau plus IBM Plex Mono — drop IBM Plex Sans entirely, nothing references it any more:
+
+```html
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ysabeau:wght@300..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+```
+
+Keep both `preconnect` lines exactly as they are.
+
+`.statline b` currently uses `var(--f-display)`. A display face is not built for dense figures and it makes the stat line ripple. Change it to `var(--f-body)` with `font-weight:600`, keeping `font-variant-numeric:tabular-nums`.
 
 - [ ] **Step 4: Verify**
 
@@ -453,7 +464,68 @@ git commit -m "style(web): make the phone layout the base, not an afterthought"
 
 ---
 
-### Task 7: See it before calling it done
+### Task 7: The logo
+
+**Files:**
+- Modify: `server/html.ts` — the `<head>` block and the `.brand` markup and rules in `layout()`
+- Already present, do not regenerate: `public/favicon-32.png`, `public/icon-180.png`, `public/icon-192.png`, `public/icon-512.png`, `public/logo-source.png`
+
+**Interfaces:**
+- Consumes: the tokens from Task 5.
+- Produces: nothing importable.
+
+The client supplied this mark and chose to use it as given, after being shown how it resolves at favicon size. Do not redraw it, restyle it, or substitute an SVG.
+
+- [ ] **Step 1: Declare the icons in the head**
+
+In `layout()`, alongside the existing `<link>` tags:
+
+```html
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta property="og:image" content="/icon-512.png">
+```
+
+- [ ] **Step 2: Put the mark in the header**
+
+`.brand` is currently text only. Add the image before the wordmark:
+
+```html
+<img class="brand-mark" src="/icon-192.png" alt="" width="28" height="28" decoding="async">
+```
+
+`alt` is deliberately empty: the wordmark beside it already names the site, and a second announcement would only repeat it to a screen reader.
+
+- [ ] **Step 3: Style it**
+
+```css
+.brand{display:flex;align-items:center;gap:var(--s2)}
+.brand-mark{width:28px;height:28px;border-radius:var(--radius-sm);flex:none}
+```
+
+The radius matters: the mark carries its own near-black backdrop, and square-cornered on a light header it reads as a black rectangle rather than a logo.
+
+- [ ] **Step 4: Confirm the files are actually served**
+
+`vercel.json` rewrites every route to `api/index`, and the local dev server in `server/serve.ts` routes everything through `handle()`. Neither obviously serves `public/`. Before claiming this works, verify it: start the dev server with the preview tooling using the `tender-radar` launch configuration, request `/favicon-32.png`, and record the status you get.
+
+If it 404s locally, add static-file handling for `public/` to `server/serve.ts` only — do not touch `vercel.json`, where the platform serves `public/` from the filesystem ahead of rewrites.
+
+- [ ] **Step 5: Verify**
+
+Run `npm test` and `npm run typecheck`, and paste the raw output of both into your report.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add server/html.ts server/serve.ts public
+git commit -m "feat(web): put the radar mark in the header and the tab"
+```
+
+---
+
+### Task 8: See it before calling it done
 
 **Files:**
 - None. This task changes nothing; it verifies.
