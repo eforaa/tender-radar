@@ -37,6 +37,7 @@ const server = createServer(async (req, res) => {
     cookieHeader: req.headers.cookie ?? null,
     method: req.method,
     body: payload,
+    headers: req.headers as Record<string, string | undefined>,
   });
   res.writeHead(status, headers);
   res.end(body);

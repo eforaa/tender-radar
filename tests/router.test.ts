@@ -36,6 +36,44 @@ test("with no Google credentials set, every request renders normally", async () 
   });
 });
 
+/* ---------- telegram webhook route, registered ahead of the Google gate ---------- */
+
+test("the webhook route answers before the Google gate, even when the gate is configured", async () => {
+  await withEnv(CONFIGURED, async () => {
+    const previousSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    delete process.env.TELEGRAM_WEBHOOK_SECRET;
+    try {
+      // No TELEGRAM_WEBHOOK_SECRET configured means every request is
+      // rejected fail-closed with 401 — the point being it is a 401, not the
+      // Google login page (200 HTML), proving this route is matched before
+      // loadAuthConfig() runs.
+      const res = await handle({
+        url: new URL("https://x.example/telegram/webhook"),
+        cookieHeader: null,
+        method: "POST",
+        body: "{}",
+        headers: {},
+      });
+      assert.equal(res.status, 401);
+      assert.ok(!res.body.includes("<html"), "must not be the HTML login page");
+    } finally {
+      if (previousSecret === undefined) delete process.env.TELEGRAM_WEBHOOK_SECRET;
+      else process.env.TELEGRAM_WEBHOOK_SECRET = previousSecret;
+    }
+  });
+});
+
+test("a GET to the webhook route is rejected without reaching the Google gate", async () => {
+  await withEnv(CONFIGURED, async () => {
+    const res = await handle({
+      url: new URL("https://x.example/telegram/webhook"),
+      cookieHeader: null,
+      method: "GET",
+    });
+    assert.equal(res.status, 405);
+  });
+});
+
 test("an unauthenticated visitor sees the sign-in page, not the site", async () => {
   await withEnv(CONFIGURED, async () => {
     const res = await handle({ url: new URL("https://x.example/"), cookieHeader: null });

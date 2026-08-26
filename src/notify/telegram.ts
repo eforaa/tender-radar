@@ -91,25 +91,39 @@ export function buildMessage(s: RunSummary): string {
 
 export type SendResult = { sent: boolean; reason?: string };
 
-/** Posts the message. Never throws: a failed notification must not fail the run. */
-export async function sendTelegram(config: TelegramConfig, text: string): Promise<SendResult> {
+/**
+ * The raw call, shared by the single-chat notifier and the broadcaster. The
+ * broadcaster needs the Response itself to tell a blocked chat from a
+ * rejected message, so this returns it unwrapped.
+ */
+export function postMessage(
+  config: TelegramConfig, chatId: string | number, text: string,
+): Promise<Response> {
+  return fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true,
+    }),
+  });
+}
+
+/** Posts to one chat. Never throws: a failed notification must not fail the run. */
+export async function sendTelegramTo(
+  config: TelegramConfig, chatId: string, text: string,
+): Promise<SendResult> {
   try {
-    const res = await fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        chat_id: config.chatId,
-        text,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
-    });
+    const res = await postMessage(config, chatId, text);
     if (!res.ok) return { sent: false, reason: `Telegram returned ${res.status}` };
     const body = (await res.json()) as { ok?: boolean; description?: string };
     return body.ok ? { sent: true } : { sent: false, reason: body.description ?? "Telegram rejected the message" };
   } catch (err) {
     return { sent: false, reason: (err as Error).message };
   }
+}
+
+export async function sendTelegram(config: TelegramConfig, text: string): Promise<SendResult> {
+  return sendTelegramTo(config, config.chatId, text);
 }
 
 /**

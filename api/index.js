@@ -3500,6 +3500,101 @@ async function exchangeCode(config, code, redirectUri) {
   return { email: claims.email.toLowerCase(), emailVerified: claims.email_verified === "true" };
 }
 
+// src/notify/webhook.ts
+var START_REPLY = "\u0413\u043E\u0442\u043E\u0432\u043E \u2014 \u0432\u0438 \u043F\u0456\u0434\u043F\u0438\u0441\u0430\u043D\u0456 \u043D\u0430 \u0449\u043E\u0434\u0435\u043D\u043D\u0438\u0439 \u043E\u0433\u043B\u044F\u0434 Tender Radar.\n\n\u0429\u043E\u0434\u043D\u044F \u043D\u0430\u0434\u0441\u0438\u043B\u0430\u0442\u0438\u043C\u0443 \u043A\u043E\u0440\u043E\u0442\u043A\u0443 \u0437\u0432\u0435\u0434\u0435\u043D\u043D\u044F: \u0449\u043E \u043D\u043E\u0432\u043E\u0433\u043E \u0434\u043E\u0434\u0430\u043B\u043E\u0441\u044F \u0442\u0430 \u043A\u0456\u043B\u044C\u043A\u0430 \u043D\u0430\u0439\u043F\u043E\u043C\u0456\u0442\u043D\u0456\u0448\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0429\u043E\u0431 \u0432\u0456\u0434\u043F\u0438\u0441\u0430\u0442\u0438\u0441\u044F, \u043D\u0430\u0434\u0456\u0448\u043B\u0456\u0442\u044C /stop.";
+var STOP_REPLY = "\u0412\u0438 \u0432\u0456\u0434\u043F\u0438\u0441\u0430\u043D\u0456. \u0429\u043E\u0431 \u043F\u043E\u0432\u0435\u0440\u043D\u0443\u0442\u0438\u0441\u044F, \u043D\u0430\u0434\u0456\u0448\u043B\u0456\u0442\u044C /start.";
+function parseCommand(payload) {
+  if (typeof payload !== "object" || payload === null) return null;
+  const message = payload.message;
+  if (typeof message !== "object" || message === null) return null;
+  const chatId = message.chat?.id;
+  const text = message.text;
+  if (typeof chatId !== "number" || typeof text !== "string") return null;
+  const word = text.trim().split(/\s+/)[0].split("@")[0].toLowerCase();
+  if (word === "/start") return { chatId, kind: "start" };
+  if (word === "/stop") return { chatId, kind: "stop" };
+  return null;
+}
+
+// src/store/subscribers.ts
+function loadSubscriberConfig(env = process.env) {
+  const url = env.SUPABASE_URL;
+  const serviceKey = env.SUPABASE_SERVICE_KEY;
+  return url && serviceKey ? { url, serviceKey } : null;
+}
+function createSubscriberStore(config, fetchImpl = fetch) {
+  const endpoint = `${config.url.replace(/\/$/, "")}/rest/v1/tg_subscribers`;
+  const headers = {
+    apikey: config.serviceKey,
+    Authorization: `Bearer ${config.serviceKey}`,
+    "content-type": "application/json"
+  };
+  async function call(url, init) {
+    const res = await fetchImpl(url, init);
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`Supabase returned ${res.status}${detail ? ` \u2014 ${detail}` : ""}`);
+    }
+    return res;
+  }
+  return {
+    // merge-duplicates makes a repeat /start idempotent, and resetting
+    // unsubscribed_at is what lets someone come back after /stop.
+    async add(chatId) {
+      await call(endpoint, {
+        method: "POST",
+        headers: { ...headers, Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ chat_id: chatId, unsubscribed_at: null })
+      });
+    },
+    // Soft delete: the row stays so the history of who left survives.
+    async remove(chatId) {
+      await call(`${endpoint}?chat_id=eq.${chatId}`, {
+        method: "PATCH",
+        headers: { ...headers, Prefer: "return=minimal" },
+        body: JSON.stringify({ unsubscribed_at: (/* @__PURE__ */ new Date()).toISOString() })
+      });
+    },
+    async listActive() {
+      const res = await call(`${endpoint}?select=chat_id&unsubscribed_at=is.null`, {
+        method: "GET",
+        headers
+      });
+      const rows = await res.json();
+      return rows.map((row) => row.chat_id);
+    }
+  };
+}
+
+// src/notify/telegram.ts
+function loadTelegramConfig(env = process.env) {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  const chatId = env.TELEGRAM_CHAT_ID;
+  return token && chatId ? { token, chatId } : null;
+}
+function postMessage(config, chatId, text) {
+  return fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: true
+    })
+  });
+}
+async function sendTelegramTo(config, chatId, text) {
+  try {
+    const res = await postMessage(config, chatId, text);
+    if (!res.ok) return { sent: false, reason: `Telegram returned ${res.status}` };
+    const body = await res.json();
+    return body.ok ? { sent: true } : { sent: false, reason: body.description ?? "Telegram rejected the message" };
+  } catch (err) {
+    return { sent: false, reason: err.message };
+  }
+}
+
 // server/router.ts
 function page(status, body, headers = {}) {
   return { status, body, headers: { "content-type": "text/html; charset=utf-8", ...headers } };
@@ -3513,7 +3608,47 @@ function safeBack(value) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/starred";
   return value;
 }
+async function handleTelegramWebhook(req, deps) {
+  const ok = { status: 200, body: "", headers: { "content-type": "text/plain" } };
+  const offered = req.headers?.["x-telegram-bot-api-secret-token"];
+  if (!deps.secret) {
+    console.error("telegram webhook rejected \u2014 TELEGRAM_WEBHOOK_SECRET is not configured");
+    return { status: 401, body: "", headers: { "content-type": "text/plain" } };
+  }
+  if (offered !== deps.secret) {
+    console.error("telegram webhook rejected \u2014 wrong secret token offered");
+    return { status: 401, body: "", headers: { "content-type": "text/plain" } };
+  }
+  if (!deps.store) return ok;
+  try {
+    const command = parseCommand(JSON.parse(req.body ?? "null"));
+    if (!command) return ok;
+    if (command.kind === "start") {
+      await deps.store.add(command.chatId);
+      await deps.reply?.(command.chatId, START_REPLY);
+    } else {
+      await deps.store.remove(command.chatId);
+      await deps.reply?.(command.chatId, STOP_REPLY);
+    }
+  } catch (err) {
+    console.error(`telegram webhook failed \u2014 ${err.message}`);
+  }
+  return ok;
+}
 async function handle(req) {
+  if (req.url.pathname === "/telegram/webhook") {
+    if ((req.method ?? "GET").toUpperCase() !== "POST") {
+      return { status: 405, body: "", headers: { "content-type": "text/plain" } };
+    }
+    const supabase = loadSubscriberConfig();
+    const telegram = loadTelegramConfig();
+    return handleTelegramWebhook(req, {
+      store: supabase ? createSubscriberStore(supabase) : null,
+      secret: process.env.TELEGRAM_WEBHOOK_SECRET,
+      reply: telegram ? (chatId, text) => sendTelegramTo(telegram, String(chatId), text).then(() => {
+      }) : void 0
+    });
+  }
   const config = loadAuthConfig();
   const secure = req.url.protocol === "https:";
   const saved = parseFavourites(readCookie(req.cookieHeader, FAVOURITES_COOKIE));
@@ -3589,7 +3724,8 @@ async function handler(req, res) {
     url,
     cookieHeader: req.headers.cookie ?? null,
     method: req.method,
-    body: payload
+    body: payload,
+    headers: req.headers
   });
   res.statusCode = status;
   for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);

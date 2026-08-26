@@ -19,6 +19,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     cookieHeader: req.headers.cookie ?? null,
     method: req.method,
     body: payload,
+    headers: req.headers as Record<string, string | undefined>,
   });
 
   res.statusCode = status;
