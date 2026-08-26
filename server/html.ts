@@ -121,8 +121,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
 /* ---------- chrome ---------- */
 .top{border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:10}
 .top .inner{max-width:72rem;margin:0 auto;padding:var(--s4) clamp(var(--s4),3vw,var(--s6));display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3) var(--s5)}
-.brand{font-family:var(--f-display);font-weight:700;font-size:1.1rem;letter-spacing:-.01em;text-decoration:none;color:var(--ink);white-space:nowrap}
+.brand{display:flex;align-items:center;gap:var(--s2);font-family:var(--f-display);font-weight:700;font-size:1.1rem;letter-spacing:-.01em;text-decoration:none;color:var(--ink);white-space:nowrap}
 .brand span{color:var(--accent)}
+/* radius-sm, not the standard radius: the mark carries its own near-black
+   backdrop, and square-cornered on a light header it reads as a black
+   rectangle rather than a logo. */
+.brand-mark{width:28px;height:28px;border-radius:var(--radius-sm);flex:none}
 .nav{display:flex;flex-wrap:wrap;gap:var(--s1);margin-left:auto}
 .nav a{text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:var(--s1) var(--s3);border-radius:2px}
 .nav a:hover{color:var(--accent);background:var(--surface-2)}
@@ -538,6 +542,10 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
 <meta property="og:locale" content="uk_UA">
 <meta property="og:title" content="${esc(opts.title)} — Tender Radar">
 <meta property="og:description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta property="og:image" content="/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ysabeau:wght@300..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -546,7 +554,7 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
 <body>
 <input type="checkbox" id="menu-toggle" class="sr-only" aria-label="Показати всі розділи">
 <header class="top"><div class="inner">
-  <a class="brand" href="/">Tender<span>&nbsp;Radar</span></a>
+  <a class="brand" href="/"><img class="brand-mark" src="/icon-192.png" alt="" width="28" height="28" decoding="async">Tender<span>&nbsp;Radar</span></a>
   <nav class="nav">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Закупівлі</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>Залізниця</a>
