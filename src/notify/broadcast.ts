@@ -36,16 +36,28 @@ export async function broadcast(
       let res = await deps.send(chatId, text);
 
       // 429 carries the seconds to wait. One retry only: a chat that is still
-      // throttled after that must not hold up everyone behind it.
+      // throttled after that must not hold up everyone behind it. Telegram's
+      // number is not trusted as-is: under flood control it can be in the
+      // hundreds or thousands of seconds, which would strand the whole run
+      // well past the workflow's timeout. Cap the wait and let anything
+      // longer fall through to being counted as failed below.
       if (res.status === 429) {
         const body = (await res.clone().json().catch(() => ({}))) as {
           parameters?: { retry_after?: number };
         };
-        await sleep((body.parameters?.retry_after ?? 1) * 1000);
+        await sleep(Math.min(body.parameters?.retry_after ?? 1, 30) * 1000);
         res = await deps.send(chatId, text);
       }
 
-      if (res.ok) { result.sent++; continue; }
+      if (res.ok) {
+        // Cancel rather than read: nothing here needs the body, but leaving
+        // it unconsumed keeps undici's socket bound until GC, and a long
+        // broadcast would accumulate half-open connections to Telegram.
+        // `.catch()` guards synthetic Responses in tests that have no body.
+        await res.body?.cancel().catch(() => {});
+        result.sent++;
+        continue;
+      }
 
       // 403 always means the user blocked the bot or deleted the chat.
       // 400 is ambiguous and must be read: Telegram returns it both for a

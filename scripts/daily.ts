@@ -5,6 +5,9 @@
 // Safe to run at any hour and safe to run twice: everything is keyed, so a
 // repeat run simply finds nothing new. A crash mid-way loses no data — the
 // next run picks up the tenders whose cards are still missing.
+//
+// Exception: the Telegram broadcast is not keyed. A manual run alongside the
+// schedule sends every subscriber the digest twice — there is no dedupe.
 import { listRiskRuleIds, fetchRiskReportCsv, fetchRisksPage } from "../src/sources/risks.ts";
 import { normalizeRiskReport, normalizeRiskRules } from "../src/normalize/risk.ts";
 import { fetchTender } from "../src/sources/openprocurement.ts";
@@ -249,8 +252,8 @@ try {
       // export) is committed by this point, so a Supabase hiccup here must
       // not flip step 4's "ok" run record to "failed" via the outer catch.
       try {
-        const store = createSubscriberStore(supabase);
-        const chatIds = await store.listActive();
+        const subscribers = createSubscriberStore(supabase);
+        const chatIds = await subscribers.listActive();
         const outcome = await broadcast(chatIds, text, {
           send: (chatId, body) => postMessage(telegram, chatId, body),
         });
@@ -265,7 +268,7 @@ try {
 
         for (const chatId of outcome.blocked) {
           try {
-            await store.remove(chatId);
+            await subscribers.remove(chatId);
           } catch (err) {
             // One chat that won't unsubscribe must not cost the rest their
             // removal, nor the admin summary that follows.
@@ -286,6 +289,10 @@ try {
       } catch (err) {
         errors++;
         log(`telegram broadcast failed — ${(err as Error).message}`);
+        // Supabase being unreachable must not lose the digest entirely: fall
+        // back to the pre-existing single send so at least the admin sees it.
+        const fallback = await sendTelegram(telegram, text);
+        log(fallback.sent ? "digest sent to the admin chat instead" : `fallback failed — ${fallback.reason}`);
       }
     }
   }

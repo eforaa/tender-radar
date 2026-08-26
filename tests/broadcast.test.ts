@@ -45,6 +45,21 @@ test("a rate limit is waited out and retried once", async () => {
   assert.deepEqual(result, { sent: 1, blocked: [], failed: 0 });
 });
 
+test("a huge retry_after is capped rather than slept for in full", async () => {
+  const slept: number[] = [];
+  let first = true;
+  const result = await broadcast([9], "hi", {
+    send: async () => {
+      if (first) { first = false; return reply(429, { parameters: { retry_after: 9000 } }); }
+      return reply(200);
+    },
+    sleep: async (ms) => { slept.push(ms); },
+  });
+
+  assert.deepEqual(slept, [30000], "capped at 30s instead of the reported 9000s");
+  assert.deepEqual(result, { sent: 1, blocked: [], failed: 0 });
+});
+
 test("a chat that keeps failing counts as an error and does not stop the rest", async () => {
   const result = await broadcast([1, 2], "hi", {
     send: async (chatId) => (chatId === 1 ? reply(500, { ok: false }) : reply(200)),

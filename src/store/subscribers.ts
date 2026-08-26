@@ -33,7 +33,12 @@ export function createSubscriberStore(
 
   async function call(url: string, init: RequestInit): Promise<Response> {
     const res = await fetchImpl(url, init);
-    if (!res.ok) throw new Error(`Supabase returned ${res.status}`);
+    if (!res.ok) {
+      // Include PostgREST's response text — without it a real failure logs
+      // only the status code, with no reason to act on.
+      const detail = await res.text().catch(() => "");
+      throw new Error(`Supabase returned ${res.status}${detail ? ` — ${detail}` : ""}`);
+    }
     return res;
   }
 

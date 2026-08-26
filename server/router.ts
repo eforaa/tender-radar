@@ -74,7 +74,15 @@ export async function handleTelegramWebhook(
 ): Promise<HttpResponse> {
   const ok = { status: 200, body: "", headers: { "content-type": "text/plain" } };
   const offered = req.headers?.["x-telegram-bot-api-secret-token"];
-  if (!deps.secret || offered !== deps.secret) {
+  if (!deps.secret) {
+    // Fail-closed is correct here — reject regardless — but doing it silently
+    // makes a missing env var indistinguishable from a live attack, and hard
+    // to diagnose from the logs alone.
+    console.error("telegram webhook rejected — TELEGRAM_WEBHOOK_SECRET is not configured");
+    return { status: 401, body: "", headers: { "content-type": "text/plain" } };
+  }
+  if (offered !== deps.secret) {
+    console.error("telegram webhook rejected — wrong secret token offered");
     return { status: 401, body: "", headers: { "content-type": "text/plain" } };
   }
   if (!deps.store) return ok;
