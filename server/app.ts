@@ -3,7 +3,7 @@ import { REGION, RAILWAY_EDRPOU, SOUTHERN_RAILWAY_EDRPOU, railwayScope, dataDir,
 import { RISK_LABELS, GROUP_ORDER, procedureLabel, readableName, type RiskGroup, MONITORING_REASONS, VIOLATION_TYPES } from "../src/labels.ts";
 import { layout, esc, money, unitMoney, shortMoney, date, trim, plural } from "./html.ts";
 import { ARTICLES, INDICATOR_LEGAL, isJointStock } from "../src/legal.ts";
-import { loadDataset, type Case, type Dataset } from "./data.ts";
+import { type Case } from "./data.ts";
 import { DIMENSIONS, buildGroups, isDimension, type Dimension, type Group } from "./grouping.ts";
 import { normaliseEdrpou, isStarred, type Favourite, type FavKind } from "./favourites.ts";
 import { reportText, reportHtml, type ReportContext } from "./report.ts";
@@ -13,6 +13,7 @@ import {
   readControls, applyControls, activeCount, isFiltered, keepControls,
   type Controls, type ControlOptions,
 } from "./controls.ts";
+import { dataset, reloadDataset, setStarred, starredList } from "./context.ts";
 
 const PAGE_SIZE = 30;
 /** Chips beyond this crowd the row; the rest are one click away. */
@@ -20,16 +21,10 @@ const MAX_ROW_FLAGS = 3;
 /** Grouping the whole country by buyer produced 10608 blocks in one page. */
 const MAX_GROUPS = 40;
 
-let db: Dataset = await loadDataset();
-console.log(
-  `loaded ${db.flagCount} flags across ${db.cases.length} tenders ` +
-    `(${db.cases.filter((c) => c.detailed).length} with full cards)`,
-);
-
 /* ---------- shared pieces ---------- */
 
 function shortRisk(riskId: string): string {
-  return RISK_LABELS[riskId]?.short ?? db.ruleById.get(riskId)?.name ?? riskId;
+  return RISK_LABELS[riskId]?.short ?? dataset().ruleById.get(riskId)?.name ?? riskId;
 }
 
 function riskFlag(riskId: string): string {
@@ -121,16 +116,13 @@ function alarms(entry: Case): string[] {
   return out;
 }
 
-/** Star list for the request being rendered. Set once at the top of render(). */
-let starred: Favourite[] = [];
-
 /**
  * The star toggle. A plain form, so the site still needs no scripts.
  * `back` is where the visitor returns after the POST.
  */
 function star(kind: FavKind, id: string, back: string, opts: { label?: boolean } = {}): string {
   if (!id) return "";
-  const on = isStarred(starred, kind, id);
+  const on = isStarred(starredList(), kind, id);
   const title = on ? "Прибрати з обраного" : "Додати до обраного";
   return `<form class="star-form" method="post" action="/starred/toggle">
   <input type="hidden" name="kind" value="${esc(kind)}">
@@ -200,7 +192,7 @@ function rankRisks(list: Case[]): [string, number][] {
 }
 
 function riskCard(riskId: string, count?: number): string {
-  const rule = db.ruleById.get(riskId);
+  const rule = dataset().ruleById.get(riskId);
   const label = RISK_LABELS[riskId];
   const legal = INDICATOR_LEGAL[riskId];
 
@@ -415,11 +407,11 @@ function filterPanel(action: string, c: Controls, opts: ControlOptions = {}, ext
       .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
       .join("");
 
-  const stamps = db.cases.map((x) => x.tender_date ?? "").filter(Boolean).sort();
+  const stamps = dataset().cases.map((x) => x.tender_date ?? "").filter(Boolean).sort();
   const earliest = stamps[0] ?? "";
   const latest = stamps[stamps.length - 1] ?? "";
-  const regions = [...new Set(db.cases.map((x) => x.region ?? "").filter(Boolean))].sort();
-  const amounts = db.cases.map((x) => x.value_amount ?? 0).filter((n) => n > 0);
+  const regions = [...new Set(dataset().cases.map((x) => x.region ?? "").filter(Boolean))].sort();
+  const amounts = dataset().cases.map((x) => x.value_amount ?? 0).filter((n) => n > 0);
   const rangeHint = amounts.length
     ? `у базі від ${shortMoney(Math.min(...amounts))} до ${shortMoney(Math.max(...amounts))}`
     : "";
@@ -436,7 +428,7 @@ function filterPanel(action: string, c: Controls, opts: ControlOptions = {}, ext
       <div class="filter-row">
         <select name="risk" aria-label="Ознака">
           <option value="">Будь-яка ознака</option>
-          ${db.rules
+          ${dataset().rules
             .map(
               (r) =>
                 `<option value="${esc(r.risk_id)}"${r.risk_id === c.risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`,
@@ -535,7 +527,7 @@ ${
 
 function feedPage(url: URL): string {
   const c = readControls(url);
-  const list = applyControls(db.cases, c, RAILWAY_EDRPOU);
+  const list = applyControls(dataset().cases, c, RAILWAY_EDRPOU);
 
   return layout({
     title: "Закупівлі",
@@ -545,10 +537,10 @@ function feedPage(url: URL): string {
 <p class="sub">Публічні закупівлі всієї України, які держава позначила як підозрілі.</p>
 
 <p class="statline">
-  <b>${db.cases.length.toLocaleString("uk-UA")}</b> закупівель ·
-  <b>${shortMoney(db.totalValue)}</b> ·
-  <b>${db.flagCount.toLocaleString("uk-UA")}</b> ознак ·
-  <b>${db.findingCount.toLocaleString("uk-UA")}</b> переплат
+  <b>${dataset().cases.length.toLocaleString("uk-UA")}</b> закупівель ·
+  <b>${shortMoney(dataset().totalValue)}</b> ·
+  <b>${dataset().flagCount.toLocaleString("uk-UA")}</b> ознак ·
+  <b>${dataset().findingCount.toLocaleString("uk-UA")}</b> переплат
 </p>
 
 ${PRIMER}
@@ -568,7 +560,7 @@ ${listBody(list, c, "/")}
 
 /** The expanded legal qualification for one tender. */
 function qualificationBlock(entry: Case): string {
-  const q = buildQualification(entry, db.ruleById);
+  const q = buildQualification(entry, dataset().ruleById);
 
   return `<p class="caution">${esc(q.caution)}</p>
 
@@ -658,13 +650,13 @@ function conclusionBlock(entry: Case, sameEntity: Case[], sameOfficer: Case[], s
 }
 
 function tenderPage(tenderId: string): string {
-  const entry = db.byTender.get(tenderId);
+  const entry = dataset().byTender.get(tenderId);
   if (!entry) return notFound();
 
-  const sameEntity = db.cases.filter((c) => c.entity_edrpou && c.entity_edrpou === entry.entity_edrpou);
-  const sameOfficer = entry.officer_key ? db.cases.filter((c) => c.officer_key === entry.officer_key) : [];
+  const sameEntity = dataset().cases.filter((c) => c.entity_edrpou && c.entity_edrpou === entry.entity_edrpou);
+  const sameOfficer = entry.officer_key ? dataset().cases.filter((c) => c.officer_key === entry.officer_key) : [];
   const officerValue = sameOfficer.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
-  const sameWinner = entry.winner_edrpou ? db.cases.filter((c) => c.winner_edrpou === entry.winner_edrpou) : [];
+  const sameWinner = entry.winner_edrpou ? dataset().cases.filter((c) => c.winner_edrpou === entry.winner_edrpou) : [];
   const winnerValue = sameWinner.reduce((sum, c) => sum + (c.winner_amount ?? c.value_amount ?? 0), 0);
 
   const title = entry.title || readableName(entry.entity_name) || "Закупівля";
@@ -780,7 +772,7 @@ ${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
 
 function officerPage(key: string, url: URL): string {
   const dossierAction = `/officer/${encodeURIComponent(key)}`;
-  const list = db.cases.filter((c) => c.officer_key === key);
+  const list = dataset().cases.filter((c) => c.officer_key === key);
   if (list.length === 0) return notFound();
 
   const name = list.find((c) => c.officer_name)?.officer_name ?? key;
@@ -835,7 +827,7 @@ ${listBody(shown, ctrl, dossierAction, { showOfficer: false })}
 
 function supplierPage(edrpou: string, url: URL): string {
   const dossierAction = `/supplier/${encodeURIComponent(edrpou)}`;
-  const list = db.cases.filter((c) => c.winner_edrpou === edrpou);
+  const list = dataset().cases.filter((c) => c.winner_edrpou === edrpou);
   if (list.length === 0) return notFound();
 
   const name = list.find((c) => c.winner_name)?.winner_name ?? edrpou;
@@ -877,7 +869,7 @@ ${listBody(shown, ctrl, dossierAction)}
 
 function entityPage(edrpou: string, url: URL): string {
   const dossierAction = `/entity/${encodeURIComponent(edrpou)}`;
-  const list = db.cases.filter((c) => c.entity_edrpou === edrpou);
+  const list = dataset().cases.filter((c) => c.entity_edrpou === edrpou);
   if (list.length === 0) return notFound();
 
   const name = list.find((c) => c.entity_name)?.entity_name ?? edrpou;
@@ -1058,7 +1050,7 @@ ${rows.length > 150 ? `<p class="note">Показано перші 150 із ${ro
 
 function entitiesPage(url: URL): string {
   const byEntity = new Map<string, { name: string; count: number; value: number }>();
-  for (const entry of db.cases) {
+  for (const entry of dataset().cases) {
     const key = entry.entity_edrpou ?? "";
     if (!key) continue;
     const acc = byEntity.get(key) ?? { name: entry.entity_name ?? key, count: 0, value: 0 };
@@ -1088,7 +1080,7 @@ function entitiesPage(url: URL): string {
 
 function officersPage(url: URL): string {
   const byOfficer = new Map<string, { name: string; entity: string; count: number; value: number }>();
-  for (const entry of db.cases) {
+  for (const entry of dataset().cases) {
     if (!entry.officer_key) continue;
     const acc = byOfficer.get(entry.officer_key) ?? {
       name: entry.officer_name ?? entry.officer_key,
@@ -1122,7 +1114,7 @@ function officersPage(url: URL): string {
 
 function suppliersPage(url: URL): string {
   const bySupplier = new Map<string, { name: string; count: number; value: number; solo: number }>();
-  for (const entry of db.cases) {
+  for (const entry of dataset().cases) {
     const key = entry.winner_edrpou ?? "";
     if (!key) continue;
     const acc = bySupplier.get(key) ?? { name: entry.winner_name ?? key, count: 0, value: 0, solo: 0 };
@@ -1158,7 +1150,7 @@ type RailwayBlock = { scope: RailwayScope; heading: string; note: string; list: 
 
 function railwayBlocks(): RailwayBlock[] {
   const by = new Map<RailwayScope, Case[]>();
-  for (const entry of db.cases) {
+  for (const entry of dataset().cases) {
     const scope = railwayScope(entry);
     if (!scope) continue;
     const list = by.get(scope) ?? [];
@@ -1320,7 +1312,7 @@ function articlePage(code: string, url: URL): string {
   const jointHidden = jointOnly ? '<input type="hidden" name="at" value="1">' : "";
   const ctrl = readControls(url);
 
-  let list = db.cases.filter(
+  let list = dataset().cases.filter(
     (c) => c.region === REGION && c.risks.some((r) => relevant.has(r)),
   );
   if (jointOnly) list = list.filter((c) => isJointStock(c.entity_name) || isJointStock(c.winner_name));
@@ -1407,10 +1399,10 @@ ${listBody(shown, ctrl, articleAction)}
 /* ---------- what changed ---------- */
 
 function updatesPage(url: URL): string {
-  const runs = [...db.runs].sort((a, b) => b.started_at.localeCompare(a.started_at));
+  const runs = [...dataset().runs].sort((a, b) => b.started_at.localeCompare(a.started_at));
   const latest = runs[0];
   const newIds = new Set(latest?.new_tender_ids ?? []);
-  const freshAll = db.cases.filter((x) => newIds.has(x.tender_id));
+  const freshAll = dataset().cases.filter((x) => newIds.has(x.tender_id));
   const c = readControls(url);
   const fresh = applyControls(freshAll, c, RAILWAY_EDRPOU);
 
@@ -1469,7 +1461,7 @@ ${runs
 /* ---------- our own price findings ---------- */
 
 function pricesPage(url: URL): string {
-  const withFindings = db.cases.filter((c) => c.findings.length > 0);
+  const withFindings = dataset().cases.filter((c) => c.findings.length > 0);
   const gapOf = (c: Case) =>
     c.findings.reduce((total, f) => {
       const e = f.evidence as { overpayment?: number; extra_cost?: number };
@@ -1533,8 +1525,8 @@ function saveControl(edrpou: string, saved: string[], back: string): string {
 
 /** What we hold on one EDRPOU, from either side of a tender. */
 function profileOf(edrpou: string): { asBuyer: Case[]; asWinner: Case[]; name: string | null } {
-  const asBuyer = db.cases.filter((c) => c.entity_edrpou === edrpou);
-  const asWinner = db.cases.filter((c) => c.winner_edrpou === edrpou);
+  const asBuyer = dataset().cases.filter((c) => c.entity_edrpou === edrpou);
+  const asWinner = dataset().cases.filter((c) => c.winner_edrpou === edrpou);
   const name =
     asBuyer.find((c) => c.entity_name)?.entity_name ?? asWinner.find((c) => c.winner_name)?.winner_name ?? null;
   return { asBuyer, asWinner, name };
@@ -1598,7 +1590,7 @@ ${
 }
 
 function starredPage(saved: Favourite[], url: URL): string {
-  const tenders = saved.filter((f) => f.kind === "tender").map((f) => db.byTender.get(f.id)).filter((c): c is Case => Boolean(c));
+  const tenders = saved.filter((f) => f.kind === "tender").map((f) => dataset().byTender.get(f.id)).filter((c): c is Case => Boolean(c));
   const missingTenders = saved.filter((f) => f.kind === "tender").length - tenders.length;
   const c = readControls(url);
   const filteredTenders = applyControls(tenders, c, RAILWAY_EDRPOU);
@@ -1608,8 +1600,8 @@ function starredPage(saved: Favourite[], url: URL): string {
     .map((f) => {
       const list =
         f.kind === "entity"
-          ? db.cases.filter((c) => c.entity_edrpou === f.id)
-          : db.cases.filter((c) => c.winner_edrpou === f.id);
+          ? dataset().cases.filter((c) => c.entity_edrpou === f.id)
+          : dataset().cases.filter((c) => c.winner_edrpou === f.id);
       const name =
         f.kind === "entity"
           ? list.find((c) => c.entity_name)?.entity_name
@@ -1627,7 +1619,7 @@ function starredPage(saved: Favourite[], url: URL): string {
   const officerRows = saved
     .filter((f) => f.kind === "officer")
     .map((f) => {
-      const list = db.cases.filter((c) => c.officer_key === f.id);
+      const list = dataset().cases.filter((c) => c.officer_key === f.id);
       return {
         fav: f,
         href: `/officer/${encodeURIComponent(f.id)}`,
@@ -1709,8 +1701,8 @@ ${section(
 function indicatorsPage(): string {
   // Every active indicator is listed, including those that never fired here —
   // a zero is information too.
-  const counted = new Map(rankRisks(db.cases));
-  const ranked: [string, number][] = db.rules
+  const counted = new Map(rankRisks(dataset().cases));
+  const ranked: [string, number][] = dataset().rules
     .map((r) => [r.risk_id, counted.get(r.risk_id) ?? 0] as [string, number])
     .sort((a, b) => b[1] - a[1]);
   return layout({
@@ -1775,8 +1767,7 @@ function notFound(): string {
 
 /** Re-reads the store. The local server calls this when the data files change. */
 export async function reload(): Promise<number> {
-  db = await loadDataset();
-  return db.cases.length;
+  return reloadDataset();
 }
 
 export type Rendered = { status: number; body: string; contentType?: string; filename?: string };
@@ -1788,7 +1779,7 @@ export type Rendered = { status: number; body: string; contentType?: string; fil
 export function render(url: URL, saved: Favourite[] = []): Rendered {
   // caseRow is called from a dozen places; threading the list through every
   // one of them would add a parameter to each. Set it once per request.
-  starred = saved;
+  setStarred(saved);
 
   const path = decodeURIComponent(url.pathname);
 
@@ -1815,14 +1806,14 @@ export function render(url: URL, saved: Favourite[] = []): Rendered {
     if (rest.endsWith("/report") || rest.endsWith("/report.txt")) {
       const asText = rest.endsWith(".txt");
       const id = rest.slice(0, rest.lastIndexOf("/report"));
-      const entry = db.byTender.get(id);
+      const entry = dataset().byTender.get(id);
       if (!entry) return { status: 404, body: notFound() };
-      const sameEntity = db.cases.filter((x) => x.entity_edrpou && x.entity_edrpou === entry.entity_edrpou);
-      const sameOfficer = entry.officer_key ? db.cases.filter((x) => x.officer_key === entry.officer_key) : [];
-      const sameWinner = entry.winner_edrpou ? db.cases.filter((x) => x.winner_edrpou === entry.winner_edrpou) : [];
+      const sameEntity = dataset().cases.filter((x) => x.entity_edrpou && x.entity_edrpou === entry.entity_edrpou);
+      const sameOfficer = entry.officer_key ? dataset().cases.filter((x) => x.officer_key === entry.officer_key) : [];
+      const sameWinner = entry.winner_edrpou ? dataset().cases.filter((x) => x.winner_edrpou === entry.winner_edrpou) : [];
       const ctx: ReportContext = {
         entry,
-        rules: db.ruleById,
+        rules: dataset().ruleById,
         sameEntity: sameEntity.length,
         sameOfficer: sameOfficer.length,
         sameWinner: sameWinner.length,
