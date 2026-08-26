@@ -23,13 +23,20 @@ import {
   favouritesCookie,
   isFavKind,
 } from "./favourites.ts";
+import { parseCommand, START_REPLY, STOP_REPLY } from "../src/notify/webhook.ts";
+import {
+  loadSubscriberConfig, createSubscriberStore, type SubscriberStore,
+} from "../src/store/subscribers.ts";
+import { loadTelegramConfig, sendTelegramTo } from "../src/notify/telegram.ts";
 
 export type HttpRequest = {
   url: URL;
   cookieHeader: string | null;
   method?: string;
-  /** Form body, for the saved-companies toggle. */
+  /** Form body, for the saved-companies toggle; JSON body, for the webhook. */
   body?: string;
+  /** Lower-cased request headers. The webhook authenticates with one. */
+  headers?: Record<string, string | undefined>;
 };
 
 export type HttpResponse = { status: number; body: string; headers: Record<string, string | string[]> };
@@ -50,6 +57,45 @@ function safeBack(value: string | null): string {
   return value;
 }
 
+export type WebhookDeps = {
+  store: SubscriberStore | null;
+  secret: string | undefined;
+  reply?: (chatId: number, text: string) => Promise<void>;
+};
+
+/**
+ * Telegram's end of the subscription. Always answers 200 once the caller is
+ * authenticated: a non-2xx makes Telegram retry with backoff and eventually
+ * drop the webhook altogether, which would silently break signups.
+ */
+export async function handleTelegramWebhook(
+  req: HttpRequest,
+  deps: WebhookDeps,
+): Promise<HttpResponse> {
+  const ok = { status: 200, body: "", headers: { "content-type": "text/plain" } };
+  const offered = req.headers?.["x-telegram-bot-api-secret-token"];
+  if (!deps.secret || offered !== deps.secret) {
+    return { status: 401, body: "", headers: { "content-type": "text/plain" } };
+  }
+  if (!deps.store) return ok;
+
+  try {
+    const command = parseCommand(JSON.parse(req.body ?? "null"));
+    if (!command) return ok;
+
+    if (command.kind === "start") {
+      await deps.store.add(command.chatId);
+      await deps.reply?.(command.chatId, START_REPLY);
+    } else {
+      await deps.store.remove(command.chatId);
+      await deps.reply?.(command.chatId, STOP_REPLY);
+    }
+  } catch (err) {
+    console.error(`telegram webhook failed — ${(err as Error).message}`);
+  }
+  return ok;
+}
+
 /**
  * Resolves one request to a response, enforcing the Google sign-in gate when
  * it is configured. With no Google credentials in the environment the gate
@@ -57,6 +103,23 @@ function safeBack(value: string | null): string {
  * Google Cloud project set up.
  */
 export async function handle(req: HttpRequest): Promise<HttpResponse> {
+  // Ahead of the Google gate on purpose: Telegram cannot sign in, and a
+  // login page returned here would silently swallow every update.
+  if (req.url.pathname === "/telegram/webhook") {
+    if ((req.method ?? "GET").toUpperCase() !== "POST") {
+      return { status: 405, body: "", headers: { "content-type": "text/plain" } };
+    }
+    const supabase = loadSubscriberConfig();
+    const telegram = loadTelegramConfig();
+    return handleTelegramWebhook(req, {
+      store: supabase ? createSubscriberStore(supabase) : null,
+      secret: process.env.TELEGRAM_WEBHOOK_SECRET,
+      reply: telegram
+        ? (chatId, text) => sendTelegramTo(telegram, String(chatId), text).then(() => {})
+        : undefined,
+    });
+  }
+
   const config = loadAuthConfig();
   const secure = req.url.protocol === "https:";
   const saved = parseFavourites(readCookie(req.cookieHeader, FAVOURITES_COOKIE));
