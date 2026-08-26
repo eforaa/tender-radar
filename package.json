@@ -19,6 +19,7 @@
     "build:web": "node scripts/build-web-data.ts",
     "deploy": "vercel deploy",
     "deploy:prod": "vercel deploy --prod",
+    "set-webhook": "node scripts/set-webhook.ts",
     "typecheck": "tsc --noEmit",
     "build:api": "node scripts/build-api.mjs",
     "bundle": "npm run build:web && npm run build:api"
