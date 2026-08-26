@@ -1,141 +1,77 @@
-// src/config.ts
-import { existsSync } from "node:fs";
-import { join as join2 } from "node:path";
-
-// src/store/json-store.ts
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
-var JsonStore = class {
-  #dir;
-  constructor(dir) {
-    this.#dir = dir;
-  }
-  async #read(table) {
-    try {
-      return JSON.parse(await readFile(join(this.#dir, `${table}.json`), "utf8"));
-    } catch (err) {
-      if (err.code === "ENOENT") return [];
-      throw err;
-    }
-  }
-  async #write(table, rows) {
-    await mkdir(this.#dir, { recursive: true });
-    await writeFile(join(this.#dir, `${table}.json`), JSON.stringify(rows), "utf8");
-  }
-  async #upsert(table, rows, key) {
-    if (rows.length === 0) return;
-    const existing = await this.#read(table);
-    const byKey = new Map(existing.map((row) => [key(row), row]));
-    for (const row of rows) byKey.set(key(row), row);
-    await this.#write(table, [...byKey.values()]);
-  }
-  upsertTenders(rows) {
-    return this.#upsert("tenders", rows, (r) => r.id);
-  }
-  upsertTenderItems(rows) {
-    return this.#upsert("tender_items", rows, (r) => `${r.tender_id}|${r.item_id}`);
-  }
-  upsertBids(rows) {
-    return this.#upsert("bids", rows, (r) => `${r.tender_id}|${r.bid_id}`);
-  }
-  upsertAwards(rows) {
-    return this.#upsert("awards", rows, (r) => `${r.tender_id}|${r.award_id}`);
-  }
-  upsertRiskFlags(rows) {
-    return this.#upsert("risk_flags", rows, (r) => `${r.tender_id}|${r.risk_id}`);
-  }
-  upsertRiskRules(rows) {
-    return this.#upsert("risk_rules", rows, (r) => r.risk_id);
-  }
-  upsertMonitorings(rows) {
-    return this.#upsert("monitorings", rows, (r) => r.monitoring_id);
-  }
-  upsertCatalogPrices(rows) {
-    return this.#upsert("catalog_prices", rows, (r) => r.offer_id);
-  }
-  upsertFindings(rows) {
-    return this.#upsert("findings", rows, (r) => `${r.tender_id}|${r.detector_key}`);
-  }
-  upsertRuns(rows) {
-    return this.#upsert("runs", rows, (r) => r.run_id);
-  }
-  replaceRuns(rows) {
-    return this.#write("runs", rows);
-  }
-  allTenders() {
-    return this.#read("tenders");
-  }
-  allTenderItems() {
-    return this.#read("tender_items");
-  }
-  allBids() {
-    return this.#read("bids");
-  }
-  allAwards() {
-    return this.#read("awards");
-  }
-  allRiskFlags() {
-    return this.#read("risk_flags");
-  }
-  allRiskRules() {
-    return this.#read("risk_rules");
-  }
-  allMonitorings() {
-    return this.#read("monitorings");
-  }
-  allCatalogPrices() {
-    return this.#read("catalog_prices");
-  }
-  allFindings() {
-    return this.#read("findings");
-  }
-  allRuns() {
-    return this.#read("runs");
-  }
-  async getCursor(worker) {
-    const all = await this.#read("cursors");
-    return all[0]?.[worker] ?? null;
-  }
-  async setCursor(worker, cursor) {
-    const all = await this.#read("cursors");
-    const map = all[0] ?? {};
-    map[worker] = cursor;
-    await this.#write("cursors", [map]);
-  }
+// server/favourites.ts
+var FAVOURITES_COOKIE = "tr_starred";
+var MAX_SAVED = 60;
+var TTL_SECONDS = 365 * 24 * 60 * 60;
+var SEPARATOR = "~";
+var PREFIX = {
+  tender: "t",
+  entity: "e",
+  supplier: "s",
+  officer: "o"
 };
-
-// src/config.ts
-var REGION = "\u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0430 \u043E\u0431\u043B\u0430\u0441\u0442\u044C";
-var SOUTHERN_RAILWAY_EDRPOU = "40081216";
-var RAILWAY_EDRPOU = /* @__PURE__ */ new Set([
-  SOUTHERN_RAILWAY_EDRPOU,
-  // РФ "Південна залізниця" — the Kharkiv branch
-  "40081347",
-  // Філія "Центр забезпечення виробництва"
-  "41022900",
-  // Філія "Пасажирська компанія"
-  "40123454",
-  // Філія "Центр з ремонту та експлуатації колійних машин"
-  "45462724",
-  // Філія "УЗ Вагон-Сервіс"
-  "45246390"
-  // Філія "Приміська пасажирська компанія"
-]);
-var RAILWAY_NAME = /залізни|укрзаліз|колійн|локомотив|вагон|тепловоз|електровоз/i;
-function railwayScope(entity) {
-  const edrpou = entity.entity_edrpou ?? "";
-  if (edrpou === SOUTHERN_RAILWAY_EDRPOU) return "southern";
-  if (RAILWAY_EDRPOU.has(edrpou)) return "branch";
-  if (entity.region === REGION && RAILWAY_NAME.test(entity.entity_name ?? "")) return "local";
-  return null;
+var BY_PREFIX = { t: "tender", e: "entity", s: "supplier", o: "officer" };
+var EDRPOU = /^\d{6,10}$/;
+function isEdrpou(value) {
+  return EDRPOU.test(value.trim());
 }
-function dataDir() {
-  if (process.env.TR_DATA_DIR) return process.env.TR_DATA_DIR;
-  const working = join2(import.meta.dirname, "..", "data");
-  return existsSync(working) ? working : join2(import.meta.dirname, "..", "web-data");
+function normaliseEdrpou(input) {
+  const digits = input.replace(/\D/g, "");
+  return isEdrpou(digits) ? digits : null;
 }
-function openStore() {
-  return new JsonStore(dataDir());
+function isUsableId(id) {
+  return id.length > 0 && id.length <= 120 && !/[~;,\s\\"]/.test(id);
+}
+function isFavKind(value) {
+  return value === "tender" || value === "entity" || value === "supplier" || value === "officer";
+}
+function encodeFavourite(fav) {
+  return `${PREFIX[fav.kind]}:${fav.id}`;
+}
+function decodeFavourite(token) {
+  const colon = token.indexOf(":");
+  if (colon !== 1) return null;
+  const kind = BY_PREFIX[token.slice(0, 1)];
+  const id = token.slice(colon + 1);
+  if (!kind || !isUsableId(id)) return null;
+  return { kind, id };
+}
+function parseFavourites(cookieValue) {
+  if (!cookieValue) return [];
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const token of cookieValue.split(SEPARATOR)) {
+    const fav = decodeFavourite(token.trim());
+    if (!fav) continue;
+    const key = encodeFavourite(fav);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(fav);
+  }
+  return out.slice(0, MAX_SAVED);
+}
+function serialiseFavourites(favourites) {
+  const seen = /* @__PURE__ */ new Set();
+  const tokens = [];
+  for (const fav of favourites) {
+    if (!isUsableId(fav.id)) continue;
+    const token = encodeFavourite(fav);
+    if (seen.has(token)) continue;
+    seen.add(token);
+    tokens.push(token);
+  }
+  return tokens.slice(0, MAX_SAVED).join(SEPARATOR);
+}
+function isStarred(favourites, kind, id) {
+  return favourites.some((f) => f.kind === kind && f.id === id);
+}
+function toggleFavourite(current, kind, id) {
+  if (!isUsableId(id)) return current;
+  return isStarred(current, kind, id) ? current.filter((f) => !(f.kind === kind && f.id === id)) : [{ kind, id }, ...current];
+}
+function favouritesCookie(favourites, secure) {
+  const value = serialiseFavourites(favourites);
+  const attrs = `SameSite=Lax; Path=/${secure ? "; Secure" : ""}`;
+  return value.length === 0 ? `${FAVOURITES_COOKIE}=; ${attrs}; Max-Age=0` : `${FAVOURITES_COOKIE}=${value}; ${attrs}; Max-Age=${TTL_SECONDS}`;
 }
 
 // src/labels.ts
@@ -287,502 +223,6 @@ function readableName(name) {
     afterQuote = false;
     return capitalise ? lower[0].toUpperCase() + lower.slice(1) : lower.toLowerCase();
   });
-}
-
-// server/html.ts
-function esc(value) {
-  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function money(amount) {
-  if (amount === null || !Number.isFinite(amount)) return "\u2014";
-  return new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 0 }).format(amount) + " \u20B4";
-}
-function unitMoney(amount) {
-  if (amount === null || !Number.isFinite(amount)) return "\u2014";
-  const digits = Math.abs(amount) < 1e3 ? 2 : 0;
-  return new Intl.NumberFormat("uk-UA", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount) + " \u20B4";
-}
-function shortMoney(amount) {
-  if (amount === null || !Number.isFinite(amount)) return "\u2014";
-  if (amount >= 1e9) return (amount / 1e9).toFixed(2).replace(".", ",") + " \u043C\u043B\u0440\u0434 \u20B4";
-  if (amount >= 1e6) return (amount / 1e6).toFixed(1).replace(".", ",") + " \u043C\u043B\u043D \u20B4";
-  if (amount >= 1e3) return Math.round(amount / 1e3).toLocaleString("uk-UA") + " \u0442\u0438\u0441 \u20B4";
-  return Math.round(amount) + " \u20B4";
-}
-var MONTHS = [
-  "\u0441\u0456\u0447\u043D\u044F",
-  "\u043B\u044E\u0442\u043E\u0433\u043E",
-  "\u0431\u0435\u0440\u0435\u0437\u043D\u044F",
-  "\u043A\u0432\u0456\u0442\u043D\u044F",
-  "\u0442\u0440\u0430\u0432\u043D\u044F",
-  "\u0447\u0435\u0440\u0432\u043D\u044F",
-  "\u043B\u0438\u043F\u043D\u044F",
-  "\u0441\u0435\u0440\u043F\u043D\u044F",
-  "\u0432\u0435\u0440\u0435\u0441\u043D\u044F",
-  "\u0436\u043E\u0432\u0442\u043D\u044F",
-  "\u043B\u0438\u0441\u0442\u043E\u043F\u0430\u0434\u0430",
-  "\u0433\u0440\u0443\u0434\u043D\u044F"
-];
-function date(value) {
-  if (!value) return "\u2014";
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  if (!m) return "\u2014";
-  const [, year, month, day2] = m;
-  const name = MONTHS[Number(month) - 1];
-  return name ? `${Number(day2)} ${name} ${year} \u0440.` : `${day2}.${month}.${year}`;
-}
-function shortDate(value) {
-  if (!value) return "\u2014";
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  return m ? `${m[3]}.${m[2]}.${m[1]}` : "\u2014";
-}
-function plural(n, one, few, many) {
-  const mod100 = Math.abs(n) % 100;
-  if (mod100 >= 11 && mod100 <= 14) return many;
-  const mod10 = mod100 % 10;
-  if (mod10 === 1) return one;
-  if (mod10 >= 2 && mod10 <= 4) return few;
-  return many;
-}
-function trim(text, max = 130) {
-  const clean = text.replace(/\s+/g, " ").trim();
-  if (clean.length <= max) return clean;
-  const cut = clean.slice(0, max);
-  const lastSpace = cut.lastIndexOf(" ");
-  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut) + "\u2026";
-}
-var STYLES = `
-:root {
-  color-scheme: light;
-
-  --paper:#F6F8F9; --surface:#FFFFFF; --surface-2:#EEF3F5; --surface-3:#FAFCFC;
-  --ink:#17222B; --ink-soft:#4A5966; --ink-faint:#7C8B96;
-  --line:#DDE4E8; --line-soft:#EBF0F2;
-  --accent:#17607F; --accent-bg:#E6F0F4;
-  --alarm:#A03A2B; --alarm-bg:#FBE9E5;
-  --warn:#87621F; --warn-bg:#FAF0DC;
-  --calm:#276B4C; --calm-bg:#E4F1EA;
-  --shadow:0 1px 2px rgba(23,34,43,.04), 0 8px 24px -18px rgba(23,34,43,.26);
-  --radius:5px;
-  --f-display:"Literata",Georgia,serif;
-  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
-  --f-mono:"IBM Plex Mono",Consolas,monospace;
-}
-*{box-sizing:border-box}
-pre,table{overflow-x:auto;max-width:100%}
-html{scroll-behavior:smooth}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-underline-offset:3px}
-a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-
-/* ---------- chrome ---------- */
-.top{border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:10}
-.top .inner{max-width:72rem;margin:0 auto;padding:.9rem clamp(1rem,3vw,2rem);display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1.6rem}
-.brand{font-family:var(--f-display);font-weight:700;font-size:1.1rem;letter-spacing:-.01em;text-decoration:none;color:var(--ink);white-space:nowrap}
-.brand span{color:var(--accent)}
-.nav{display:flex;flex-wrap:wrap;gap:.25rem;margin-left:auto}
-.nav a{text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:.3rem .65rem;border-radius:2px}
-.nav a:hover{color:var(--accent);background:var(--surface-2)}
-.nav a[aria-current]{color:var(--accent);background:var(--accent-bg);font-weight:500}
-
-/* Slide-in drawer. CSS only \u2014 a checkbox drives it, because <details>
-   cannot animate between display:none and shown. The checkbox is hidden
-   visually rather than with display:none, which keeps it keyboard-reachable
-   and keeps the sibling selectors working. */
-.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
-.burger{border-radius:var(--radius);flex:none;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:4px;width:2.4rem;height:2.4rem;padding:.55rem;border:1px solid var(--line);background:var(--surface)}
-.burger span{display:block;height:2px;background:var(--ink);border-radius:1px;transition:background .2s ease}
-.burger:hover{border-color:var(--accent)}
-.burger:hover span{background:var(--accent)}
-#menu-toggle:focus-visible + .top .burger{border-radius:var(--radius);outline:2px solid var(--accent);outline-offset:2px}
-
-.scrim{position:fixed;inset:0;background:rgba(10,18,24,.42);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease;z-index:40;cursor:pointer}
-#menu-toggle:checked ~ .scrim{opacity:1;visibility:visible}
-
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(20rem,86vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
-#menu-toggle:checked ~ .drawer{transform:translateX(0)}
-
-.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.15rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
-.drawer-head strong{font-family:var(--f-display);font-size:1.02rem;font-weight:700}
-.drawer-close{cursor:pointer;font-size:1.5rem;line-height:1;color:var(--ink-faint);padding:.1rem .45rem;border:1px solid transparent}
-.drawer-close:hover{color:var(--accent);border-color:var(--line)}
-.drawer a{display:flex;flex-direction:column;gap:.05rem;padding:.8rem 1.15rem;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);font-size:.99rem}
-.drawer a:last-child{border-bottom:0}
-.drawer a:hover{background:var(--surface-2);color:var(--accent)}
-.drawer a[aria-current]{background:var(--accent-bg);color:var(--accent);font-weight:500;box-shadow:inset 3px 0 0 var(--accent)}
-.drawer small{color:var(--ink-faint);font-size:.82rem;font-weight:400}
-
-@media (prefers-reduced-motion: reduce){.drawer,.scrim{transition-duration:.01ms}}
-
-
-.wrap{max-width:72rem;margin:0 auto;padding:clamp(1rem,2.5vw,1.6rem) clamp(1rem,3vw,2rem) 6rem}
-
-/* ---------- type ---------- */
-h1{font-family:var(--f-display);font-weight:700;font-size:clamp(1.5rem,3vw,1.95rem);line-height:1.18;letter-spacing:-.015em;margin:0 0 .35rem;text-wrap:balance;max-width:30ch}
-h1.long{font-size:clamp(1.35rem,3vw,1.9rem);max-width:32ch}
-h2{font-family:var(--f-display);font-weight:700;font-size:1.35rem;line-height:1.25;margin:2.75rem 0 .35rem;text-wrap:balance}
-h2:first-of-type{margin-top:2rem}
-.sub{color:var(--ink-soft);max-width:80ch;margin:0 0 .55rem;font-size:.95rem}
-.hint{color:var(--ink-faint);font-size:.89rem;max-width:70ch;margin:.1rem 0 .7rem}
-.statline{display:flex;flex-wrap:wrap;gap:.2rem .5rem;align-items:baseline;font-size:.88rem;color:var(--ink-soft);margin:0 0 .7rem;max-width:none}
-.statline b{font-family:var(--f-display);font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
-.caution{font-size:.88rem;line-height:1.5;color:var(--alarm);background:var(--alarm-bg);border:1px solid var(--alarm);border-radius:var(--radius);padding:.5rem .75rem;margin:0 0 1.5rem;max-width:72ch}
-
-/* ---------- breadcrumb ---------- */
-.back{display:inline-block;font-size:.9rem;color:var(--ink-soft);text-decoration:none;margin-bottom:1.1rem}
-.back:hover{color:var(--accent)}
-
-
-/* ---------- filters ---------- */
-form.filters{display:flex;flex-wrap:wrap;gap:.55rem;margin-bottom:.9rem;align-items:center}
-input,select{border-radius:var(--radius);font-family:inherit;font-size:.95rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);padding:.55rem .75rem;min-width:0}
-input[type=search]{flex:1 1 20rem}
-select{max-width:24rem}
-button{border-radius:var(--radius);font-family:inherit;font-size:.95rem;font-weight:500;color:#fff;background:var(--accent);border:1px solid var(--accent);padding:.55rem 1.15rem;cursor:pointer}
-button:hover{filter:brightness(1.08)}
-.check{display:flex;align-items:center;gap:.4rem;font-size:.93rem;color:var(--ink-soft);white-space:nowrap}
-.check input{min-width:auto}
-.reset{font-size:.9rem;color:var(--ink-faint)}
-form.filters{flex-direction:column;align-items:stretch;gap:.6rem}
-.filter-row{display:flex;flex-wrap:wrap;gap:.55rem;align-items:center}
-/* Inputs must not stretch vertically: the form itself is a column, so a
-   bare flex-grow on a child would grow it down the page. */
-.filter-row input,.filter-row select,.filter-row button{align-self:center}
-.filter-row input[type=search]{flex:1 1 22rem;max-width:38rem}
-.filter-row input[type=date]{flex:0 0 auto;width:10.5rem}
-.filter-row input.num{flex:0 0 auto;width:9rem;font-variant-numeric:tabular-nums}
-.filter-label.faint{color:var(--ink-faint);font-size:.85rem}
-
-/* the collapsed filter panel */
-.filters-more{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
-.filters-more summary{cursor:pointer;list-style:none;padding:.6rem .9rem;font-size:.95rem;font-weight:500;color:var(--accent);display:flex;align-items:center;gap:.5rem}
-.filters-more summary::-webkit-details-marker{display:none}
-.filters-more summary::before{content:"\u25B8";color:var(--ink-faint);font-size:.8rem;transition:transform .15s ease;display:inline-block}
-.filters-more[open] summary::before{transform:rotate(90deg)}
-.filters-more[open] summary{border-bottom:1px solid var(--line-soft)}
-.filters-more summary:hover{background:var(--surface-3)}
-.filters-more .inner{padding:.9rem;display:flex;flex-direction:column;gap:.6rem}
-.verdict{border-left:4px solid var(--ink-faint)}
-.verdict.high{border-left-color:var(--alarm)}
-.verdict.medium{border-left-color:var(--warn)}
-.verdict.low{border-left-color:var(--ink-faint)}
-.verdict-tag{display:inline-block;font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:.24rem .55rem;border-radius:2px;margin-right:.5rem;vertical-align:middle}
-.verdict.high .verdict-tag{color:var(--alarm);background:var(--alarm-bg);border:1px solid var(--alarm)}
-.verdict.medium .verdict-tag{color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn)}
-.verdict.low .verdict-tag{color:var(--ink-faint);background:var(--surface-2);border:1px solid var(--line)}
-ol.findings{margin:.4rem 0 1rem;padding-left:1.4rem;display:flex;flex-direction:column;gap:.7rem}
-ol.findings li{max-width:68ch}
-ol.findings li strong{display:block;margin-bottom:.15rem}
-ol.findings li span{color:var(--ink-soft);font-size:.96rem}
-ol.findings li.w-high::marker{color:var(--alarm);font-weight:700}
-ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
-/* the three-line explainer a newcomer reads once */
-.primer{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .9rem;margin:0 0 .7rem;padding:.45rem .75rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);font-size:.85rem;color:var(--ink-soft)}
-.primer b{display:inline-flex;align-items:center;justify-content:center;width:1.15rem;height:1.15rem;border-radius:50%;background:var(--accent);color:#fff;font-size:.7rem;margin-right:.35rem}
-.primer span{display:inline-flex;align-items:center;white-space:nowrap}
-.primer a{margin-left:auto;font-size:.88rem}
-
-/* one-click starting points */
-.presets{display:flex;flex-wrap:wrap;gap:.35rem;margin:0 0 .6rem}
-.preset{text-decoration:none;font-size:.88rem;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:.38rem .85rem;white-space:nowrap}
-.preset:hover{border-color:var(--accent);color:var(--accent)}
-.preset.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
-
-/* sorting and grouping, always in view */
-.sortbar{display:flex;flex-wrap:wrap;gap:.45rem .7rem;align-items:center;margin:0 0 .7rem;padding:.5rem .75rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
-.sortbar label{display:inline-flex;align-items:center;gap:.35rem;font-size:.86rem;color:var(--ink-faint);white-space:nowrap}
-.sortbar select{font-size:.88rem;padding:.3rem .45rem;max-width:12.5rem}
-.sortbar input[type=search]{flex:1 1 14rem;min-width:10rem;font-size:.9rem;padding:.35rem .55rem}
-.sortbar .go{font-size:.9rem;padding:.4rem .95rem}
-.filters{margin-bottom:1rem}
-.filters-more summary .reset{margin-left:auto}
-
-.actions{display:flex;flex-wrap:wrap;gap:.55rem;margin:0 0 1.75rem}
-.action{display:inline-flex;align-items:center;gap:.45rem;text-decoration:none;font-size:.95rem;color:var(--accent);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:.55rem 1rem}
-.action:hover{border-color:var(--accent);background:var(--accent-bg)}
-.action.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
-.action.primary:hover{filter:brightness(1.08);background:var(--accent)}
-.action.primary::before{content:"\u2913";font-size:1.05rem}
-.block-head{font-family:var(--f-display);font-weight:700;font-size:1.1rem;margin:1.75rem 0 .35rem}
-.badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:600;min-width:1.3rem;height:1.3rem;border-radius:1rem;display:inline-flex;align-items:center;justify-content:center;padding:0 .4rem}
-/* star toggle \u2014 a form so the site still needs no scripts */
-.star-form{display:inline;margin:0}
-.star{background:none;border:0;padding:0 .4rem 0 0;margin:0;cursor:pointer;font-size:1.15rem;line-height:1;color:var(--ink-faint);border-radius:var(--radius);vertical-align:baseline}
-.star:hover{color:var(--warn)}
-.star.on{color:#D9A21B}
-.star span{display:none}
-.name .star{float:left}
-
-/* the labelled variant, used at the top of a dossier */
-.star-form:has(.star span){display:inline-block;margin:0 0 1.25rem}
-.star:has(span){display:inline-flex;align-items:center;gap:.5rem;font-size:1rem;border:1px solid var(--line);background:var(--surface);padding:.45rem .9rem;color:var(--accent)}
-.star:has(span) span{display:inline}
-.star.on:has(span){background:var(--accent-bg);border-color:var(--accent);font-weight:500}
-.name .star:has(span){float:none}
-
-.starred-btn{display:inline-flex;align-items:center;gap:.4rem;text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:.3rem .65rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
-.starred-btn:hover{color:var(--accent);border-color:var(--accent)}
-.starred-btn.on{color:var(--accent);background:var(--accent-bg);border-color:var(--accent);font-weight:500}
-
-.filter-label{font-size:.92rem;color:var(--ink-faint);white-space:nowrap}
-select:disabled{opacity:.5;cursor:not-allowed}
-
-/* grouped results */
-.group-block{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);margin-bottom:.6rem}
-.group-block summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.4rem 1rem;padding:.85rem 1.15rem}
-.group-block summary::-webkit-details-marker{display:none}
-.group-block summary::before{content:"\u25B8";color:var(--ink-faint);margin-right:.5rem;font-size:.8rem;transition:transform .15s ease;display:inline-block}
-.group-block[open] > summary::before{transform:rotate(90deg)}
-.group-block[open] > summary{border-bottom:1px solid var(--line-soft)}
-.group-block summary:hover{background:var(--surface-3)}
-.g-name{font-weight:600;font-size:1.02rem;flex:1 1 18rem;min-width:0}
-.g-meta{font-size:.9rem;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
-.g-body{padding:.9rem 1.15rem 1.15rem}
-.group-block .depth-1{background:var(--surface-3);box-shadow:none}
-.group-block .rows{box-shadow:none}
-
-/* ---------- result rows ---------- */
-.rows{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-.row{background:var(--surface);padding:.65rem 1rem;display:grid;grid-template-columns:auto 1fr minmax(6.5rem,auto);gap:.15rem .9rem;align-items:start}
-.row:hover{background:var(--surface-3)}
-
-/* severity, readable at a glance and on hover */
-.dot{grid-row:1 / span 2;width:.55rem;height:.55rem;border-radius:50%;margin-top:.5rem;flex:none;background:var(--line)}
-.sev-proven .dot{background:var(--alarm);box-shadow:0 0 0 3px var(--alarm-bg)}
-.sev-high .dot{background:var(--alarm)}
-.sev-medium .dot{background:var(--warn)}
-.sev-clear .dot{background:var(--calm)}
-.sev-low .dot{background:#C4D0D6}
-
-.row .who{min-width:0}
-.row .name{font-size:1rem;font-weight:600;line-height:1.4;letter-spacing:-.005em;overflow-wrap:anywhere}
-.row .name a{color:var(--ink);text-decoration:none}
-.row .name a:hover{color:var(--accent);text-decoration:underline}
-.row .meta{font-size:.85rem;color:var(--ink-soft);line-height:1.4;overflow-wrap:anywhere}
-.row .meta a{color:var(--ink-soft)}
-.row .meta a:hover{color:var(--accent)}
-.row .amount{text-align:right}
-.row .amount .big{font-family:var(--f-display);font-weight:700;font-size:1.05rem;line-height:1.3;font-variant-numeric:tabular-nums;white-space:nowrap}
-.row .amount .exact{font-family:var(--f-mono);font-size:.72rem;color:var(--ink-faint);white-space:nowrap;display:block;margin-top:.1rem}
-.row .flags{grid-column:2 / -1;display:flex;flex-wrap:wrap;gap:.28rem;margin-top:.3rem}
-
-a.flag:hover{border-color:var(--accent);color:var(--accent)}
-.flag.alarm{border-color:var(--alarm);background:var(--alarm-bg);color:var(--alarm);font-weight:500}
-.flag.warn{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
-.flag.more{color:var(--ink-faint);border-style:dashed}
-.flag.proven{border-color:var(--alarm);background:var(--alarm);color:#fff;font-weight:600}
-.flag.clear{border-color:var(--calm);background:var(--calm-bg);color:var(--calm);font-weight:500}
-.tier{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:.24rem .55rem;border:1px solid currentColor;white-space:nowrap;border-radius:2px}
-.tier.confirmed{color:var(--calm);background:var(--calm-bg)}
-.tier.state{color:var(--warn);background:var(--warn-bg)}
-.tier.own{color:var(--ink-faint);background:var(--surface-2)}
-.code{font-family:var(--f-mono);font-size:.74rem;color:var(--ink-faint)}
-
-/* ---------- cards ---------- */
-.card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.4rem 1.55rem;margin-bottom:1rem}
-.card h3{margin:0 0 .5rem;font-size:1.08rem;font-weight:600;line-height:1.4;letter-spacing:-.005em}
-.card p{margin:0 0 .7rem;color:var(--ink-soft);max-width:68ch}
-.card p:last-child{margin-bottom:0}
-.card p.lead{color:var(--ink);font-size:1.02rem}
-.legal{border-left:3px solid var(--accent);background:var(--accent-bg);padding:.75rem 1rem;font-size:.94rem;color:var(--ink);max-width:none;border-radius:0 var(--radius) var(--radius) 0}
-.legal.reading{border-left-color:var(--warn);background:var(--warn-bg)}
-details.sub{margin:.9rem 0 .2rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-3)}
-details.sub summary{cursor:pointer;list-style:none;padding:.6rem .9rem;font-size:.93rem;font-weight:500;color:var(--accent)}
-details.sub summary::-webkit-details-marker{display:none}
-details.sub summary::before{content:"+";display:inline-block;width:1.1rem;color:var(--ink-faint);font-weight:600}
-details.sub[open] summary::before{content:"\u2212"}
-details.sub[open] summary{border-bottom:1px solid var(--line-soft)}
-details.sub .inner{padding:.85rem .9rem 1rem}
-details.sub p{margin:0 0 .8rem;font-size:.93rem;max-width:68ch}
-details.sub p:last-child{margin-bottom:0}
-.faint{color:var(--ink-faint);font-size:.9rem}
-
-.group{margin:2rem 0 .75rem;display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap}
-.group h3{font-family:var(--f-display);font-weight:700;font-size:1.12rem;margin:0}
-.group .count{font-size:.88rem;color:var(--ink-faint)}
-
-dl.facts{display:grid;grid-template-columns:minmax(8rem,max-content) 1fr;gap:.55rem 1.5rem;margin:0}
-dl.facts dt{font-size:.86rem;color:var(--ink-faint);padding-top:.1rem}
-dl.facts dd{margin:0;font-size:1rem}
-dl.facts dd strong{font-weight:600}
-
-
-/* ---------- misc ---------- */
-.pager{display:flex;gap:.6rem;align-items:center;margin-top:1.75rem;font-size:.94rem}
-.pager a{padding:.5rem 1rem;border:1px solid var(--line);background:var(--surface);text-decoration:none}
-.pager a:hover{border-color:var(--accent)}
-.pager span{color:var(--ink-faint)}
-.empty{background:var(--surface);border:1px dashed var(--line);padding:3rem 1.5rem;text-align:center;color:var(--ink-soft)}
-.card ul{margin:.2rem 0 .9rem;padding-left:1.2rem;color:var(--ink-soft);max-width:68ch}
-.card li{margin-bottom:.4rem}
-.note{font-size:.9rem;color:var(--ink-faint);max-width:68ch;margin-top:2.5rem;padding-top:1.15rem;border-top:1px solid var(--line)}
-
-details.help{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:1.75rem}
-details.help summary{cursor:pointer;padding:.85rem 1.25rem;font-weight:500;font-size:.97rem;list-style:none;display:flex;align-items:center;gap:.5rem}
-details.help summary::-webkit-details-marker{display:none}
-details.help summary::before{content:"?";display:inline-flex;align-items:center;justify-content:center;width:1.35rem;height:1.35rem;border:1px solid var(--accent);color:var(--accent);font-size:.82rem;font-weight:600;flex:none}
-details.help[open] summary{border-bottom:1px solid var(--line-soft)}
-details.help .inner{padding:1.1rem 1.25rem 1.35rem}
-details.help p{margin:0 0 .7rem;color:var(--ink-soft);max-width:68ch}
-details.help p:last-child{margin-bottom:0}
-details.help ul{margin:.2rem 0 .9rem;padding-left:1.2rem;color:var(--ink-soft);max-width:68ch}
-details.help li{margin-bottom:.35rem}
-details.help p.lead{color:var(--ink)}
-details.help p strong{color:var(--ink)}
-details.help + details.help{margin-top:-1rem}
-/* ---------- screens ----------
-   Every size decision lives here rather than beside the rule it overrides.
-   Phones get a single column, thumb-sized hit areas and 16px form text:
-   anything smaller and iOS zooms the whole page the moment a field is
-   focused, which then leaves the layout scrolled sideways. Tablets keep the
-   desktop shape with tighter spacing. */
-
-@media (max-width:64rem){
-  .card{padding:1.2rem 1.3rem}
-  h2{margin-top:2.25rem}
-  .wrap{padding-bottom:4.5rem}
-  /* Below a wide desktop the third column is gone and the chips wrap. Let
-     them: a flag nobody can see is a flag that may as well not be there. */
-  .row .flags .flag{font-size:.76rem;padding:.17rem .42rem}
-}
-
-@media (max-width:44rem){
-  body{font-size:16px}
-
-  /* header: the drawer already lists every section, so the inline links are
-     duplication that costs a whole row on a narrow screen */
-  .nav{display:none}
-  .top .inner{padding:.55rem max(1rem,env(safe-area-inset-right)) .55rem max(1rem,env(safe-area-inset-left));gap:.45rem .8rem}
-  .brand{font-size:1rem}
-  .burger{width:2.75rem;height:2.75rem}
-  .starred-btn{min-height:2.75rem;padding:.5rem .8rem}
-  .starred-btn span{display:none}
-  .drawer{width:min(20rem,88vw)}
-  .drawer a{padding:.9rem 1.15rem}
-
-  .wrap{padding:.9rem 1rem 4rem}
-  h1{font-size:1.25rem;max-width:none;margin-bottom:.25rem}
-  h2{font-size:1.15rem;margin-top:1.75rem}
-  .sub{font-size:.88rem;margin-bottom:.4rem}
-  .statline{display:none}
-  .presets{margin-bottom:.45rem}
-  .sortbar{margin-bottom:.5rem}
-  .sub,.hint,.card p,.card ul,.note,details.sub p{max-width:none}
-
-  /* iOS zoom guard \u2014 every control a finger can land in */
-  input,select,button{font-size:16px}
-
-  .sortbar{padding:.45rem .55rem;gap:.35rem}
-  /* two rows, not four: search shares its row with the button, the two
-     selects share the next one with their captions stacked above them */
-  .sortbar input[type=search]{flex:1 1 58%;min-width:0;min-height:2.6rem;font-size:16px}
-  .sortbar .go{flex:0 0 auto;width:auto;min-height:2.6rem;padding:.4rem .95rem;font-size:16px}
-  .sortbar label{order:1;flex:1 1 calc(50% - .2rem);flex-direction:column;align-items:stretch;gap:.1rem;font-size:.72rem;letter-spacing:.02em}
-  .sortbar.dir label{flex:1 1 100%}
-  .sortbar select{width:100%;max-width:none;min-height:2.5rem;font-size:16px}
-
-  /* every chip visible: a hidden one may as well not exist */
-  .presets{flex-wrap:wrap;gap:.3rem}
-  .preset{flex:none;min-height:2.35rem;display:inline-flex;align-items:center;padding:.5rem .7rem;font-size:.86rem}
-  .primer{display:none}
-
-  /* full-bleed lists: on a phone the card frame is noise, the content is not */
-  .rows,.group-block{border-radius:0;border-left:0;border-right:0;margin-inline:-1rem;box-shadow:none}
-  .row{grid-template-columns:auto 1fr;padding:.7rem 1rem;gap:.1rem .7rem}
-  .row .name{font-size:.98rem}
-  .row .name a{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .row .meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .row .amount{grid-column:2;text-align:left;margin-top:.2rem}
-  .row .amount .big{font-size:1rem}
-  .row .amount .exact{display:inline;margin-left:.5rem}
-  .row .flags{grid-column:1 / -1;margin-top:.4rem;gap:.22rem}
-  .row .flags .flag{font-size:.74rem;padding:.16rem .4rem;line-height:1.35}
-  .row .star{padding:.3rem .5rem .3rem 0;font-size:1.3rem}
-
-  .group-block summary{padding:.95rem 1rem}
-  .g-name{flex:1 1 100%}
-  .g-body{padding:.7rem 1rem 1rem}
-
-  .card{padding:1.05rem 1.1rem;box-shadow:none}
-  .actions{gap:.45rem}
-  .action{flex:1 1 100%;justify-content:center;min-height:2.75rem}
-  .pager a{min-height:2.75rem;display:inline-flex;align-items:center}
-
-  .filters-more summary{padding:.8rem .9rem}
-  .filter-row input[type=search],.filter-row input[type=date],.filter-row input.num,.filter-row select{flex:1 1 100%;width:100%;max-width:none}
-
-  dl.facts{grid-template-columns:1fr;gap:.05rem}
-  dl.facts dd{margin-bottom:.7rem}
-
-  details.help summary,details.sub summary{padding:.85rem 1rem}
-  .legal{padding:.7rem .85rem}
-}
-
-@media (max-width:22rem){
-  .brand span{display:none}
-}
-
-`;
-var MENU = [
-  { href: "/", nav: "feed", label: "\u0423\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", hint: "\u043F\u043E\u0432\u043D\u0438\u0439 \u043F\u0435\u0440\u0435\u043B\u0456\u043A, \u0437 \u043F\u043E\u0448\u0443\u043A\u043E\u043C \u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0430\u043C\u0438" },
-  { href: "/railway", nav: "railway", label: "\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F", hint: "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438" },
-  { href: "/prices", nav: "prices", label: "\u0417\u0430\u0432\u0438\u0449\u0435\u043D\u0456 \u0446\u0456\u043D\u0438", hint: "\u0434\u0435 \u043C\u0438 \u0441\u0430\u043C\u0456 \u043F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442\u0443" },
-  { href: "/starred", nav: "starred", label: "\u041E\u0431\u0440\u0430\u043D\u0435", hint: "\u0443\u0441\u0435, \u0449\u043E \u0432\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0438 \u0437\u0456\u0440\u043E\u0447\u043A\u043E\u044E" },
-  { href: "/lookup", nav: "lookup", label: "\u041F\u043E\u0448\u0443\u043A \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423", hint: "\u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0431\u0443\u0434\u044C-\u044F\u043A\u0435 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E" },
-  { href: "/article/366", nav: "article-366", label: "\u041F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432", hint: "\u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445 \u0456 \u0437\u0432\u0456\u0442\u0430\u0445" },
-  { href: "/entities", nav: "entities", label: "\u0425\u0442\u043E \u043A\u0443\u043F\u0443\u0454", hint: "\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438-\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438" },
-  { href: "/suppliers", nav: "suppliers", label: "\u0425\u0442\u043E \u043F\u0440\u043E\u0434\u0430\u0454", hint: "\u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457-\u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456" },
-  { href: "/officers", nav: "officers", label: "\u0425\u0442\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0454", hint: "\u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456, \u0449\u043E \u0432\u0435\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456" },
-  { href: "/indicators", nav: "indicators", label: "\u0429\u043E \u043C\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E", hint: "\u0443\u0441\u0456 \u043E\u0437\u043D\u0430\u043A\u0438 \u043F\u0440\u043E\u0441\u0442\u0438\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438" },
-  { href: "/updates", nav: "updates", label: "\u0429\u043E \u043D\u043E\u0432\u043E\u0433\u043E", hint: "\u043E\u0441\u0442\u0430\u043D\u043D\u0454 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0431\u0430\u0437\u0438" },
-  { href: "/about", nav: "about", label: "\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443", hint: "\u0437\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456 \u0456 \u0447\u043E\u0433\u043E \u0432\u043E\u043D\u0430 \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C" }
-];
-var SITE_DESCRIPTION = "\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0423\u043A\u0440\u0430\u0457\u043D\u0438 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443: \u0432\u0438\u0441\u043D\u043E\u0432\u043A\u0438 \u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0438, \u0432\u043B\u0430\u0441\u043D\u0438\u0439 \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0446\u0456\u043D \u0456 \u043F\u0440\u0430\u0432\u043E\u0432\u0430 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F \u043F\u043E \u043A\u043E\u0436\u043D\u0456\u0439 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456.";
-function layout(opts) {
-  return `<!doctype html>
-<html lang="uk">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(opts.title)} \u2014 Tender Radar</title>
-<meta name="description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
-<meta property="og:site_name" content="Tender Radar">
-<meta property="og:type" content="website">
-<meta property="og:locale" content="uk_UA">
-<meta property="og:title" content="${esc(opts.title)} \u2014 Tender Radar">
-<meta property="og:description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
-<style>${STYLES}</style>
-</head>
-<body>
-<input type="checkbox" id="menu-toggle" class="sr-only" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0432\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
-<header class="top"><div class="inner">
-  <a class="brand" href="/">Tender<span>&nbsp;Radar</span></a>
-  <nav class="nav">
-    <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
-    <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</a>
-    <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443</a>
-  </nav>
-  <a class="starred-btn${opts.nav === "starred" ? " on" : ""}" href="/starred" title="\u041E\u0431\u0440\u0430\u043D\u0435">\u2605<span>\u041E\u0431\u0440\u0430\u043D\u0435</span></a>
-  <label class="burger" for="menu-toggle" role="button" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438" title="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438"><span></span><span></span><span></span></label>
-</div></header>
-<label class="scrim" for="menu-toggle" aria-hidden="true"></label>
-<nav class="drawer" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
-  <div class="drawer-head">
-    <strong>\u0420\u043E\u0437\u0434\u0456\u043B\u0438</strong>
-    <label class="drawer-close" for="menu-toggle" role="button" aria-label="\u0417\u0430\u043A\u0440\u0438\u0442\u0438">&times;</label>
-  </div>
-  ${MENU.map(
-    (item) => `<a href="${item.href}"${opts.nav === item.nav ? ' aria-current="page"' : ""}>${item.label}<small>${item.hint}</small></a>`
-  ).join("")}
-</nav>
-<main class="wrap">
-${opts.body}
-</main>
-</body>
-</html>`;
 }
 
 // src/legal.ts
@@ -1043,297 +483,553 @@ function isJointStock(name) {
   return name !== null && JOINT_STOCK.test(name);
 }
 
-// src/normalize/tender.ts
-function officerKey(row) {
-  if (row.officer_email) return row.officer_email.trim().toLowerCase();
-  if (row.officer_name && row.entity_edrpou) return `${row.officer_name.trim().toLowerCase()}@@${row.entity_edrpou}`;
-  return null;
+// server/html.ts
+function esc(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-
-// src/normalize/monitoring.ts
-function asRecord(value) {
-  return value && typeof value === "object" ? value : {};
+function money(amount) {
+  if (amount === null || !Number.isFinite(amount)) return "\u2014";
+  return new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 0 }).format(amount) + " \u20B4";
 }
-function asString(value) {
-  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+function unitMoney(amount) {
+  if (amount === null || !Number.isFinite(amount)) return "\u2014";
+  const digits = Math.abs(amount) < 1e3 ? 2 : 0;
+  return new Intl.NumberFormat("uk-UA", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(amount) + " \u20B4";
 }
-function violationEstablished(row) {
-  const conclusion = asRecord(row.conclusion);
-  return typeof conclusion.violationOccurred === "boolean" ? conclusion.violationOccurred : null;
+function shortMoney(amount) {
+  if (amount === null || !Number.isFinite(amount)) return "\u2014";
+  if (amount >= 1e9) return (amount / 1e9).toFixed(2).replace(".", ",") + " \u043C\u043B\u0440\u0434 \u20B4";
+  if (amount >= 1e6) return (amount / 1e6).toFixed(1).replace(".", ",") + " \u043C\u043B\u043D \u20B4";
+  if (amount >= 1e3) return Math.round(amount / 1e3).toLocaleString("uk-UA") + " \u0442\u0438\u0441 \u20B4";
+  return Math.round(amount) + " \u20B4";
 }
-function conclusionText(row, max = 600) {
-  const conclusion = asRecord(row.conclusion);
-  const text = (conclusion.description ?? "").replace(/\s+/g, " ").trim();
-  if (text.length <= max) return text;
-  const cut = text.slice(0, max);
-  const stop = cut.lastIndexOf(" ");
-  return (stop > max * 0.6 ? cut.slice(0, stop) : cut) + "\u2026";
-}
-function conclusionPublished(row) {
-  const conclusion = asRecord(row.conclusion);
-  return asString(conclusion.datePublished) ?? asString(conclusion.dateCreated) ?? row.date_modified;
-}
-
-// server/data.ts
-function tenderDateOf(tenderRef) {
-  const m = /^UA-(\d{4}-\d{2}-\d{2})-/.exec(tenderRef);
-  return m ? m[1] : null;
-}
-function activeAward(awards) {
-  return awards.find((a) => a.status === "active") ?? awards[0];
-}
-function violationTypes(row) {
-  const conclusion = row.conclusion;
-  const types = conclusion?.violationType;
-  return Array.isArray(types) ? types.filter((t) => typeof t === "string") : [];
-}
-async function loadDataset() {
-  const store = openStore();
-  const flags = await store.allRiskFlags();
-  const rules = await store.allRiskRules();
-  const tenders = await store.allTenders();
-  const awards = await store.allAwards();
-  const bids = await store.allBids();
-  const runs = await store.allRuns();
-  const findings = await store.allFindings();
-  const monitorings = await store.allMonitorings();
-  const monitoringsByTender = /* @__PURE__ */ new Map();
-  for (const row of monitorings) {
-    const list = monitoringsByTender.get(row.tender_id) ?? [];
-    list.push(row);
-    monitoringsByTender.set(row.tender_id, list);
-  }
-  const auditByTender = /* @__PURE__ */ new Map();
-  for (const [tenderId, list] of monitoringsByTender) {
-    const decided = list.filter((row) => violationEstablished(row) !== null);
-    if (decided.length === 0) continue;
-    const pick = decided.find((row) => violationEstablished(row) === true) ?? decided[0];
-    auditByTender.set(tenderId, {
-      violation: violationEstablished(pick) === true,
-      text: conclusionText(pick),
-      published: conclusionPublished(pick),
-      monitoring_id: pick.monitoring_id,
-      count: decided.length,
-      reasons: Array.isArray(pick.reasons) ? pick.reasons : [],
-      types: violationTypes(pick)
-    });
-  }
-  const findingsByTender = /* @__PURE__ */ new Map();
-  for (const finding of findings) {
-    const list = findingsByTender.get(finding.tender_id) ?? [];
-    list.push(finding);
-    findingsByTender.set(finding.tender_id, list);
-  }
-  const tenderById = new Map(tenders.map((t) => [t.id, t]));
-  const awardsByTender = /* @__PURE__ */ new Map();
-  for (const award of awards) {
-    const list = awardsByTender.get(award.tender_id) ?? [];
-    list.push(award);
-    awardsByTender.set(award.tender_id, list);
-  }
-  const bidCount = /* @__PURE__ */ new Map();
-  for (const bid of bids) bidCount.set(bid.tender_id, (bidCount.get(bid.tender_id) ?? 0) + 1);
-  const byTender = /* @__PURE__ */ new Map();
-  for (const flag of flags) {
-    let entry = byTender.get(flag.tender_id);
-    if (!entry) {
-      const detail = tenderById.get(flag.tender_id);
-      const won = activeAward(awardsByTender.get(flag.tender_id) ?? []);
-      entry = {
-        tender_id: flag.tender_id,
-        tender_ref: flag.tender_ref || detail?.tender_id || "",
-        tender_date: tenderDateOf(flag.tender_ref || detail?.tender_id || ""),
-        title: detail?.title ?? null,
-        status: detail?.status ?? null,
-        method: detail?.method ?? null,
-        entity_edrpou: flag.entity_edrpou ?? detail?.entity_edrpou ?? null,
-        entity_name: flag.entity_name ?? detail?.entity_name ?? null,
-        region: flag.region ?? detail?.region ?? null,
-        value_amount: flag.value_amount ?? detail?.value_amount ?? null,
-        date_assessed: flag.date_assessed,
-        risks: [],
-        officer_name: detail?.officer_name ?? null,
-        officer_email: detail?.officer_email ?? null,
-        officer_phone: detail?.officer_phone ?? null,
-        officer_key: detail ? officerKey(detail) : null,
-        winner_name: won?.supplier_name ?? null,
-        winner_edrpou: won?.supplier_edrpou ?? null,
-        winner_amount: won?.amount ?? null,
-        bidders: bidCount.get(flag.tender_id) ?? 0,
-        detailed: Boolean(detail),
-        findings: findingsByTender.get(flag.tender_id) ?? [],
-        audit: auditByTender.get(flag.tender_id) ?? null
-      };
-      byTender.set(flag.tender_id, entry);
-    }
-    if (!entry.tender_ref && flag.tender_ref) {
-      entry.tender_ref = flag.tender_ref;
-      entry.tender_date = tenderDateOf(flag.tender_ref);
-    }
-    if (entry.value_amount === null) entry.value_amount = flag.value_amount;
-    if (!entry.risks.includes(flag.risk_id)) entry.risks.push(flag.risk_id);
-  }
-  const cases = [...byTender.values()];
-  return {
-    cases,
-    byTender,
-    rules,
-    ruleById: new Map(rules.map((r) => [r.risk_id, r])),
-    runs,
-    findingCount: findings.length,
-    flagCount: flags.length,
-    totalValue: cases.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0)
-  };
-}
-
-// server/grouping.ts
-var DIMENSIONS = [
-  { value: "", label: "\u0411\u0435\u0437 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F" },
-  { value: "entity", label: "\u0417\u0430 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u043E\u043C" },
-  { value: "officer", label: "\u0417\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0438\u043C" },
-  { value: "supplier", label: "\u0417\u0430 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0435\u043C" },
-  { value: "risk", label: "\u0417\u0430 \u043E\u0437\u043D\u0430\u043A\u043E\u044E" },
-  { value: "year", label: "\u0417\u0430 \u0440\u043E\u043A\u043E\u043C" },
-  { value: "method", label: "\u0417\u0430 \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u043E\u044E" },
-  { value: "severity", label: "\u0417\u0430 \u0433\u043E\u0441\u0442\u0440\u043E\u0442\u043E\u044E" }
+var MONTHS = [
+  "\u0441\u0456\u0447\u043D\u044F",
+  "\u043B\u044E\u0442\u043E\u0433\u043E",
+  "\u0431\u0435\u0440\u0435\u0437\u043D\u044F",
+  "\u043A\u0432\u0456\u0442\u043D\u044F",
+  "\u0442\u0440\u0430\u0432\u043D\u044F",
+  "\u0447\u0435\u0440\u0432\u043D\u044F",
+  "\u043B\u0438\u043F\u043D\u044F",
+  "\u0441\u0435\u0440\u043F\u043D\u044F",
+  "\u0432\u0435\u0440\u0435\u0441\u043D\u044F",
+  "\u0436\u043E\u0432\u0442\u043D\u044F",
+  "\u043B\u0438\u0441\u0442\u043E\u043F\u0430\u0434\u0430",
+  "\u0433\u0440\u0443\u0434\u043D\u044F"
 ];
-function isDimension(value) {
-  return DIMENSIONS.some((d) => d.value === value);
+function date(value) {
+  if (!value) return "\u2014";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!m) return "\u2014";
+  const [, year, month, day2] = m;
+  const name = MONTHS[Number(month) - 1];
+  return name ? `${Number(day2)} ${name} ${year} \u0440.` : `${day2}.${month}.${year}`;
 }
-var SEVERITY_ORDER = { \u0413\u043E\u0441\u0442\u0440\u0456: 0, \u041F\u043E\u043C\u0456\u0442\u043D\u0456: 1, \u0417\u0432\u0438\u0447\u0430\u0439\u043D\u0456: 2 };
-function bucketsOf(entry, dimension, riskLabel) {
-  switch (dimension) {
-    case "entity":
-      return [
-        {
-          key: entry.entity_edrpou ?? "\u2014",
-          label: entry.entity_name ?? "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u0438\u0439",
-          href: entry.entity_edrpou ? `/entity/${encodeURIComponent(entry.entity_edrpou)}` : null
-        }
-      ];
-    case "officer":
-      return entry.officer_key ? [{ key: entry.officer_key, label: entry.officer_name ?? entry.officer_key, href: `/officer/${encodeURIComponent(entry.officer_key)}` }] : [{ key: "\u2014", label: "\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u043E", href: null }];
-    case "supplier":
-      return entry.winner_edrpou ? [{ key: entry.winner_edrpou, label: entry.winner_name ?? entry.winner_edrpou, href: `/supplier/${encodeURIComponent(entry.winner_edrpou)}` }] : [{ key: "\u2014", label: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043E", href: null }];
-    case "risk":
-      return entry.risks.map((id) => ({ key: id, label: riskLabel(id), href: `/?risk=${encodeURIComponent(id)}` }));
-    case "year": {
-      const year = (entry.date_assessed ?? entry.tender_ref.slice(3, 7) ?? "").slice(0, 4);
-      return [{ key: year || "\u2014", label: year ? `${year} \u0440\u0456\u043A` : "\u0420\u0456\u043A \u043D\u0435\u0432\u0456\u0434\u043E\u043C\u0438\u0439", href: null }];
-    }
-    case "method":
-      return [{ key: entry.method ?? "\u2014", label: entry.method ?? "\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0443 \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u043E", href: null }];
-    case "severity": {
-      const label = entry.findings.some((f) => f.severity === "high") || entry.risks.length >= 3 ? "\u0413\u043E\u0441\u0442\u0440\u0456" : entry.findings.length > 0 || entry.bidders === 1 ? "\u041F\u043E\u043C\u0456\u0442\u043D\u0456" : "\u0417\u0432\u0438\u0447\u0430\u0439\u043D\u0456";
-      return [{ key: label, label, href: null }];
-    }
-    default:
-      return [];
-  }
+function shortDate(value) {
+  if (!value) return "\u2014";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : "\u2014";
 }
-function sum(cases) {
-  return cases.reduce((total, c) => total + (c.value_amount ?? 0), 0);
+function plural(n, one, few, many) {
+  const mod100 = Math.abs(n) % 100;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  const mod10 = mod100 % 10;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
 }
-function sortGroups(groups, dimension) {
-  if (dimension === "year") return groups.sort((a, b) => b.bucket.key.localeCompare(a.bucket.key));
-  if (dimension === "severity") {
-    return groups.sort((a, b) => (SEVERITY_ORDER[a.bucket.key] ?? 9) - (SEVERITY_ORDER[b.bucket.key] ?? 9));
-  }
-  return groups.sort((a, b) => b.value - a.value || b.cases.length - a.cases.length);
+function trim(text, max = 130) {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut) + "\u2026";
 }
-function buildGroups(cases, first, second, riskLabel) {
-  if (!first) return [];
-  const byKey = /* @__PURE__ */ new Map();
-  for (const entry of cases) {
-    for (const bucket of bucketsOf(entry, first, riskLabel)) {
-      const group = byKey.get(bucket.key) ?? { bucket, cases: [] };
-      group.cases.push(entry);
-      byKey.set(bucket.key, group);
-    }
-  }
-  const groups = [...byKey.values()].map(({ bucket, cases: inner }) => ({
-    bucket,
-    cases: inner,
-    value: sum(inner),
-    children: second && second !== first ? buildGroups(inner, second, "", riskLabel) : []
-  }));
-  return sortGroups(groups, first);
+var STYLES = `
+:root{
+  color-scheme: light;
+
+  /* Rhythm. Every spacing value in this file comes from here \u2014 the old file
+     had twenty ad-hoc values, and that irregularity is what read as clutter. */
+  --s1:.25rem; --s2:.5rem;  --s3:.75rem; --s4:1rem;
+  --s5:1.5rem; --s6:2rem;   --s7:3rem;   --s8:4rem;
+
+  /* Paper, not screen: the old palette had a cold blue cast that dated it. */
+  --paper:#FCFCFA; --surface:#FFFFFF; --surface-2:#F3F3EF;
+  --ink:#14181A; --ink-soft:#565B60; --ink-faint:#8B9096;
+  --line:#E4E3DD; --line-soft:#EFEEE9;
+
+  --accent:#0F5C8C; --accent-bg:#E8F0F7;
+  --alarm:#B02418; --alarm-bg:#FBEAE7;
+  --warn:#8A6100;  --warn-bg:#FAF2DE;
+  --calm:#1E6B43;  --calm-bg:#E6F1EA;
+
+  /* One shadow, for the drawer that genuinely floats. Cards use their border. */
+  --shadow:0 12px 32px -20px rgba(20,24,26,.45);
+  --radius:8px; --radius-sm:4px;
+
+  /* One voice instead of the safe serif-plus-grotesque pair. Ysabeau is a
+     Garamond-boned sans that carries both display sizes and body copy. */
+  --f-display:"Ysabeau","Segoe UI",system-ui,sans-serif;
+  --f-body:"Ysabeau","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+pre,table{overflow-x:auto;max-width:100%}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-underline-offset:3px}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- chrome ---------- */
+.top{border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:10}
+.top .inner{max-width:72rem;margin:0 auto;padding:var(--s4) clamp(var(--s4),3vw,var(--s6));display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3) var(--s5)}
+.brand{display:flex;align-items:center;gap:var(--s2);font-family:var(--f-display);font-weight:700;font-size:1.1rem;letter-spacing:-.01em;text-decoration:none;color:var(--ink);white-space:nowrap}
+.brand span{color:var(--accent)}
+/* radius-sm, not the standard radius: the mark carries its own near-black
+   backdrop, and square-cornered on a light header it reads as a black
+   rectangle rather than a logo. */
+.brand-mark{width:28px;height:28px;border-radius:var(--radius-sm);flex:none}
+.nav{display:flex;flex-wrap:wrap;gap:var(--s1);margin-left:auto}
+.nav a{text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:var(--s1) var(--s3);border-radius:2px}
+.nav a:hover{color:var(--accent);background:var(--surface-2)}
+.nav a[aria-current]{color:var(--accent);background:var(--accent-bg);font-weight:500}
+
+/* Slide-in drawer. CSS only \u2014 a checkbox drives it, because <details>
+   cannot animate between display:none and shown. The checkbox is hidden
+   visually rather than with display:none, which keeps it keyboard-reachable
+   and keeps the sibling selectors working. */
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+.burger{border-radius:var(--radius);flex:none;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:4px;width:2.4rem;height:2.4rem;padding:var(--s2);border:1px solid var(--line);background:var(--surface)}
+.burger span{display:block;height:2px;background:var(--ink);border-radius:1px;transition:background .2s ease}
+.burger:hover{border-color:var(--accent)}
+.burger:hover span{background:var(--accent)}
+#menu-toggle:focus-visible + .top .burger{border-radius:var(--radius);outline:2px solid var(--accent);outline-offset:2px}
+
+.scrim{position:fixed;inset:0;background:rgba(10,18,24,.42);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease;z-index:40;cursor:pointer}
+#menu-toggle:checked ~ .scrim{opacity:1;visibility:visible}
+
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(20rem,86vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
+#menu-toggle:checked ~ .drawer{transform:translateX(0)}
+
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:var(--s4) var(--s4);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+.drawer-head strong{font-family:var(--f-display);font-size:1.02rem;font-weight:700}
+.drawer-close{cursor:pointer;font-size:1.5rem;line-height:1;color:var(--ink-faint);padding:var(--s1) var(--s2);border:1px solid transparent}
+.drawer-close:hover{color:var(--accent);border-color:var(--line)}
+.drawer a{display:flex;flex-direction:column;gap:var(--s1);padding:var(--s3) var(--s4);text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);font-size:.99rem}
+.drawer a:last-child{border-bottom:0}
+.drawer a:hover{background:var(--surface-2);color:var(--accent)}
+.drawer a[aria-current]{background:var(--accent-bg);color:var(--accent);font-weight:500;box-shadow:inset 3px 0 0 var(--accent)}
+.drawer small{color:var(--ink-faint);font-size:.82rem;font-weight:400}
+
+@media (prefers-reduced-motion: reduce){.drawer,.scrim,.filters-drawer,.filters-scrim{transition-duration:.01ms}}
+
+.wrap{max-width:72rem;margin:0 auto;padding:clamp(var(--s4),2.5vw,var(--s5)) clamp(var(--s4),3vw,var(--s6)) var(--s8)}
+
+/* ---------- type ---------- */
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(1.5rem,3vw,1.95rem);line-height:1.18;letter-spacing:-.015em;margin:0 0 var(--s2);text-wrap:balance;max-width:30ch}
+h1.long{font-size:clamp(1.35rem,3vw,1.9rem);max-width:32ch}
+h2{font-family:var(--f-display);font-weight:700;font-size:1.35rem;line-height:1.25;margin:var(--s7) 0 var(--s2);text-wrap:balance}
+h2:first-of-type{margin-top:var(--s6)}
+.sub{color:var(--ink-soft);max-width:80ch;margin:0 0 var(--s2);font-size:.95rem}
+.hint{color:var(--ink-faint);font-size:.89rem;max-width:70ch;margin:var(--s1) 0 var(--s3)}
+.statline{display:flex;flex-wrap:wrap;gap:var(--s1) var(--s2);align-items:baseline;font-size:.88rem;color:var(--ink-soft);margin:0 0 var(--s3);max-width:none}
+.statline b{font-family:var(--f-body);font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.caution{font-size:.88rem;line-height:1.5;color:var(--alarm);background:var(--alarm-bg);border:1px solid var(--alarm);border-radius:var(--radius);padding:var(--s2) var(--s3);margin:0 0 var(--s5);max-width:72ch}
+
+/* ---------- breadcrumb ---------- */
+.back{display:inline-block;font-size:.9rem;color:var(--ink-soft);text-decoration:none;margin-bottom:var(--s4)}
+.back:hover{color:var(--accent)}
+
+
+/* ---------- filters ---------- */
+form.filters{display:flex;flex-wrap:wrap;gap:var(--s2);margin-bottom:var(--s4);align-items:center}
+input,select{border-radius:var(--radius);font-family:inherit;font-size:.95rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);padding:var(--s2) var(--s3);min-width:0}
+input[type=search]{flex:1 1 20rem}
+select{max-width:24rem}
+button{border-radius:var(--radius);font-family:inherit;font-size:.95rem;font-weight:500;color:#fff;background:var(--accent);border:1px solid var(--accent);padding:var(--s2) var(--s4);cursor:pointer}
+button:hover{filter:brightness(1.08)}
+.check{display:flex;align-items:center;gap:var(--s2);font-size:.93rem;color:var(--ink-soft);white-space:nowrap}
+.check input{min-width:auto}
+.reset{font-size:.9rem;color:var(--ink-faint)}
+form.filters{flex-direction:column;align-items:stretch;gap:var(--s3)}
+.filter-row{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+/* Inputs must not stretch vertically: the form itself is a column, so a
+   bare flex-grow on a child would grow it down the page. */
+.filter-row input,.filter-row select,.filter-row button{align-self:center}
+.filter-row input[type=search]{flex:1 1 22rem;max-width:38rem}
+.filter-row input[type=date]{flex:0 0 auto;width:10.5rem}
+.filter-row input.num{flex:0 0 auto;width:9rem;font-variant-numeric:tabular-nums}
+.filter-label.faint{color:var(--ink-faint);font-size:.85rem}
+
+/* the collapsed filter panel */
+.filters-more{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.filters-more summary{cursor:pointer;list-style:none;padding:var(--s3) var(--s4);font-size:.95rem;font-weight:500;color:var(--accent);display:flex;align-items:center;gap:var(--s2)}
+.filters-more summary::-webkit-details-marker{display:none}
+.filters-more summary::before{content:"\u25B8";color:var(--ink-faint);font-size:.8rem;transition:transform .15s ease;display:inline-block}
+.filters-more[open] summary::before{transform:rotate(90deg)}
+.filters-more[open] summary{border-bottom:1px solid var(--line-soft)}
+.filters-more summary:hover{background:var(--surface)}
+.filters-more .inner{padding:var(--s4);display:flex;flex-direction:column;gap:var(--s3)}
+.verdict{border-left:4px solid var(--ink-faint)}
+.verdict.high{border-left-color:var(--alarm)}
+.verdict.medium{border-left-color:var(--warn)}
+.verdict.low{border-left-color:var(--ink-faint)}
+.verdict-tag{display:inline-block;font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:var(--s1) var(--s2);border-radius:2px;margin-right:var(--s2);vertical-align:middle}
+.verdict.high .verdict-tag{color:var(--alarm);background:var(--alarm-bg);border:1px solid var(--alarm)}
+.verdict.medium .verdict-tag{color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn)}
+.verdict.low .verdict-tag{color:var(--ink-faint);background:var(--surface-2);border:1px solid var(--line)}
+ol.findings{margin:var(--s2) 0 var(--s4);padding-left:var(--s5);display:flex;flex-direction:column;gap:var(--s3)}
+ol.findings li{max-width:68ch}
+ol.findings li strong{display:block;margin-bottom:var(--s1)}
+ol.findings li span{color:var(--ink-soft);font-size:.96rem}
+ol.findings li.w-high::marker{color:var(--alarm);font-weight:700}
+ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
+/* the three-line explainer a newcomer reads once */
+.primer{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s1) var(--s4);margin:0 0 var(--s3);padding:var(--s2) var(--s3);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);font-size:.85rem;color:var(--ink-soft)}
+.primer b{display:inline-flex;align-items:center;justify-content:center;width:1.15rem;height:1.15rem;border-radius:50%;background:var(--accent);color:#fff;font-size:.7rem;margin-right:var(--s2)}
+.primer span{display:inline-flex;align-items:center;white-space:nowrap}
+.primer a{margin-left:auto;font-size:.88rem}
+
+/* the mobile filter sheet: presets, sort/group and the filter panel share
+   one checkbox-driven drawer, the same mechanism the nav drawer already
+   uses in this file. Above 44rem there is room for all of it inline, so
+   these rules just put the drawer back in normal flow and hide the trigger
+   that only exists for the cramped case. */
+.filters-trigger{display:none}
+.filters-scrim{display:none}
+.filters-drawer{position:static;transform:none;width:auto;box-shadow:none;border:0;background:transparent;overflow:visible}
+.filters-drawer .drawer-head{display:none}
+.filters-drawer-body{padding:0}
+
+/* one-click starting points */
+.presets{display:flex;flex-wrap:wrap;gap:var(--s2);margin:0 0 var(--s3)}
+.preset{text-decoration:none;font-size:.88rem;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:var(--s2) var(--s4);white-space:nowrap}
+.preset:hover{border-color:var(--accent);color:var(--accent)}
+.preset.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+
+/* sorting and grouping, always in view */
+.sortbar{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s3);align-items:center;margin:0 0 var(--s3);padding:var(--s2) var(--s3);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.sortbar label{display:inline-flex;align-items:center;gap:var(--s2);font-size:.86rem;color:var(--ink-faint);white-space:nowrap}
+.sortbar select{font-size:.88rem;padding:var(--s1) var(--s2);max-width:12.5rem}
+.sortbar input[type=search]{flex:1 1 14rem;min-width:10rem;font-size:.9rem;padding:var(--s2) var(--s2)}
+.sortbar .go{font-size:.9rem;padding:var(--s2) var(--s4)}
+.filters{margin-bottom:var(--s4)}
+.filters-more summary .reset{margin-left:auto}
+
+.actions{display:flex;flex-wrap:wrap;gap:var(--s2);margin:0 0 var(--s5)}
+.action{display:inline-flex;align-items:center;gap:var(--s2);text-decoration:none;font-size:.95rem;color:var(--accent);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:var(--s2) var(--s4)}
+.action:hover{border-color:var(--accent);background:var(--accent-bg)}
+.action.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+.action.primary:hover{filter:brightness(1.08);background:var(--accent)}
+.action.primary::before{content:"\u2913";font-size:1.05rem}
+.block-head{font-family:var(--f-display);font-weight:700;font-size:1.1rem;margin:var(--s5) 0 var(--s2)}
+.badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:600;min-width:1.3rem;height:1.3rem;border-radius:1rem;display:inline-flex;align-items:center;justify-content:center;padding:0 var(--s2)}
+/* star toggle \u2014 a form so the site still needs no scripts */
+.star-form{display:inline;margin:0}
+.star{background:none;border:0;padding:0 var(--s2) 0 0;margin:0;cursor:pointer;font-size:1.15rem;line-height:1;color:var(--ink-faint);border-radius:var(--radius);vertical-align:baseline}
+.star:hover{color:var(--warn)}
+.star.on{color:#D9A21B}
+.star span{display:none}
+.name .star{float:left}
+
+/* the labelled variant, used at the top of a dossier */
+.star-form:has(.star span){display:inline-block;margin:0 0 var(--s4)}
+.star:has(span){display:inline-flex;align-items:center;gap:var(--s2);font-size:1rem;border:1px solid var(--line);background:var(--surface);padding:var(--s2) var(--s4);color:var(--accent)}
+.star:has(span) span{display:inline}
+.star.on:has(span){background:var(--accent-bg);border-color:var(--accent);font-weight:500}
+.name .star:has(span){float:none}
+
+.starred-btn{display:inline-flex;align-items:center;gap:var(--s2);text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:var(--s1) var(--s3);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.starred-btn:hover{color:var(--accent);border-color:var(--accent)}
+.starred-btn.on{color:var(--accent);background:var(--accent-bg);border-color:var(--accent);font-weight:500}
+.filter-label{font-size:.92rem;color:var(--ink-faint);white-space:nowrap}
+select:disabled{opacity:.5;cursor:not-allowed}
+
+/* grouped results */
+.group-block{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);margin-bottom:var(--s3)}
+.group-block summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:var(--s2) var(--s4);padding:var(--s4) var(--s4)}
+.group-block summary::-webkit-details-marker{display:none}
+.group-block summary::before{content:"\u25B8";color:var(--ink-faint);margin-right:var(--s2);font-size:.8rem;transition:transform .15s ease;display:inline-block}
+.group-block[open] > summary::before{transform:rotate(90deg)}
+.group-block[open] > summary{border-bottom:1px solid var(--line-soft)}
+.group-block summary:hover{background:var(--surface)}
+.g-name{font-weight:600;font-size:1.02rem;flex:1 1 18rem;min-width:0}
+.g-meta{font-size:.9rem;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+.g-body{padding:var(--s4) var(--s4) var(--s4)}
+.group-block .depth-1{background:var(--surface);box-shadow:none}
+.group-block .rows{box-shadow:none}
+
+/* ---------- result rows ---------- */
+.rows{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.row{background:var(--surface);padding:var(--s3) var(--s4);display:grid;grid-template-columns:auto 1fr minmax(6.5rem,auto);gap:var(--s1) var(--s4);align-items:start}
+.row:hover{background:var(--surface)}
+
+/* severity, readable at a glance and on hover */
+.dot{grid-row:1 / span 2;width:.55rem;height:.55rem;border-radius:50%;margin-top:var(--s2);flex:none;background:var(--line)}
+.sev-proven .dot{background:var(--alarm);box-shadow:0 0 0 3px var(--alarm-bg)}
+.sev-high .dot{background:var(--alarm)}
+.sev-medium .dot{background:var(--warn)}
+.sev-clear .dot{background:var(--calm)}
+.sev-low .dot{background:#C4D0D6}
+
+.row .who{min-width:0}
+.row .name{font-size:1rem;font-weight:600;line-height:1.4;letter-spacing:-.005em;overflow-wrap:anywhere}
+.row .name a{color:var(--ink);text-decoration:none}
+.row .name a:hover{color:var(--accent);text-decoration:underline}
+.row .meta{font-size:.85rem;color:var(--ink-soft);line-height:1.4;overflow-wrap:anywhere}
+.row .meta a{color:var(--ink-soft)}
+.row .meta a:hover{color:var(--accent)}
+.row .amount{text-align:right}
+.row .amount .big{font-family:var(--f-display);font-weight:700;font-size:1.05rem;line-height:1.3;font-variant-numeric:tabular-nums;white-space:nowrap}
+.row .amount .exact{font-family:var(--f-mono);font-size:.72rem;color:var(--ink-faint);white-space:nowrap;display:block;margin-top:var(--s1)}
+.row .flags{grid-column:2 / -1;display:flex;flex-wrap:wrap;gap:var(--s1);margin-top:var(--s1)}
+
+a.flag:hover{border-color:var(--accent);color:var(--accent)}
+.flag.alarm{border-color:var(--alarm);background:var(--alarm-bg);color:var(--alarm);font-weight:500}
+.flag.warn{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
+.flag.more{color:var(--ink-faint);border-style:dashed}
+.flag.proven{border-color:var(--alarm);background:var(--alarm);color:#fff;font-weight:600}
+.flag.clear{border-color:var(--calm);background:var(--calm-bg);color:var(--calm);font-weight:500}
+.tier{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:var(--s1) var(--s2);border:1px solid currentColor;white-space:nowrap;border-radius:2px}
+.tier.confirmed{color:var(--calm);background:var(--calm-bg)}
+.tier.state{color:var(--warn);background:var(--warn-bg)}
+.tier.own{color:var(--ink-faint);background:var(--surface-2)}
+.code{font-family:var(--f-mono);font-size:.74rem;color:var(--ink-faint)}
+
+/* ---------- cards ---------- */
+.card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:var(--s5) var(--s5);margin-bottom:var(--s4)}
+.card h3{margin:0 0 var(--s2);font-size:1.08rem;font-weight:600;line-height:1.4;letter-spacing:-.005em}
+.card p{margin:0 0 var(--s3);color:var(--ink-soft);max-width:68ch}
+.card p:last-child{margin-bottom:0}
+.card p.lead{color:var(--ink);font-size:1.02rem}
+.legal{border-left:3px solid var(--accent);background:var(--accent-bg);padding:var(--s3) var(--s4);font-size:.94rem;color:var(--ink);max-width:none;border-radius:0 var(--radius) var(--radius) 0}
+.legal.reading{border-left-color:var(--warn);background:var(--warn-bg)}
+details.sub{margin:var(--s4) 0 var(--s1);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+details.sub summary{cursor:pointer;list-style:none;padding:var(--s3) var(--s4);font-size:.93rem;font-weight:500;color:var(--accent)}
+details.sub summary::-webkit-details-marker{display:none}
+details.sub summary::before{content:"+";display:inline-block;width:1.1rem;color:var(--ink-faint);font-weight:600}
+details.sub[open] summary::before{content:"\u2212"}
+details.sub[open] summary{border-bottom:1px solid var(--line-soft)}
+details.sub .inner{padding:var(--s3) var(--s4) var(--s4)}
+details.sub p{margin:0 0 var(--s3);font-size:.93rem;max-width:68ch}
+details.sub p:last-child{margin-bottom:0}
+.faint{color:var(--ink-faint);font-size:.9rem}
+
+.group{margin:var(--s6) 0 var(--s3);display:flex;align-items:baseline;gap:var(--s3);flex-wrap:wrap}
+.group h3{font-family:var(--f-display);font-weight:700;font-size:1.12rem;margin:0}
+.group .count{font-size:.88rem;color:var(--ink-faint)}
+
+dl.facts{display:grid;grid-template-columns:minmax(8rem,max-content) 1fr;gap:var(--s2) var(--s5);margin:0}
+dl.facts dt{font-size:.86rem;color:var(--ink-faint);padding-top:var(--s1)}
+dl.facts dd{margin:0;font-size:1rem}
+dl.facts dd strong{font-weight:600}
+
+/* ---------- misc ---------- */
+.pager{display:flex;gap:var(--s3);align-items:center;margin-top:var(--s5);font-size:.94rem}
+.pager a{padding:var(--s2) var(--s4);border:1px solid var(--line);background:var(--surface);text-decoration:none}
+.pager a:hover{border-color:var(--accent)}
+.pager span{color:var(--ink-faint)}
+.empty{background:var(--surface);border:1px dashed var(--line);padding:var(--s7) var(--s5);text-align:center;color:var(--ink-soft)}
+.card ul{margin:var(--s1) 0 var(--s4);padding-left:var(--s4);color:var(--ink-soft);max-width:68ch}
+.card li{margin-bottom:var(--s2)}
+.note{font-size:.9rem;color:var(--ink-faint);max-width:68ch;margin-top:var(--s7);padding-top:var(--s4);border-top:1px solid var(--line)}
+
+details.help{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:var(--s5)}
+details.help summary{cursor:pointer;padding:var(--s4) var(--s4);font-weight:500;font-size:.97rem;list-style:none;display:flex;align-items:center;gap:var(--s2)}
+details.help summary::-webkit-details-marker{display:none}
+details.help summary::before{content:"?";display:inline-flex;align-items:center;justify-content:center;width:1.35rem;height:1.35rem;border:1px solid var(--accent);color:var(--accent);font-size:.82rem;font-weight:600;flex:none}
+details.help[open] summary{border-bottom:1px solid var(--line-soft)}
+details.help .inner{padding:var(--s4) var(--s4) var(--s4)}
+details.help p{margin:0 0 var(--s3);color:var(--ink-soft);max-width:68ch}
+details.help p:last-child{margin-bottom:0}
+details.help ul{margin:var(--s1) 0 var(--s4);padding-left:var(--s4);color:var(--ink-soft);max-width:68ch}
+details.help li{margin-bottom:var(--s2)}
+details.help p.lead{color:var(--ink)}
+details.help p strong{color:var(--ink)}
+details.help + details.help{margin-top:calc(-1 * var(--s4))}
+/* ---------- screens ----------
+   Every size decision lives here rather than beside the rule it overrides.
+   Phones get a single column, thumb-sized hit areas and 16px form text:
+   anything smaller and iOS zooms the whole page the moment a field is
+   focused, which then leaves the layout scrolled sideways. Tablets keep the
+   desktop shape with tighter spacing. */
+
+@media (max-width:64rem){
+  .card{padding:var(--s4) var(--s4)}
+  h2{margin-top:var(--s6)}
+  .wrap{padding-bottom:var(--s8)}
+  /* Below a wide desktop the third column is gone and the chips wrap. Let
+     them: a flag nobody can see is a flag that may as well not be there. */
+  .row .flags .flag{font-size:.76rem;padding:var(--s1) var(--s2)}
 }
 
-// server/favourites.ts
-var FAVOURITES_COOKIE = "tr_starred";
-var MAX_SAVED = 60;
-var TTL_SECONDS = 365 * 24 * 60 * 60;
-var SEPARATOR = "~";
-var PREFIX = {
-  tender: "t",
-  entity: "e",
-  supplier: "s",
-  officer: "o"
-};
-var BY_PREFIX = { t: "tender", e: "entity", s: "supplier", o: "officer" };
-var EDRPOU = /^\d{6,10}$/;
-function isEdrpou(value) {
-  return EDRPOU.test(value.trim());
+@media (max-width:44rem){
+  body{font-size:16px}
+
+  /* header: the drawer already lists every section, so the inline links are
+     duplication that costs a whole row on a narrow screen */
+  .nav{display:none}
+  .top .inner{padding:var(--s2) max(var(--s4),env(safe-area-inset-right)) var(--s2) max(var(--s4),env(safe-area-inset-left));gap:var(--s2) var(--s3)}
+  .brand{font-size:1rem}
+  .burger{width:2.75rem;height:2.75rem}
+  .starred-btn{min-height:2.75rem;padding:var(--s2) var(--s3)}
+  .starred-btn span{display:none}
+  .drawer{width:min(20rem,88vw)}
+  .drawer a{padding:var(--s4) var(--s4);min-height:2.75rem}
+
+  .wrap{padding:var(--s4) var(--s4) var(--s8)}
+  h1{font-size:1.25rem;max-width:none;margin-bottom:var(--s1)}
+  h2{font-size:1.15rem;margin-top:var(--s5)}
+  .sub{font-size:.88rem;margin-bottom:var(--s2)}
+  .statline{display:none}
+  .presets{margin-bottom:var(--s2)}
+  .sortbar{margin-bottom:var(--s2)}
+  .sub,.hint,.card p,.card ul,.note,details.sub p{max-width:none}
+
+  /* iOS zoom guard \u2014 every control a finger can land in */
+  input,select,button{font-size:16px}
+
+  .sortbar{padding:var(--s2) var(--s2);gap:var(--s2)}
+  /* two rows, not four: search shares its row with the button, the two
+     selects share the next one with their captions stacked above them.
+     Every control here is a tap target, so none goes below 44px. */
+  .sortbar input[type=search]{flex:1 1 58%;min-width:0;min-height:2.75rem;font-size:16px}
+  .sortbar .go{flex:0 0 auto;width:auto;min-height:2.75rem;padding:var(--s2) var(--s4);font-size:16px}
+  .sortbar label{order:1;flex:1 1 calc(50% - .2rem);flex-direction:column;align-items:stretch;gap:var(--s1);font-size:.72rem;letter-spacing:.02em}
+  .sortbar.dir label{flex:1 1 100%}
+  .sortbar select{width:100%;max-width:none;min-height:2.75rem;font-size:16px}
+
+  /* every chip visible: a hidden one may as well not exist */
+  .presets{flex-wrap:wrap;gap:var(--s1)}
+  .preset{flex:none;min-height:2.75rem;display:inline-flex;align-items:center;padding:var(--s2) var(--s3);font-size:.86rem}
+  .primer{display:none}
+
+  /* the filter sheet: presets, sort/group and the filter panel collapse
+     behind one full-width trigger. The count stays on the trigger itself \u2014
+     state that hides itself is worse than state that crowds. */
+  .filters-trigger{display:flex;align-items:center;justify-content:center;gap:var(--s2);width:100%;min-height:2.75rem;margin:0 0 var(--s3);padding:var(--s2) var(--s4);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--accent);font-size:.95rem;font-weight:500;cursor:pointer}
+  .filters-scrim{display:block}
+  #filters-toggle:checked ~ .filters-scrim{opacity:1;visibility:visible}
+  .filters-drawer{position:fixed;top:0;right:0;bottom:0;left:auto;width:min(22rem,88vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
+  #filters-toggle:checked ~ .filters-drawer{transform:translateX(0)}
+  .filters-drawer .drawer-head{display:flex}
+  .filters-drawer-body{padding:var(--s4)}
+
+  /* full-bleed lists: on a phone the card frame is noise, the content is not */
+  .rows,.group-block{border-radius:0;border-left:0;border-right:0;margin-inline:calc(-1 * var(--s4));box-shadow:none}
+  /* the amount is what a reader scans for, so it leads the stack; the dot
+     rides along with it instead of floating on its own line. Buyer/title
+     comes next, flags last \u2014 nobody scrolls to a chip before the number. */
+  .row{display:flex;flex-direction:column;gap:var(--s1);position:relative;padding:var(--s3) var(--s4) var(--s3) calc(var(--s4) + var(--s4));}
+  .row .dot{position:absolute;left:var(--s4);top:1.1rem;grid-row:auto;margin-top:0}
+  .row .amount{order:-2;text-align:left;margin-top:0;display:flex;align-items:baseline;gap:var(--s2)}
+  .row .amount .big{font-size:1.05rem;font-variant-numeric:tabular-nums}
+  .row .amount .exact{display:inline;margin-left:0}
+  .row .who{order:-1}
+  .row .name{font-size:.98rem;display:flex;align-items:flex-start;gap:var(--s1)}
+  .row .name a{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .row .meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .flags{order:0;margin-top:var(--s1);gap:var(--s1)}
+  .row .flags .flag{font-size:.74rem;padding:var(--s1) var(--s2);line-height:1.35}
+  /* the worst tap target on the page before this: a 1.15rem glyph with no
+     hit-box padding. It now clears 44px on both sides; float is dropped so
+     the extra hit area does not overlap the title text next to it. No
+     negative margin: the 44px box already sets .name's own line height (it
+     is the tallest flex item in that row), so pulling it up with a
+     negative margin only ever bleeds into the block above (.amount) \u2014
+     there is no slack to reclaim without doing that. */
+  .row .name .star{float:none}
+  .row .star{display:inline-flex;align-items:center;justify-content:center;min-width:2.75rem;min-height:2.75rem;padding:0;margin:0;font-size:1.3rem;flex:none}
+
+  .group-block summary{padding:var(--s4) var(--s4)}
+  .g-name{flex:1 1 100%}
+  .g-body{padding:var(--s3) var(--s4) var(--s4)}
+
+  .card{padding:var(--s4) var(--s4);box-shadow:none}
+  .actions{gap:var(--s2)}
+  .action{flex:1 1 100%;justify-content:center;min-height:2.75rem}
+  .pager a{min-height:2.75rem;display:inline-flex;align-items:center}
+
+  .filters-more summary{padding:var(--s3) var(--s4)}
+  .filter-row input[type=search],.filter-row input[type=date],.filter-row input.num,.filter-row select{flex:1 1 100%;width:100%;max-width:none}
+
+  dl.facts{grid-template-columns:1fr;gap:var(--s1)}
+  dl.facts dd{margin-bottom:var(--s3)}
+
+  details.help summary,details.sub summary{padding:var(--s4) var(--s4)}
+  .legal{padding:var(--s3) var(--s4)}
 }
-function normaliseEdrpou(input) {
-  const digits = input.replace(/\D/g, "");
-  return isEdrpou(digits) ? digits : null;
+
+@media (max-width:22rem){
+  .brand span{display:none}
 }
-function isUsableId(id) {
-  return id.length > 0 && id.length <= 120 && !/[~;,\s\\"]/.test(id);
-}
-function isFavKind(value) {
-  return value === "tender" || value === "entity" || value === "supplier" || value === "officer";
-}
-function encodeFavourite(fav) {
-  return `${PREFIX[fav.kind]}:${fav.id}`;
-}
-function decodeFavourite(token) {
-  const colon = token.indexOf(":");
-  if (colon !== 1) return null;
-  const kind = BY_PREFIX[token.slice(0, 1)];
-  const id = token.slice(colon + 1);
-  if (!kind || !isUsableId(id)) return null;
-  return { kind, id };
-}
-function parseFavourites(cookieValue) {
-  if (!cookieValue) return [];
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const token of cookieValue.split(SEPARATOR)) {
-    const fav = decodeFavourite(token.trim());
-    if (!fav) continue;
-    const key = encodeFavourite(fav);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(fav);
-  }
-  return out.slice(0, MAX_SAVED);
-}
-function serialiseFavourites(favourites) {
-  const seen = /* @__PURE__ */ new Set();
-  const tokens = [];
-  for (const fav of favourites) {
-    if (!isUsableId(fav.id)) continue;
-    const token = encodeFavourite(fav);
-    if (seen.has(token)) continue;
-    seen.add(token);
-    tokens.push(token);
-  }
-  return tokens.slice(0, MAX_SAVED).join(SEPARATOR);
-}
-function isStarred(favourites, kind, id) {
-  return favourites.some((f) => f.kind === kind && f.id === id);
-}
-function toggleFavourite(current, kind, id) {
-  if (!isUsableId(id)) return current;
-  return isStarred(current, kind, id) ? current.filter((f) => !(f.kind === kind && f.id === id)) : [{ kind, id }, ...current];
-}
-function favouritesCookie(favourites, secure) {
-  const value = serialiseFavourites(favourites);
-  const attrs = `SameSite=Lax; Path=/${secure ? "; Secure" : ""}`;
-  return value.length === 0 ? `${FAVOURITES_COOKIE}=; ${attrs}; Max-Age=0` : `${FAVOURITES_COOKIE}=${value}; ${attrs}; Max-Age=${TTL_SECONDS}`;
+
+`;
+var MENU = [
+  { href: "/", nav: "feed", label: "\u0423\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", hint: "\u043F\u043E\u0432\u043D\u0438\u0439 \u043F\u0435\u0440\u0435\u043B\u0456\u043A, \u0437 \u043F\u043E\u0448\u0443\u043A\u043E\u043C \u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0430\u043C\u0438" },
+  { href: "/railway", nav: "railway", label: "\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F", hint: "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438" },
+  { href: "/prices", nav: "prices", label: "\u0417\u0430\u0432\u0438\u0449\u0435\u043D\u0456 \u0446\u0456\u043D\u0438", hint: "\u0434\u0435 \u043C\u0438 \u0441\u0430\u043C\u0456 \u043F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442\u0443" },
+  { href: "/starred", nav: "starred", label: "\u041E\u0431\u0440\u0430\u043D\u0435", hint: "\u0443\u0441\u0435, \u0449\u043E \u0432\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0438 \u0437\u0456\u0440\u043E\u0447\u043A\u043E\u044E" },
+  { href: "/lookup", nav: "lookup", label: "\u041F\u043E\u0448\u0443\u043A \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423", hint: "\u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0431\u0443\u0434\u044C-\u044F\u043A\u0435 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E" },
+  { href: "/article/366", nav: "article-366", label: "\u041F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432", hint: "\u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445 \u0456 \u0437\u0432\u0456\u0442\u0430\u0445" },
+  { href: "/entities", nav: "entities", label: "\u0425\u0442\u043E \u043A\u0443\u043F\u0443\u0454", hint: "\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438-\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438" },
+  { href: "/suppliers", nav: "suppliers", label: "\u0425\u0442\u043E \u043F\u0440\u043E\u0434\u0430\u0454", hint: "\u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457-\u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456" },
+  { href: "/officers", nav: "officers", label: "\u0425\u0442\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0454", hint: "\u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456, \u0449\u043E \u0432\u0435\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456" },
+  { href: "/indicators", nav: "indicators", label: "\u0429\u043E \u043C\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E", hint: "\u0443\u0441\u0456 \u043E\u0437\u043D\u0430\u043A\u0438 \u043F\u0440\u043E\u0441\u0442\u0438\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438" },
+  { href: "/updates", nav: "updates", label: "\u0429\u043E \u043D\u043E\u0432\u043E\u0433\u043E", hint: "\u043E\u0441\u0442\u0430\u043D\u043D\u0454 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0431\u0430\u0437\u0438" },
+  { href: "/about", nav: "about", label: "\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443", hint: "\u0437\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456 \u0456 \u0447\u043E\u0433\u043E \u0432\u043E\u043D\u0430 \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C" }
+];
+var SITE_DESCRIPTION = "\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0423\u043A\u0440\u0430\u0457\u043D\u0438 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443: \u0432\u0438\u0441\u043D\u043E\u0432\u043A\u0438 \u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0438, \u0432\u043B\u0430\u0441\u043D\u0438\u0439 \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0446\u0456\u043D \u0456 \u043F\u0440\u0430\u0432\u043E\u0432\u0430 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F \u043F\u043E \u043A\u043E\u0436\u043D\u0456\u0439 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456.";
+function layout(opts) {
+  return `<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(opts.title)} \u2014 Tender Radar</title>
+<meta name="description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
+<meta property="og:site_name" content="Tender Radar">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:title" content="${esc(opts.title)} \u2014 Tender Radar">
+<meta property="og:description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta property="og:image" content="/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ysabeau:wght@300..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>${STYLES}</style>
+</head>
+<body>
+<input type="checkbox" id="menu-toggle" class="sr-only" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0432\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
+<header class="top"><div class="inner">
+  <a class="brand" href="/"><img class="brand-mark" src="/icon-192.png" alt="" width="28" height="28" decoding="async">Tender<span>&nbsp;Radar</span></a>
+  <nav class="nav">
+    <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
+    <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</a>
+    <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443</a>
+  </nav>
+  <a class="starred-btn${opts.nav === "starred" ? " on" : ""}" href="/starred" title="\u041E\u0431\u0440\u0430\u043D\u0435">\u2605<span>\u041E\u0431\u0440\u0430\u043D\u0435</span></a>
+  <label class="burger" for="menu-toggle" role="button" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438" title="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438"><span></span><span></span><span></span></label>
+</div></header>
+<label class="scrim" for="menu-toggle" aria-hidden="true"></label>
+<nav class="drawer" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
+  <div class="drawer-head">
+    <strong>\u0420\u043E\u0437\u0434\u0456\u043B\u0438</strong>
+    <label class="drawer-close" for="menu-toggle" role="button" aria-label="\u0417\u0430\u043A\u0440\u0438\u0442\u0438">&times;</label>
+  </div>
+  ${MENU.map(
+    (item) => `<a href="${item.href}"${opts.nav === item.nav ? ' aria-current="page"' : ""}>${item.label}<small>${item.hint}</small></a>`
+  ).join("")}
+</nav>
+<main class="wrap">
+${opts.body}
+</main>
+</body>
+</html>`;
 }
 
 // server/conclusion.ts
@@ -1826,20 +1522,40 @@ function reportHtml(ctx) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>\u0417\u0432\u0456\u0442 \u2014 ${esc(entry.tender_ref)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ysabeau:wght@300..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-  :root{color-scheme:light;--ink:#17222B;--soft:#4A5966;--line:#DDE4E8;--accent:#17607F}
+  :root{
+    color-scheme:light;
+    /* Same scale as the site (server/html.ts) \u2014 kept local rather than shared
+       because this document has no import path back to that stylesheet. */
+    --s1:.25rem; --s2:.5rem; --s3:.75rem; --s4:1rem;
+    --s5:1.5rem; --s6:2rem;  --s7:3rem;   --s8:4rem;
+    --paper:#FCFCFA; --ink:#14181A; --soft:#565B60; --line:#E4E3DD; --accent:#0F5C8C;
+    --f-body:"Ysabeau","Segoe UI",system-ui,sans-serif;
+    --f-mono:"IBM Plex Mono",Consolas,monospace;
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:#F6F8F9;color:var(--ink);font-family:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;font-size:15px;line-height:1.6}
-  .sheet{max-width:52rem;margin:0 auto;background:#fff;padding:2.5rem 3rem 4rem;min-height:100vh}
-  .toolbar{max-width:52rem;margin:1rem auto 0;padding:0 3rem;display:flex;gap:.75rem;flex-wrap:wrap}
-  .toolbar a,.toolbar button{font:inherit;font-size:.92rem;text-decoration:none;color:var(--accent);background:#fff;border:1px solid var(--line);border-radius:5px;padding:.5rem 1rem;cursor:pointer}
+  /* One voice on screen, same as the site. On paper it doesn't matter \u2014 the
+     print rule below forces plain white regardless of this token. */
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+  .sheet{max-width:52rem;margin:0 auto;background:#fff;padding:var(--s7) var(--s7) var(--s8);min-height:100vh}
+  .toolbar{max-width:52rem;margin:var(--s4) auto 0;padding:0 var(--s7);display:flex;gap:var(--s3);flex-wrap:wrap}
+  .toolbar a,.toolbar button{font:inherit;font-size:.92rem;text-decoration:none;color:var(--accent);background:#fff;border:1px solid var(--line);border-radius:5px;padding:var(--s2) var(--s4);cursor:pointer}
   .toolbar a:hover,.toolbar button:hover{border-color:var(--accent)}
-  h1{font-family:Literata,Georgia,serif;font-size:1.5rem;line-height:1.25;margin:0 0 .4rem}
-  .ref{font-family:"IBM Plex Mono",Consolas,monospace;font-size:.85rem;color:var(--soft)}
-  .made{color:var(--soft);font-size:.85rem;margin:.2rem 0 1.5rem;padding-bottom:1.2rem;border-bottom:2px solid var(--ink)}
-  section{margin:0 0 1.6rem;break-inside:avoid}
-  h2{font-family:Literata,Georgia,serif;font-size:1rem;letter-spacing:.04em;margin:0 0 .5rem;padding-bottom:.3rem;border-bottom:1px solid var(--line)}
-  p{margin:0 0 .4rem;max-width:64ch}
+  /* No serif on paper either: a second voice here would be the same
+     inconsistency the site just dropped. Weight and size still carry the
+     hierarchy, same as the site's own h2. */
+  h1{font-family:var(--f-body);font-weight:700;font-size:1.5rem;line-height:1.25;margin:0 0 var(--s2)}
+  .ref{font-family:var(--f-mono);font-size:.85rem;color:var(--soft)}
+  .made{color:var(--soft);font-size:.85rem;margin:var(--s1) 0 var(--s5);padding-bottom:var(--s4);border-bottom:2px solid var(--ink)}
+  section{margin:0 0 var(--s5);break-inside:avoid}
+  h2{font-family:var(--f-body);font-weight:700;font-size:1rem;letter-spacing:.04em;margin:0 0 var(--s2);padding-bottom:var(--s1);border-bottom:1px solid var(--line)}
+  p{margin:0 0 var(--s2);max-width:64ch}
+  /* The page a person actually holds: plain black text on white, no tint,
+     no brand background \u2014 paper is not a screen and shouldn't try to look
+     like one. */
   @media print{
     body{background:#fff;font-size:11pt}
     .toolbar{display:none}
@@ -1862,6 +1578,379 @@ function reportHtml(ctx) {
 </div>
 </body>
 </html>`;
+}
+
+// src/config.ts
+import { existsSync } from "node:fs";
+import { join as join2 } from "node:path";
+
+// src/store/json-store.ts
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+var JsonStore = class {
+  #dir;
+  constructor(dir) {
+    this.#dir = dir;
+  }
+  async #read(table) {
+    try {
+      return JSON.parse(await readFile(join(this.#dir, `${table}.json`), "utf8"));
+    } catch (err) {
+      if (err.code === "ENOENT") return [];
+      throw err;
+    }
+  }
+  async #write(table, rows) {
+    await mkdir(this.#dir, { recursive: true });
+    await writeFile(join(this.#dir, `${table}.json`), JSON.stringify(rows), "utf8");
+  }
+  async #upsert(table, rows, key) {
+    if (rows.length === 0) return;
+    const existing = await this.#read(table);
+    const byKey = new Map(existing.map((row) => [key(row), row]));
+    for (const row of rows) byKey.set(key(row), row);
+    await this.#write(table, [...byKey.values()]);
+  }
+  upsertTenders(rows) {
+    return this.#upsert("tenders", rows, (r) => r.id);
+  }
+  upsertTenderItems(rows) {
+    return this.#upsert("tender_items", rows, (r) => `${r.tender_id}|${r.item_id}`);
+  }
+  upsertBids(rows) {
+    return this.#upsert("bids", rows, (r) => `${r.tender_id}|${r.bid_id}`);
+  }
+  upsertAwards(rows) {
+    return this.#upsert("awards", rows, (r) => `${r.tender_id}|${r.award_id}`);
+  }
+  upsertRiskFlags(rows) {
+    return this.#upsert("risk_flags", rows, (r) => `${r.tender_id}|${r.risk_id}`);
+  }
+  upsertRiskRules(rows) {
+    return this.#upsert("risk_rules", rows, (r) => r.risk_id);
+  }
+  upsertMonitorings(rows) {
+    return this.#upsert("monitorings", rows, (r) => r.monitoring_id);
+  }
+  upsertCatalogPrices(rows) {
+    return this.#upsert("catalog_prices", rows, (r) => r.offer_id);
+  }
+  upsertFindings(rows) {
+    return this.#upsert("findings", rows, (r) => `${r.tender_id}|${r.detector_key}`);
+  }
+  upsertRuns(rows) {
+    return this.#upsert("runs", rows, (r) => r.run_id);
+  }
+  replaceRuns(rows) {
+    return this.#write("runs", rows);
+  }
+  allTenders() {
+    return this.#read("tenders");
+  }
+  allTenderItems() {
+    return this.#read("tender_items");
+  }
+  allBids() {
+    return this.#read("bids");
+  }
+  allAwards() {
+    return this.#read("awards");
+  }
+  allRiskFlags() {
+    return this.#read("risk_flags");
+  }
+  allRiskRules() {
+    return this.#read("risk_rules");
+  }
+  allMonitorings() {
+    return this.#read("monitorings");
+  }
+  allCatalogPrices() {
+    return this.#read("catalog_prices");
+  }
+  allFindings() {
+    return this.#read("findings");
+  }
+  allRuns() {
+    return this.#read("runs");
+  }
+  async getCursor(worker) {
+    const all = await this.#read("cursors");
+    return all[0]?.[worker] ?? null;
+  }
+  async setCursor(worker, cursor) {
+    const all = await this.#read("cursors");
+    const map = all[0] ?? {};
+    map[worker] = cursor;
+    await this.#write("cursors", [map]);
+  }
+};
+
+// src/config.ts
+var REGION = "\u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0430 \u043E\u0431\u043B\u0430\u0441\u0442\u044C";
+var SOUTHERN_RAILWAY_EDRPOU = "40081216";
+var RAILWAY_EDRPOU = /* @__PURE__ */ new Set([
+  SOUTHERN_RAILWAY_EDRPOU,
+  // РФ "Південна залізниця" — the Kharkiv branch
+  "40081347",
+  // Філія "Центр забезпечення виробництва"
+  "41022900",
+  // Філія "Пасажирська компанія"
+  "40123454",
+  // Філія "Центр з ремонту та експлуатації колійних машин"
+  "45462724",
+  // Філія "УЗ Вагон-Сервіс"
+  "45246390"
+  // Філія "Приміська пасажирська компанія"
+]);
+var RAILWAY_NAME = /залізни|укрзаліз|колійн|локомотив|вагон|тепловоз|електровоз/i;
+function railwayScope(entity) {
+  const edrpou = entity.entity_edrpou ?? "";
+  if (edrpou === SOUTHERN_RAILWAY_EDRPOU) return "southern";
+  if (RAILWAY_EDRPOU.has(edrpou)) return "branch";
+  if (entity.region === REGION && RAILWAY_NAME.test(entity.entity_name ?? "")) return "local";
+  return null;
+}
+function dataDir() {
+  if (process.env.TR_DATA_DIR) return process.env.TR_DATA_DIR;
+  const working = join2(import.meta.dirname, "..", "data");
+  return existsSync(working) ? working : join2(import.meta.dirname, "..", "web-data");
+}
+function openStore() {
+  return new JsonStore(dataDir());
+}
+
+// src/normalize/tender.ts
+function officerKey(row) {
+  if (row.officer_email) return row.officer_email.trim().toLowerCase();
+  if (row.officer_name && row.entity_edrpou) return `${row.officer_name.trim().toLowerCase()}@@${row.entity_edrpou}`;
+  return null;
+}
+
+// src/normalize/monitoring.ts
+function asRecord(value) {
+  return value && typeof value === "object" ? value : {};
+}
+function asString(value) {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+function violationEstablished(row) {
+  const conclusion = asRecord(row.conclusion);
+  return typeof conclusion.violationOccurred === "boolean" ? conclusion.violationOccurred : null;
+}
+function conclusionText(row, max = 600) {
+  const conclusion = asRecord(row.conclusion);
+  const text = (conclusion.description ?? "").replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const stop = cut.lastIndexOf(" ");
+  return (stop > max * 0.6 ? cut.slice(0, stop) : cut) + "\u2026";
+}
+function conclusionPublished(row) {
+  const conclusion = asRecord(row.conclusion);
+  return asString(conclusion.datePublished) ?? asString(conclusion.dateCreated) ?? row.date_modified;
+}
+
+// server/data.ts
+function tenderDateOf(tenderRef) {
+  const m = /^UA-(\d{4}-\d{2}-\d{2})-/.exec(tenderRef);
+  return m ? m[1] : null;
+}
+function activeAward(awards) {
+  return awards.find((a) => a.status === "active") ?? awards[0];
+}
+function violationTypes(row) {
+  const conclusion = row.conclusion;
+  const types = conclusion?.violationType;
+  return Array.isArray(types) ? types.filter((t) => typeof t === "string") : [];
+}
+async function loadDataset() {
+  const store = openStore();
+  const flags = await store.allRiskFlags();
+  const rules = await store.allRiskRules();
+  const tenders = await store.allTenders();
+  const awards = await store.allAwards();
+  const bids = await store.allBids();
+  const runs = await store.allRuns();
+  const findings = await store.allFindings();
+  const monitorings = await store.allMonitorings();
+  const monitoringsByTender = /* @__PURE__ */ new Map();
+  for (const row of monitorings) {
+    const list = monitoringsByTender.get(row.tender_id) ?? [];
+    list.push(row);
+    monitoringsByTender.set(row.tender_id, list);
+  }
+  const auditByTender = /* @__PURE__ */ new Map();
+  for (const [tenderId, list] of monitoringsByTender) {
+    const decided = list.filter((row) => violationEstablished(row) !== null);
+    if (decided.length === 0) continue;
+    const pick = decided.find((row) => violationEstablished(row) === true) ?? decided[0];
+    auditByTender.set(tenderId, {
+      violation: violationEstablished(pick) === true,
+      text: conclusionText(pick),
+      published: conclusionPublished(pick),
+      monitoring_id: pick.monitoring_id,
+      count: decided.length,
+      reasons: Array.isArray(pick.reasons) ? pick.reasons : [],
+      types: violationTypes(pick)
+    });
+  }
+  const findingsByTender = /* @__PURE__ */ new Map();
+  for (const finding of findings) {
+    const list = findingsByTender.get(finding.tender_id) ?? [];
+    list.push(finding);
+    findingsByTender.set(finding.tender_id, list);
+  }
+  const tenderById = new Map(tenders.map((t) => [t.id, t]));
+  const awardsByTender = /* @__PURE__ */ new Map();
+  for (const award of awards) {
+    const list = awardsByTender.get(award.tender_id) ?? [];
+    list.push(award);
+    awardsByTender.set(award.tender_id, list);
+  }
+  const bidCount = /* @__PURE__ */ new Map();
+  for (const bid of bids) bidCount.set(bid.tender_id, (bidCount.get(bid.tender_id) ?? 0) + 1);
+  const byTender = /* @__PURE__ */ new Map();
+  for (const flag of flags) {
+    let entry = byTender.get(flag.tender_id);
+    if (!entry) {
+      const detail = tenderById.get(flag.tender_id);
+      const won = activeAward(awardsByTender.get(flag.tender_id) ?? []);
+      entry = {
+        tender_id: flag.tender_id,
+        tender_ref: flag.tender_ref || detail?.tender_id || "",
+        tender_date: tenderDateOf(flag.tender_ref || detail?.tender_id || ""),
+        title: detail?.title ?? null,
+        status: detail?.status ?? null,
+        method: detail?.method ?? null,
+        entity_edrpou: flag.entity_edrpou ?? detail?.entity_edrpou ?? null,
+        entity_name: flag.entity_name ?? detail?.entity_name ?? null,
+        region: flag.region ?? detail?.region ?? null,
+        value_amount: flag.value_amount ?? detail?.value_amount ?? null,
+        date_assessed: flag.date_assessed,
+        risks: [],
+        officer_name: detail?.officer_name ?? null,
+        officer_email: detail?.officer_email ?? null,
+        officer_phone: detail?.officer_phone ?? null,
+        officer_key: detail ? officerKey(detail) : null,
+        winner_name: won?.supplier_name ?? null,
+        winner_edrpou: won?.supplier_edrpou ?? null,
+        winner_amount: won?.amount ?? null,
+        bidders: bidCount.get(flag.tender_id) ?? 0,
+        detailed: Boolean(detail),
+        findings: findingsByTender.get(flag.tender_id) ?? [],
+        audit: auditByTender.get(flag.tender_id) ?? null
+      };
+      byTender.set(flag.tender_id, entry);
+    }
+    if (!entry.tender_ref && flag.tender_ref) {
+      entry.tender_ref = flag.tender_ref;
+      entry.tender_date = tenderDateOf(flag.tender_ref);
+    }
+    if (entry.value_amount === null) entry.value_amount = flag.value_amount;
+    if (!entry.risks.includes(flag.risk_id)) entry.risks.push(flag.risk_id);
+  }
+  const cases = [...byTender.values()];
+  return {
+    cases,
+    byTender,
+    rules,
+    ruleById: new Map(rules.map((r) => [r.risk_id, r])),
+    runs,
+    findingCount: findings.length,
+    flagCount: flags.length,
+    totalValue: cases.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0)
+  };
+}
+
+// server/context.ts
+var db = await loadDataset();
+console.log(
+  `loaded ${db.flagCount} flags across ${db.cases.length} tenders (${db.cases.filter((c) => c.detailed).length} with full cards)`
+);
+var starred = [];
+function dataset() {
+  return db;
+}
+function setStarred(list) {
+  starred = list;
+}
+function starredList() {
+  return starred;
+}
+
+// server/grouping.ts
+var DIMENSIONS = [
+  { value: "", label: "\u0411\u0435\u0437 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F" },
+  { value: "entity", label: "\u0417\u0430 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u043E\u043C" },
+  { value: "officer", label: "\u0417\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0438\u043C" },
+  { value: "supplier", label: "\u0417\u0430 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0435\u043C" },
+  { value: "risk", label: "\u0417\u0430 \u043E\u0437\u043D\u0430\u043A\u043E\u044E" },
+  { value: "year", label: "\u0417\u0430 \u0440\u043E\u043A\u043E\u043C" },
+  { value: "method", label: "\u0417\u0430 \u043F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u043E\u044E" },
+  { value: "severity", label: "\u0417\u0430 \u0433\u043E\u0441\u0442\u0440\u043E\u0442\u043E\u044E" }
+];
+function isDimension(value) {
+  return DIMENSIONS.some((d) => d.value === value);
+}
+var SEVERITY_ORDER = { \u0413\u043E\u0441\u0442\u0440\u0456: 0, \u041F\u043E\u043C\u0456\u0442\u043D\u0456: 1, \u0417\u0432\u0438\u0447\u0430\u0439\u043D\u0456: 2 };
+function bucketsOf(entry, dimension, riskLabel) {
+  switch (dimension) {
+    case "entity":
+      return [
+        {
+          key: entry.entity_edrpou ?? "\u2014",
+          label: entry.entity_name ?? "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u0438\u0439",
+          href: entry.entity_edrpou ? `/entity/${encodeURIComponent(entry.entity_edrpou)}` : null
+        }
+      ];
+    case "officer":
+      return entry.officer_key ? [{ key: entry.officer_key, label: entry.officer_name ?? entry.officer_key, href: `/officer/${encodeURIComponent(entry.officer_key)}` }] : [{ key: "\u2014", label: "\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u043E", href: null }];
+    case "supplier":
+      return entry.winner_edrpou ? [{ key: entry.winner_edrpou, label: entry.winner_name ?? entry.winner_edrpou, href: `/supplier/${encodeURIComponent(entry.winner_edrpou)}` }] : [{ key: "\u2014", label: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043E", href: null }];
+    case "risk":
+      return entry.risks.map((id) => ({ key: id, label: riskLabel(id), href: `/?risk=${encodeURIComponent(id)}` }));
+    case "year": {
+      const year = (entry.date_assessed ?? entry.tender_ref.slice(3, 7) ?? "").slice(0, 4);
+      return [{ key: year || "\u2014", label: year ? `${year} \u0440\u0456\u043A` : "\u0420\u0456\u043A \u043D\u0435\u0432\u0456\u0434\u043E\u043C\u0438\u0439", href: null }];
+    }
+    case "method":
+      return [{ key: entry.method ?? "\u2014", label: entry.method ?? "\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0443 \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u043E", href: null }];
+    case "severity": {
+      const label = entry.findings.some((f) => f.severity === "high") || entry.risks.length >= 3 ? "\u0413\u043E\u0441\u0442\u0440\u0456" : entry.findings.length > 0 || entry.bidders === 1 ? "\u041F\u043E\u043C\u0456\u0442\u043D\u0456" : "\u0417\u0432\u0438\u0447\u0430\u0439\u043D\u0456";
+      return [{ key: label, label, href: null }];
+    }
+    default:
+      return [];
+  }
+}
+function sum(cases) {
+  return cases.reduce((total, c) => total + (c.value_amount ?? 0), 0);
+}
+function sortGroups(groups, dimension) {
+  if (dimension === "year") return groups.sort((a, b) => b.bucket.key.localeCompare(a.bucket.key));
+  if (dimension === "severity") {
+    return groups.sort((a, b) => (SEVERITY_ORDER[a.bucket.key] ?? 9) - (SEVERITY_ORDER[b.bucket.key] ?? 9));
+  }
+  return groups.sort((a, b) => b.value - a.value || b.cases.length - a.cases.length);
+}
+function buildGroups(cases, first, second, riskLabel) {
+  if (!first) return [];
+  const byKey = /* @__PURE__ */ new Map();
+  for (const entry of cases) {
+    for (const bucket of bucketsOf(entry, first, riskLabel)) {
+      const group = byKey.get(bucket.key) ?? { bucket, cases: [] };
+      group.cases.push(entry);
+      byKey.set(bucket.key, group);
+    }
+  }
+  const groups = [...byKey.values()].map(({ bucket, cases: inner }) => ({
+    bucket,
+    cases: inner,
+    value: sum(inner),
+    children: second && second !== first ? buildGroups(inner, second, "", riskLabel) : []
+  }));
+  return sortGroups(groups, first);
 }
 
 // server/controls.ts
@@ -1950,20 +2039,73 @@ function keepControls(action, c, over = {}) {
   return query ? `${action}?${query}` : action;
 }
 
-// server/app.ts
-var PAGE_SIZE = 30;
-var MAX_ROW_FLAGS = 3;
-var MAX_GROUPS = 40;
-var db = await loadDataset();
-console.log(
-  `loaded ${db.flagCount} flags across ${db.cases.length} tenders (${db.cases.filter((c) => c.detailed).length} with full cards)`
-);
+// server/components/risk.ts
 function shortRisk(riskId) {
-  return RISK_LABELS[riskId]?.short ?? db.ruleById.get(riskId)?.name ?? riskId;
+  return RISK_LABELS[riskId]?.short ?? dataset().ruleById.get(riskId)?.name ?? riskId;
 }
 function riskFlag(riskId) {
   return `<a class="flag" href="/?risk=${encodeURIComponent(riskId)}">${esc(shortRisk(riskId))}</a>`;
 }
+function rankRisks(list) {
+  const counts = /* @__PURE__ */ new Map();
+  for (const entry of list) for (const r of entry.risks) counts.set(r, (counts.get(r) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+}
+function riskCard(riskId, count) {
+  const rule = dataset().ruleById.get(riskId);
+  const label = RISK_LABELS[riskId];
+  const legal = INDICATOR_LEGAL[riskId];
+  const stateNorm = rule?.legitimateness?.trim();
+  const norm = stateNorm ? `<p class="legal"><strong>\u041D\u043E\u0440\u043C\u0430, \u044F\u043A\u0443 \u043D\u0430\u0432\u043E\u0434\u0438\u0442\u044C \u0434\u0435\u0440\u0436\u0430\u0432\u0430:</strong> ${esc(stateNorm)}</p>` : legal?.norm ? `<p class="legal reading"><strong>\u041D\u043E\u0440\u043C\u0430 \u2014 \u043D\u0430\u0448\u0435 \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043D\u044F:</strong> ${esc(legal.norm)}</p>
+  <p class="faint">${esc(legal.normNote ?? "")}</p>` : `<p class="faint">\u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u043D\u0435 \u043D\u0430\u0432\u043E\u0434\u0438\u0442\u044C \u043D\u043E\u0440\u043C\u0443 \u0434\u043B\u044F \u0446\u044C\u043E\u0433\u043E \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0430, \u0456 \u043C\u0438 \u043D\u0435 \u0431\u0435\u0440\u0435\u043C\u043E\u0441\u044F \u0457\u0457 \u0434\u043E\u0431\u0443\u0434\u0443\u0432\u0430\u0442\u0438.</p>`;
+  const criminal = legal?.criminal.length ? `<details class="sub">
+  <summary>\u0429\u043E \u0446\u0435 \u043C\u043E\u0436\u0435 \u043E\u0437\u043D\u0430\u0447\u0430\u0442\u0438 \u0437\u0430 \u043A\u0440\u0438\u043C\u0456\u043D\u0430\u043B\u044C\u043D\u0438\u043C \u0437\u0430\u043A\u043E\u043D\u043E\u043C \u2014 ${legal.criminal.length} ${plural(legal.criminal.length, "\u043D\u0430\u043F\u0440\u044F\u043C", "\u043D\u0430\u043F\u0440\u044F\u043C\u0438", "\u043D\u0430\u043F\u0440\u044F\u043C\u0456\u0432")}</summary>
+  <div class="inner">
+    <p class="faint">\u0426\u0435 \u043D\u0430\u043F\u0440\u044F\u043C\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u0434\u043B\u044F \u044E\u0440\u0438\u0441\u0442\u0430, \u0430 \u043D\u0435 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F \u0434\u0456\u0439. \u0423\u043C\u0438\u0441\u0435\u043B \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u043B\u0438\u0448\u0435 \u0441\u0443\u0434.</p>
+    ${legal.criminal.map((direction) => {
+    const article = ARTICLES[direction.code];
+    return `<p><strong>\u0421\u0442\u0430\u0442\u0442\u044F ${esc(direction.code)} \u041A\u041A\u0423 \u2014 ${esc(article?.title ?? "")}</strong><br>${esc(direction.why)}<br><a href="/article/${esc(direction.code)}">\u0423\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430 \u0446\u0438\u043C \u043D\u0430\u043F\u0440\u044F\u043C\u043E\u043C \u2192</a></p>`;
+  }).join("")}
+  </div>
+</details>` : "";
+  return `<div class="card">
+  <h3><span class="tier state">\u041F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430</span> &nbsp;${esc(label?.short ?? rule?.name ?? riskId)}${count ? ` <span class="faint">\u2014 ${count} ${plural(count, "\u0440\u0430\u0437", "\u0440\u0430\u0437\u0438", "\u0440\u0430\u0437\u0456\u0432")}</span>` : ""}</h3>
+  ${label ? `<p class="lead">${esc(label.means)}</p>` : ""}
+  ${rule?.name && label ? `<p class="faint"><strong>\u041E\u0444\u0456\u0446\u0456\u0439\u043D\u0435 \u0444\u043E\u0440\u043C\u0443\u043B\u044E\u0432\u0430\u043D\u043D\u044F:</strong> ${esc(rule.name)}</p>` : ""}
+  ${norm}
+  ${criminal}
+  <p class="code">\u0406\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 ${esc(riskId)} \xB7 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C</p>
+</div>`;
+}
+function groupedRiskCards(ranked) {
+  const byGroup = /* @__PURE__ */ new Map();
+  const ungrouped = [];
+  for (const pair of ranked) {
+    const group = RISK_LABELS[pair[0]]?.group;
+    if (!group) {
+      ungrouped.push(pair);
+      continue;
+    }
+    const list = byGroup.get(group) ?? [];
+    list.push(pair);
+    byGroup.set(group, list);
+  }
+  const parts = [];
+  for (const group of GROUP_ORDER) {
+    const list = byGroup.get(group);
+    if (!list) continue;
+    const total = list.reduce((sum2, [, n]) => sum2 + n, 0);
+    parts.push(
+      `<div class="group"><h3>${esc(group)}</h3><span class="count">${total} ${plural(total, "\u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u043D\u044F", "\u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u043D\u044F", "\u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u044C")}</span></div>`,
+      ...list.map(([riskId, count]) => riskCard(riskId, count))
+    );
+  }
+  parts.push(...ungrouped.map(([riskId, count]) => riskCard(riskId, count)));
+  return parts.join("");
+}
+
+// server/components/case-row.ts
+var MAX_ROW_FLAGS = 3;
 function rowSeverity(entry) {
   if (entry.audit?.violation) return "proven";
   if (entry.findings.length > 0) return "high";
@@ -2015,10 +2157,9 @@ function alarms(entry) {
   if (entry.risks.length >= 3) out.push(`${entry.risks.length} \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438 \u043E\u0434\u0440\u0430\u0437\u0443`);
   return out;
 }
-var starred = [];
 function star(kind, id, back, opts = {}) {
   if (!id) return "";
-  const on = isStarred(starred, kind, id);
+  const on = isStarred(starredList(), kind, id);
   const title = on ? "\u041F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0437 \u043E\u0431\u0440\u0430\u043D\u043E\u0433\u043E" : "\u0414\u043E\u0434\u0430\u0442\u0438 \u0434\u043E \u043E\u0431\u0440\u0430\u043D\u043E\u0433\u043E";
   return `<form class="star-form" method="post" action="/starred/toggle">
   <input type="hidden" name="kind" value="${esc(kind)}">
@@ -2068,72 +2209,10 @@ function caseRow(entry, opts = {}) {
   </div>
 </div>`;
 }
-function rankRisks(list) {
-  const counts = /* @__PURE__ */ new Map();
-  for (const entry of list) for (const r of entry.risks) counts.set(r, (counts.get(r) ?? 0) + 1);
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-}
-function riskCard(riskId, count) {
-  const rule = db.ruleById.get(riskId);
-  const label = RISK_LABELS[riskId];
-  const legal = INDICATOR_LEGAL[riskId];
-  const stateNorm = rule?.legitimateness?.trim();
-  const norm = stateNorm ? `<p class="legal"><strong>\u041D\u043E\u0440\u043C\u0430, \u044F\u043A\u0443 \u043D\u0430\u0432\u043E\u0434\u0438\u0442\u044C \u0434\u0435\u0440\u0436\u0430\u0432\u0430:</strong> ${esc(stateNorm)}</p>` : legal?.norm ? `<p class="legal reading"><strong>\u041D\u043E\u0440\u043C\u0430 \u2014 \u043D\u0430\u0448\u0435 \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043D\u044F:</strong> ${esc(legal.norm)}</p>
-  <p class="faint">${esc(legal.normNote ?? "")}</p>` : `<p class="faint">\u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u043D\u0435 \u043D\u0430\u0432\u043E\u0434\u0438\u0442\u044C \u043D\u043E\u0440\u043C\u0443 \u0434\u043B\u044F \u0446\u044C\u043E\u0433\u043E \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0430, \u0456 \u043C\u0438 \u043D\u0435 \u0431\u0435\u0440\u0435\u043C\u043E\u0441\u044F \u0457\u0457 \u0434\u043E\u0431\u0443\u0434\u0443\u0432\u0430\u0442\u0438.</p>`;
-  const criminal = legal?.criminal.length ? `<details class="sub">
-  <summary>\u0429\u043E \u0446\u0435 \u043C\u043E\u0436\u0435 \u043E\u0437\u043D\u0430\u0447\u0430\u0442\u0438 \u0437\u0430 \u043A\u0440\u0438\u043C\u0456\u043D\u0430\u043B\u044C\u043D\u0438\u043C \u0437\u0430\u043A\u043E\u043D\u043E\u043C \u2014 ${legal.criminal.length} ${plural(legal.criminal.length, "\u043D\u0430\u043F\u0440\u044F\u043C", "\u043D\u0430\u043F\u0440\u044F\u043C\u0438", "\u043D\u0430\u043F\u0440\u044F\u043C\u0456\u0432")}</summary>
-  <div class="inner">
-    <p class="faint">\u0426\u0435 \u043D\u0430\u043F\u0440\u044F\u043C\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u0434\u043B\u044F \u044E\u0440\u0438\u0441\u0442\u0430, \u0430 \u043D\u0435 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F \u0434\u0456\u0439. \u0423\u043C\u0438\u0441\u0435\u043B \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u043B\u0438\u0448\u0435 \u0441\u0443\u0434.</p>
-    ${legal.criminal.map((direction) => {
-    const article = ARTICLES[direction.code];
-    return `<p><strong>\u0421\u0442\u0430\u0442\u0442\u044F ${esc(direction.code)} \u041A\u041A\u0423 \u2014 ${esc(article?.title ?? "")}</strong><br>${esc(direction.why)}<br><a href="/article/${esc(direction.code)}">\u0423\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430 \u0446\u0438\u043C \u043D\u0430\u043F\u0440\u044F\u043C\u043E\u043C \u2192</a></p>`;
-  }).join("")}
-  </div>
-</details>` : "";
-  return `<div class="card">
-  <h3><span class="tier state">\u041F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430</span> &nbsp;${esc(label?.short ?? rule?.name ?? riskId)}${count ? ` <span class="faint">\u2014 ${count} ${plural(count, "\u0440\u0430\u0437", "\u0440\u0430\u0437\u0438", "\u0440\u0430\u0437\u0456\u0432")}</span>` : ""}</h3>
-  ${label ? `<p class="lead">${esc(label.means)}</p>` : ""}
-  ${rule?.name && label ? `<p class="faint"><strong>\u041E\u0444\u0456\u0446\u0456\u0439\u043D\u0435 \u0444\u043E\u0440\u043C\u0443\u043B\u044E\u0432\u0430\u043D\u043D\u044F:</strong> ${esc(rule.name)}</p>` : ""}
-  ${norm}
-  ${criminal}
-  <p class="code">\u0406\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 ${esc(riskId)} \xB7 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C</p>
-</div>`;
-}
-function groupedRiskCards(ranked) {
-  const byGroup = /* @__PURE__ */ new Map();
-  const ungrouped = [];
-  for (const pair of ranked) {
-    const group = RISK_LABELS[pair[0]]?.group;
-    if (!group) {
-      ungrouped.push(pair);
-      continue;
-    }
-    const list = byGroup.get(group) ?? [];
-    list.push(pair);
-    byGroup.set(group, list);
-  }
-  const parts = [];
-  for (const group of GROUP_ORDER) {
-    const list = byGroup.get(group);
-    if (!list) continue;
-    const total = list.reduce((sum2, [, n]) => sum2 + n, 0);
-    parts.push(
-      `<div class="group"><h3>${esc(group)}</h3><span class="count">${total} ${plural(total, "\u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u043D\u044F", "\u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u043D\u044F", "\u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u044C")}</span></div>`,
-      ...list.map(([riskId, count]) => riskCard(riskId, count))
-    );
-  }
-  parts.push(...ungrouped.map(([riskId, count]) => riskCard(riskId, count)));
-  return parts.join("");
-}
-var HELP = `<details class="help">
-  <summary>\u042F\u043A \u0447\u0438\u0442\u0430\u0442\u0438 \u0446\u044E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443</summary>
-  <div class="inner">
-    <p>\u041A\u043E\u0436\u0435\u043D \u0440\u044F\u0434\u043E\u043A \u2014 \u0446\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F, \u0443 \u044F\u043A\u0456\u0439 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443. \u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u0441\u0430\u043C\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0442\u0430\u043A\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456; \u043C\u0438 \u043B\u0438\u0448\u0435 \u0437\u0431\u0438\u0440\u0430\u0454\u043C\u043E \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u043F\u043E ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u044F\u0445 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0439 \u043F\u043E\u043A\u0430\u0437\u0443\u0454\u043C\u043E \u0457\u0445 \u0437\u0440\u043E\u0437\u0443\u043C\u0456\u043B\u043E.</p>
-    <p>\u0427\u0435\u0440\u0432\u043E\u043D\u0456 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u2014 \u0442\u0435, \u043D\u0430 \u0449\u043E \u0432\u0430\u0440\u0442\u043E \u0433\u043B\u044F\u043D\u0443\u0442\u0438 \u043F\u0435\u0440\u0448\u0438\u043C: \u0454\u0434\u0438\u043D\u0438\u0439 \u0443\u0447\u0430\u0441\u043D\u0438\u043A \u043D\u0430 \u0432\u0435\u043B\u0438\u043A\u0438\u0445 \u0442\u043E\u0440\u0433\u0430\u0445, \u0441\u0443\u043C\u0430 \u043F\u043E\u043D\u0430\u0434 \u043C\u0456\u043B\u044C\u044F\u0440\u0434, \u043A\u0456\u043B\u044C\u043A\u0430 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u043E\u0434\u0440\u0430\u0437\u0443.</p>
-    <p>\u0421\u0456\u0440\u0456 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u2014 \u0449\u043E \u0441\u0430\u043C\u0435 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430. \u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u043D\u0430 \u0431\u0443\u0434\u044C-\u044F\u043A\u0443, \u0449\u043E\u0431 \u043F\u043E\u0431\u0430\u0447\u0438\u0442\u0438 \u0432\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u0442\u0456\u0454\u044E \u0441\u0430\u043C\u043E\u044E \u043E\u0437\u043D\u0430\u043A\u043E\u044E.</p>
-    <p><strong>\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043D\u0435 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</strong> \u0426\u0435 \u043F\u0456\u0434\u0441\u0442\u0430\u0432\u0430 \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u0439 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0457\u0457 \u043B\u044E\u0434\u0438\u043D\u043E\u044E.</p>
-  </div>
-</details>`;
+
+// server/components/filters.ts
+var PAGE_SIZE = 30;
+var MAX_GROUPS = 40;
 function presetsFor(action) {
   const base = [
     { label: "\u0423\u0441\u0456", hint: "\u043F\u043E\u0432\u043D\u0438\u0439 \u043F\u0435\u0440\u0435\u043B\u0456\u043A", query: "" },
@@ -2198,12 +2277,6 @@ function sortBar(action, c, extra = "") {
   <button type="submit" class="go">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
 </form>`;
 }
-var PRIMER = `<div class="primer">
-  <span><b>1</b> \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u043F\u0456\u0434\u043E\u0437\u0440\u0456\u043B\u0456</span>
-  <span><b>2</b> \u043C\u0438 \u043F\u043E\u044F\u0441\u043D\u044E\u0454\u043C\u043E \u0456 \u0440\u0430\u0445\u0443\u0454\u043C\u043E \u0446\u0456\u043D\u0443</span>
-  <span><b>3</b> \u0443 \u043A\u043E\u0436\u043D\u0456\u0439 \u2014 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0456 \u0437\u0432\u0456\u0442</span>
-  <a href="/about">\u0414\u043E\u043A\u043B\u0430\u0434\u043D\u0456\u0448\u0435</a>
-</div>`;
 function groupBlock(group, depth) {
   const inner = group.children.length > 0 ? group.children.map((child) => groupBlock(child, depth + 1)).join("") : `<div class="rows">${group.cases.slice(0, 20).map((c) => caseRow(c)).join("")}</div>${group.cases.length > 20 ? `<p class="hint" style="margin:.6rem 0 0">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E 20 \u043D\u0430\u0439\u0434\u043E\u0440\u043E\u0436\u0447\u0438\u0445 \u0456\u0437 ${group.cases.length}.</p>` : ""}`;
   return `<details class="group-block depth-${depth}"${depth === 0 && group.cases.length <= 40 ? " open" : ""}>
@@ -2219,11 +2292,11 @@ function groupBlock(group, depth) {
 }
 function filterPanel(action, c, opts = {}, extra = "") {
   const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
-  const stamps = db.cases.map((x) => x.tender_date ?? "").filter(Boolean).sort();
+  const stamps = dataset().cases.map((x) => x.tender_date ?? "").filter(Boolean).sort();
   const earliest = stamps[0] ?? "";
   const latest = stamps[stamps.length - 1] ?? "";
-  const regions = [...new Set(db.cases.map((x) => x.region ?? "").filter(Boolean))].sort();
-  const amounts = db.cases.map((x) => x.value_amount ?? 0).filter((n) => n > 0);
+  const regions = [...new Set(dataset().cases.map((x) => x.region ?? "").filter(Boolean))].sort();
+  const amounts = dataset().cases.map((x) => x.value_amount ?? 0).filter((n) => n > 0);
   const rangeHint = amounts.length ? `\u0443 \u0431\u0430\u0437\u0456 \u0432\u0456\u0434 ${shortMoney(Math.min(...amounts))} \u0434\u043E ${shortMoney(Math.max(...amounts))}` : "";
   const active = activeCount(c);
   const anything = isFiltered(c) || Boolean(c.group);
@@ -2236,7 +2309,7 @@ function filterPanel(action, c, opts = {}, extra = "") {
       <div class="filter-row">
         <select name="risk" aria-label="\u041E\u0437\u043D\u0430\u043A\u0430">
           <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0430 \u043E\u0437\u043D\u0430\u043A\u0430</option>
-          ${db.rules.map(
+          ${dataset().rules.map(
     (r) => `<option value="${esc(r.risk_id)}"${r.risk_id === c.risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`
   ).join("")}
         </select>
@@ -2279,6 +2352,27 @@ function filterPanel(action, c, opts = {}, extra = "") {
   </details>
 </form>`;
 }
+function controlBar(action, c, opts = {}, params = {}) {
+  const active = activeCount(c);
+  const presets = params.url ? presetBar(action, params.url, c) : "";
+  const extra = params.extra ?? "";
+  return `<div class="filter-sheet">
+  <input type="checkbox" id="filters-toggle" class="sr-only" aria-label="\u0424\u0456\u043B\u044C\u0442\u0440\u0438">
+  <label class="filters-trigger" for="filters-toggle">\u0424\u0456\u043B\u044C\u0442\u0440\u0438${active > 0 ? ` <span class="badge">${active}</span>` : ""}</label>
+  <label class="scrim filters-scrim" for="filters-toggle" aria-hidden="true"></label>
+  <div class="drawer filters-drawer" aria-label="\u0424\u0456\u043B\u044C\u0442\u0440\u0438">
+    <div class="drawer-head">
+      <strong>\u0424\u0456\u043B\u044C\u0442\u0440\u0438</strong>
+      <label class="drawer-close" for="filters-toggle" role="button" aria-label="\u0417\u0430\u043A\u0440\u0438\u0442\u0438">&times;</label>
+    </div>
+    <div class="filters-drawer-body">
+      ${presets}
+      ${sortBar(action, c, extra)}
+      ${filterPanel(action, c, opts, extra)}
+    </div>
+  </div>
+</div>`;
+}
 function resultLine(list, c, groupCount) {
   const value = list.reduce((sum2, x) => sum2 + (x.value_amount ?? 0), 0);
   const base = isFiltered(c) ? `\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(value)}.` : `\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(value)}.`;
@@ -2305,9 +2399,26 @@ ${pages > 1 ? `<div class="pager">
   ${page2 < pages ? `<a href="${keepControls(action, c, { page: String(page2 + 1) })}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a>` : ""}
 </div>` : ""}`;
 }
+
+// server/pages/feed.ts
+var HELP = `<details class="help">
+  <summary>\u042F\u043A \u0447\u0438\u0442\u0430\u0442\u0438 \u0446\u044E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443</summary>
+  <div class="inner">
+    <p>\u041A\u043E\u0436\u0435\u043D \u0440\u044F\u0434\u043E\u043A \u2014 \u0446\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F, \u0443 \u044F\u043A\u0456\u0439 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443. \u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u0441\u0430\u043C\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0442\u0430\u043A\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456; \u043C\u0438 \u043B\u0438\u0448\u0435 \u0437\u0431\u0438\u0440\u0430\u0454\u043C\u043E \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u043F\u043E ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u044F\u0445 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0439 \u043F\u043E\u043A\u0430\u0437\u0443\u0454\u043C\u043E \u0457\u0445 \u0437\u0440\u043E\u0437\u0443\u043C\u0456\u043B\u043E.</p>
+    <p>\u0427\u0435\u0440\u0432\u043E\u043D\u0456 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u2014 \u0442\u0435, \u043D\u0430 \u0449\u043E \u0432\u0430\u0440\u0442\u043E \u0433\u043B\u044F\u043D\u0443\u0442\u0438 \u043F\u0435\u0440\u0448\u0438\u043C: \u0454\u0434\u0438\u043D\u0438\u0439 \u0443\u0447\u0430\u0441\u043D\u0438\u043A \u043D\u0430 \u0432\u0435\u043B\u0438\u043A\u0438\u0445 \u0442\u043E\u0440\u0433\u0430\u0445, \u0441\u0443\u043C\u0430 \u043F\u043E\u043D\u0430\u0434 \u043C\u0456\u043B\u044C\u044F\u0440\u0434, \u043A\u0456\u043B\u044C\u043A\u0430 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u043E\u0434\u0440\u0430\u0437\u0443.</p>
+    <p>\u0421\u0456\u0440\u0456 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u2014 \u0449\u043E \u0441\u0430\u043C\u0435 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430. \u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u043D\u0430 \u0431\u0443\u0434\u044C-\u044F\u043A\u0443, \u0449\u043E\u0431 \u043F\u043E\u0431\u0430\u0447\u0438\u0442\u0438 \u0432\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u0442\u0456\u0454\u044E \u0441\u0430\u043C\u043E\u044E \u043E\u0437\u043D\u0430\u043A\u043E\u044E.</p>
+    <p><strong>\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043D\u0435 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</strong> \u0426\u0435 \u043F\u0456\u0434\u0441\u0442\u0430\u0432\u0430 \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u0439 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0457\u0457 \u043B\u044E\u0434\u0438\u043D\u043E\u044E.</p>
+  </div>
+</details>`;
+var PRIMER = `<div class="primer">
+  <span><b>1</b> \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u043F\u0456\u0434\u043E\u0437\u0440\u0456\u043B\u0456</span>
+  <span><b>2</b> \u043C\u0438 \u043F\u043E\u044F\u0441\u043D\u044E\u0454\u043C\u043E \u0456 \u0440\u0430\u0445\u0443\u0454\u043C\u043E \u0446\u0456\u043D\u0443</span>
+  <span><b>3</b> \u0443 \u043A\u043E\u0436\u043D\u0456\u0439 \u2014 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0456 \u0437\u0432\u0456\u0442</span>
+  <a href="/about">\u0414\u043E\u043A\u043B\u0430\u0434\u043D\u0456\u0448\u0435</a>
+</div>`;
 function feedPage(url) {
   const c = readControls(url);
-  const list = applyControls(db.cases, c, RAILWAY_EDRPOU);
+  const list = applyControls(dataset().cases, c, RAILWAY_EDRPOU);
   return layout({
     title: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
     nav: "feed",
@@ -2316,17 +2427,15 @@ function feedPage(url) {
 <p class="sub">\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432\u0441\u0456\u0454\u0457 \u0423\u043A\u0440\u0430\u0457\u043D\u0438, \u044F\u043A\u0456 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u044F\u043A \u043F\u0456\u0434\u043E\u0437\u0440\u0456\u043B\u0456.</p>
 
 <p class="statline">
-  <b>${db.cases.length.toLocaleString("uk-UA")}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \xB7
-  <b>${shortMoney(db.totalValue)}</b> \xB7
-  <b>${db.flagCount.toLocaleString("uk-UA")}</b> \u043E\u0437\u043D\u0430\u043A \xB7
-  <b>${db.findingCount.toLocaleString("uk-UA")}</b> \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442
+  <b>${dataset().cases.length.toLocaleString("uk-UA")}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \xB7
+  <b>${shortMoney(dataset().totalValue)}</b> \xB7
+  <b>${dataset().flagCount.toLocaleString("uk-UA")}</b> \u043E\u0437\u043D\u0430\u043A \xB7
+  <b>${dataset().findingCount.toLocaleString("uk-UA")}</b> \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442
 </p>
 
 ${PRIMER}
 
-${presetBar("/", url, c)}
-${sortBar("/", c)}
-${filterPanel("/", c)}
+${controlBar("/", c, {}, { url })}
 
 ${c.risk ? riskCard(c.risk) : ""}
 
@@ -2336,8 +2445,10 @@ ${listBody(list, c, "/")}
 `
   });
 }
+
+// server/components/verdict.ts
 function qualificationBlock(entry) {
-  const q = buildQualification(entry, db.ruleById);
+  const q = buildQualification(entry, dataset().ruleById);
   return `<p class="caution">${esc(q.caution)}</p>
 
 <h3 class="block-head">\u041D\u043E\u0440\u043C\u0438, \u044F\u043A\u0456 \u0437\u0430\u0447\u0435\u043F\u043B\u0435\u043D\u0456</h3>
@@ -2406,13 +2517,158 @@ function conclusionBlock(entry, sameEntity, sameOfficer, sameWinner) {
   <p class="faint">\u0426\u0435\u0439 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0441\u043A\u043B\u0430\u043B\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0437 \u0447\u0438\u0441\u0435\u043B, \u043D\u0430\u0432\u0435\u0434\u0435\u043D\u0438\u0445 \u0432\u0438\u0449\u0435. \u0412\u0456\u043D \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0456 \u043D\u0435 \u0454 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u0454\u044E \u0434\u0456\u0439 \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u043E\u0441\u043E\u0431\u0438.</p>
 </div>`;
 }
+
+// server/pages/static.ts
+function starredPage(saved, url) {
+  const tenders = saved.filter((f) => f.kind === "tender").map((f) => dataset().byTender.get(f.id)).filter((c2) => Boolean(c2));
+  const missingTenders = saved.filter((f) => f.kind === "tender").length - tenders.length;
+  const c = readControls(url);
+  const filteredTenders = applyControls(tenders, c, RAILWAY_EDRPOU);
+  const companyRows = saved.filter((f) => f.kind === "entity" || f.kind === "supplier").map((f) => {
+    const list = f.kind === "entity" ? dataset().cases.filter((c2) => c2.entity_edrpou === f.id) : dataset().cases.filter((c2) => c2.winner_edrpou === f.id);
+    const name = f.kind === "entity" ? list.find((c2) => c2.entity_name)?.entity_name : list.find((c2) => c2.winner_name)?.winner_name;
+    return {
+      fav: f,
+      href: `/${f.kind === "entity" ? "entity" : "supplier"}/${encodeURIComponent(f.id)}`,
+      name: readableName(name ?? "") || f.id,
+      role: f.kind === "entity" ? "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A" : "\u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A",
+      count: list.length,
+      value: list.reduce((sum2, c2) => sum2 + (c2.value_amount ?? 0), 0)
+    };
+  });
+  const officerRows = saved.filter((f) => f.kind === "officer").map((f) => {
+    const list = dataset().cases.filter((c2) => c2.officer_key === f.id);
+    return {
+      fav: f,
+      href: `/officer/${encodeURIComponent(f.id)}`,
+      name: list.find((c2) => c2.officer_name)?.officer_name ?? f.id,
+      entity: readableName(list.find((c2) => c2.entity_name)?.entity_name ?? ""),
+      count: list.length,
+      value: list.reduce((sum2, c2) => sum2 + (c2.value_amount ?? 0), 0)
+    };
+  });
+  const section = (title, count, inner) => count === 0 ? "" : `<h2>${esc(title)} \u2014 ${count}</h2>${inner}`;
+  return layout({
+    title: "\u041E\u0431\u0440\u0430\u043D\u0435",
+    nav: "starred",
+    body: `
+<h1>\u041E\u0431\u0440\u0430\u043D\u0435</h1>
+<p class="sub">\u0423\u0441\u0435, \u0449\u043E \u0432\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0438 \u0437\u0456\u0440\u043E\u0447\u043A\u043E\u044E: \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438, \u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A\u0438, \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456. \u0421\u043F\u0438\u0441\u043E\u043A \u0437\u0431\u0435\u0440\u0456\u0433\u0430\u0454\u0442\u044C\u0441\u044F \u0443 \u0432\u0430\u0448\u043E\u043C\u0443 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0456 \u0439 \u043D\u0435 \u043F\u0440\u0438\u0432'\u044F\u0437\u0430\u043D\u0438\u0439 \u0434\u043E \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u043E\u0433\u043E \u0437\u0430\u043F\u0438\u0441\u0443.</p>
+
+<form class="filters" method="get" action="/lookup">
+  <div class="filter-row">
+    <input type="search" name="edrpou" placeholder="\u0417\u043D\u0430\u0439\u0442\u0438 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423 \u2014 \u043D\u0430\u043F\u0440\u0438\u043A\u043B\u0430\u0434, 00131954" aria-label="\u0404\u0414\u0420\u041F\u041E\u0423" inputmode="numeric">
+    <button type="submit">\u0417\u043D\u0430\u0439\u0442\u0438</button>
+  </div>
+</form>
+
+${saved.length === 0 ? `<div class="empty">\u041F\u043E\u043A\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E. \u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u2606 \u0431\u0456\u043B\u044F \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457 \u0447\u0438 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u044F.</div>` : ""}
+
+${section(
+      "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
+      tenders.length,
+      `${controlBar("/starred", c)}${listBody(filteredTenders, c, "/starred")}${missingTenders > 0 ? `<p class="note">${missingTenders} ${plural(missingTenders, "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0430", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0456", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E")} \u0432 \u0431\u0430\u0437\u0456.</p>` : ""}`
+    )}
+
+${section(
+      "\u041A\u043E\u043C\u043F\u0430\u043D\u0456\u0457",
+      companyRows.length,
+      `<div class="rows">${companyRows.map(
+        (r) => `<div class="row">
+  <div class="who">
+    <div class="name">${star(r.fav.kind, r.fav.id, "/starred")}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="meta">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(r.fav.id)} \xB7 ${esc(r.role)} \xB7 ${r.count} ${plural(r.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
+</div>`
+      ).join("")}</div>`
+    )}
+
+${section(
+      "\u041F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
+      officerRows.length,
+      `<div class="rows">${officerRows.map(
+        (r) => `<div class="row">
+  <div class="who">
+    <div class="name">${star("officer", r.fav.id, "/starred")}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="meta">${esc(r.entity)} \xB7 ${r.count} ${plural(r.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
+</div>`
+      ).join("")}</div>`
+    )}
+`
+  });
+}
+function indicatorsPage() {
+  const counted = new Map(rankRisks(dataset().cases));
+  const ranked = dataset().rules.map((r) => [r.risk_id, counted.get(r.risk_id) ?? 0]).sort((a, b) => b[1] - a[1]);
+  return layout({
+    title: "\u0429\u043E \u043C\u0438 \u0448\u0443\u043A\u0430\u0454\u043C\u043E",
+    nav: "indicators",
+    body: `
+<h1>\u0429\u043E \u043C\u0438 \u0448\u0443\u043A\u0430\u0454\u043C\u043E</h1>
+<p class="sub">\u0427\u043E\u0442\u0438\u0440\u043D\u0430\u0434\u0446\u044F\u0442\u044C \u043E\u0437\u043D\u0430\u043A, \u0437\u0430 \u044F\u043A\u0438\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u043A\u043E\u0436\u043D\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0449\u043E \u043A\u043E\u0436\u043D\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u043E\u044E \u043C\u043E\u0432\u043E\u044E \u0456 \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0440\u0430\u0437\u0456\u0432 \u0432\u043E\u043D\u0430 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0430 \u0432 ${esc(REGION)} \u0442\u0430 \u043D\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456.</p>
+${groupedRiskCards(ranked)}
+`
+  });
+}
+function aboutPage() {
+  return layout({
+    title: "\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443",
+    nav: "about",
+    body: `
+<h1>\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443</h1>
+<p class="sub">\u0429\u043E \u043F\u043E\u043A\u0430\u0437\u0443\u0454 \u0446\u0435\u0439 \u0441\u0430\u0439\u0442, \u0437\u0432\u0456\u0434\u043A\u0438 \u0431\u0435\u0440\u0435 \u0434\u0430\u043D\u0456 \u0456 \u0447\u043E\u0433\u043E \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C.</p>
+
+<div class="card">
+  <h3>\u0417\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456</h3>
+  <p class="lead">\u0414\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u0438\u0445 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u0440\u0438\u0437\u0438\u043A\u0443 Prozorro \u2014 \u043D\u0430\u043A\u0430\u0437 \u041C\u0456\u043D\u0444\u0456\u043D\u0443 \u2116 476 \u0432\u0456\u0434 27 \u0432\u0435\u0440\u0435\u0441\u043D\u044F 2024 \u0440\u043E\u043A\u0443. \u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u043A\u043E\u0436\u043D\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u0437\u0430 \u0447\u0438\u043D\u043D\u0438\u043C \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u043E\u043C \u043E\u0437\u043D\u0430\u043A \u0456 \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u043E.</p>
+  <p>\u041C\u0438 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u043C\u043E \u0446\u0435\u0439 \u043C\u0430\u0441\u0438\u0432, \u0432\u0456\u0434\u0431\u0438\u0440\u0430\u0454\u043C\u043E ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0457 \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB, \u0434\u043E\u043F\u043E\u0432\u043D\u044E\u0454\u043C\u043E \u043A\u0430\u0440\u0442\u043A\u0430\u043C\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 Prozorro \u2014 \u0437\u0432\u0456\u0434\u043A\u0438 \u0431\u0435\u0440\u0435\u043C\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0443 \u043E\u0441\u043E\u0431\u0443, \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432 \u0456 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u2014 \u0456 \u043F\u043E\u0434\u0430\u0454\u043C\u043E \u0442\u0430\u043A, \u0449\u043E\u0431 \u0437 \u0446\u0438\u043C \u043C\u043E\u0436\u043D\u0430 \u0431\u0443\u043B\u043E \u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0442\u0438.</p>
+</div>
+
+<div class="card">
+  <h3>\u0422\u0440\u0438 \u0440\u0456\u0432\u043D\u0456 \u0434\u043E\u0441\u0442\u043E\u0432\u0456\u0440\u043D\u043E\u0441\u0442\u0456</h3>
+  <p><span class="tier confirmed">\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430</span> &nbsp;\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u043F\u0440\u043E\u0432\u0435\u043B\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u0456 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
+  <p><span class="tier state">\u041F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430</span> &nbsp;\u0421\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438. \u0426\u0435 \u043F\u0456\u0434\u043E\u0437\u0440\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0438 \u0437 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F\u043C \u043D\u0430 \u043D\u043E\u0440\u043C\u0443 \u0437\u0430\u043A\u043E\u043D\u0443 \u2014 \u0441\u0430\u043C\u0435 \u0446\u0435 \u043F\u043E\u043A\u0430\u0437\u0430\u043D\u043E \u043D\u0430 \u0441\u0430\u0439\u0442\u0456 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456.</p>
+  <p><span class="tier own">\u041F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043C\u0438</span> &nbsp;\u041D\u0430\u0448 \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A: \u0446\u0456\u043D\u0430 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E \u043F\u0440\u043E\u0442\u0438 \u043A\u0430\u0442\u0430\u043B\u043E\u0436\u043D\u043E\u0457. \u041F\u0456\u0434\u043A\u043B\u044E\u0447\u0430\u0454\u0442\u044C\u0441\u044F \u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0438\u043C \u0435\u0442\u0430\u043F\u043E\u043C.</p>
+  <p>\u041D\u0438\u0436\u0447\u0438\u0439 \u0440\u0456\u0432\u0435\u043D\u044C \u043D\u0456\u043A\u043E\u043B\u0438 \u043D\u0435 \u043F\u043E\u0434\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A \u0432\u0438\u0449\u0438\u0439.</p>
+</div>
+
+<div class="card">
+  <h3>\u041F\u0440\u043E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456\u0432</h3>
+  <p>\u0406\u043C'\u044F, \u043F\u043E\u0448\u0442\u0430 \u0439 \u0442\u0435\u043B\u0435\u0444\u043E\u043D \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438 \u0432\u0437\u044F\u0442\u0456 \u0437 \u043A\u0430\u0440\u0442\u043A\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432 Prozorro, \u0434\u0435 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0441\u0430\u043C \u0457\u0445 \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454. \u041E\u0434\u043D\u0443 \u043B\u044E\u0434\u0438\u043D\u0443 \u043C\u0456\u0436 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438 \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043E \u0437\u0430 \u043F\u043E\u0448\u0442\u043E\u044E, \u0431\u043E \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044F \u0456\u043C\u0435\u043D\u0456 \u0440\u0456\u0437\u043D\u0438\u0442\u044C\u0441\u044F.</p>
+  <p>\u0421\u0442\u043E\u0440\u0456\u043D\u043A\u0430 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u044F \u043F\u043E\u043A\u0430\u0437\u0443\u0454, \u0443 \u0441\u043A\u0456\u043B\u044C\u043A\u043E\u0445 \u0439\u043E\u0433\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0456 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438 \u0456 \u0437\u0430 \u044F\u043A\u0438\u043C\u0438 \u043D\u043E\u0440\u043C\u0430\u043C\u0438 \u0437\u0430\u043A\u043E\u043D\u0443. <strong>\u0426\u0435 \u043D\u0435 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432\u0438\u043D\u0430.</strong></p>
+</div>
+
+<div class="card">
+  <h3>\u0427\u043E\u043C\u0443 \u0442\u0443\u0442 \u043D\u0435\u043C\u0430\u0454 \u0441\u0443\u0434\u0438\u043C\u043E\u0441\u0442\u0435\u0439</h3>
+  <p>\u0404\u0434\u0438\u043D\u0438\u0439 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u0439 \u0440\u0435\u0454\u0441\u0442\u0440 \u0441\u0443\u0434\u043E\u0432\u0438\u0445 \u0440\u0456\u0448\u0435\u043D\u044C \u0437\u0430\u043A\u0440\u0438\u0442\u0438\u0439 CAPTCHA, \u0430 \u0432 \u0442\u0435\u043A\u0441\u0442\u0430\u0445 \u043A\u0440\u0438\u043C\u0456\u043D\u0430\u043B\u044C\u043D\u0438\u0445 \u0440\u0456\u0448\u0435\u043D\u044C \u0456\u043C\u0435\u043D\u0430 \u0437\u0430\u043C\u0456\u043D\u0435\u043D\u0456 \u043D\u0430 \xAB\u041E\u0421\u041E\u0411\u0410_1\xBB \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u043D\u043E \u0434\u043E \u0437\u0430\u043A\u043E\u043D\u043E\u0434\u0430\u0432\u0441\u0442\u0432\u0430 \u043F\u0440\u043E \u0437\u0430\u0445\u0438\u0441\u0442 \u043F\u0435\u0440\u0441\u043E\u043D\u0430\u043B\u044C\u043D\u0438\u0445 \u0434\u0430\u043D\u0438\u0445. \u0417\u0456\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456\u0437 \u043B\u044E\u0434\u0438\u043D\u043E\u044E \u0437\u0430 \u0437\u0431\u0456\u0433\u043E\u043C \u043F\u0440\u0456\u0437\u0432\u0438\u0449\u0430 \u043D\u0435\u043C\u043E\u0436\u043B\u0438\u0432\u043E \u043D\u0430\u0434\u0456\u0439\u043D\u043E, \u0430 \u043F\u043E\u043C\u0438\u043B\u043A\u0430 \u0442\u0443\u0442 \u2014 \u0446\u0435 \u0437\u0432\u0438\u043D\u0443\u0432\u0430\u0447\u0435\u043D\u043D\u044F \u043D\u0435\u0432\u0438\u043D\u043D\u043E\u0433\u043E.</p>
+  <p>\u0422\u043E\u043C\u0443 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454 \u043B\u0438\u0448\u0435 \u0442\u0435, \u0449\u043E \u043C\u043E\u0436\u043D\u0430 \u0434\u043E\u0432\u0435\u0441\u0442\u0438: \u044F\u043A\u0456 \u043E\u0437\u043D\u0430\u043A\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0432\u0438\u044F\u0432\u0438\u043B\u0430 \u0432 \u043A\u043E\u043D\u043A\u0440\u0435\u0442\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u043A\u043E\u043D\u043A\u0440\u0435\u0442\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438.</p>
+</div>
+
+<div class="card">
+  <h3>\u0427\u043E\u0433\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C</h3>
+  <p>\u0412\u043E\u043D\u0430 \u043D\u0435 \u043E\u0433\u043E\u043B\u043E\u0448\u0443\u0454 \u0432\u0438\u043D\u0443 \u0456 \u043D\u0435 \u043D\u0430\u0437\u0438\u0432\u0430\u0454 \u0436\u043E\u0434\u043D\u0443 \u0444\u0456\u0440\u043C\u0443 \u0447\u0438 \u043B\u044E\u0434\u0438\u043D\u0443 \u0437\u043B\u043E\u0447\u0438\u043D\u0446\u0435\u043C. \u0412\u043E\u043D\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454 \u043E\u0437\u043D\u0430\u043A\u0438 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0456 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u044E\u0442\u044C \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0456 \u0437\u0430\u0432\u0436\u0434\u0438 \u0434\u0430\u0454 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u043D\u0430 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E, \u0449\u043E\u0431 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u043C\u043E\u0436\u043D\u0430 \u0431\u0443\u043B\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0432\u0440\u0443\u0447\u043D\u0443.</p>
+</div>
+`
+  });
+}
+function notFound() {
+  return layout({
+    title: "\u041D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E",
+    body: `<h1>\u041D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E</h1><p class="sub">\u0422\u0430\u043A\u043E\u0457 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438 \u043D\u0435\u043C\u0430\u0454. <a href="/">\u0414\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u043D\u0430\u0445\u0456\u0434\u043E\u043A \u2192</a></p>`
+  });
+}
+
+// server/pages/tender.ts
 function tenderPage(tenderId) {
-  const entry = db.byTender.get(tenderId);
+  const entry = dataset().byTender.get(tenderId);
   if (!entry) return notFound();
-  const sameEntity = db.cases.filter((c) => c.entity_edrpou && c.entity_edrpou === entry.entity_edrpou);
-  const sameOfficer = entry.officer_key ? db.cases.filter((c) => c.officer_key === entry.officer_key) : [];
+  const sameEntity = dataset().cases.filter((c) => c.entity_edrpou && c.entity_edrpou === entry.entity_edrpou);
+  const sameOfficer = entry.officer_key ? dataset().cases.filter((c) => c.officer_key === entry.officer_key) : [];
   const officerValue = sameOfficer.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
-  const sameWinner = entry.winner_edrpou ? db.cases.filter((c) => c.winner_edrpou === entry.winner_edrpou) : [];
+  const sameWinner = entry.winner_edrpou ? dataset().cases.filter((c) => c.winner_edrpou === entry.winner_edrpou) : [];
   const winnerValue = sameWinner.reduce((sum2, c) => sum2 + (c.winner_amount ?? c.value_amount ?? 0), 0);
   const title = entry.title || readableName(entry.entity_name) || "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F";
   const signals = alarms(entry);
@@ -2509,100 +2765,11 @@ ${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
 `
   });
 }
-function officerPage(key, url) {
-  const dossierAction = `/officer/${encodeURIComponent(key)}`;
-  const list = db.cases.filter((c) => c.officer_key === key);
-  if (list.length === 0) return notFound();
-  const name = list.find((c) => c.officer_name)?.officer_name ?? key;
-  const email = list.find((c) => c.officer_email)?.officer_email ?? null;
-  const phone = list.find((c) => c.officer_phone)?.officer_phone ?? null;
-  const entity = list.find((c) => c.entity_name)?.entity_name ?? null;
-  const entityEdrpou = list.find((c) => c.entity_edrpou)?.entity_edrpou ?? "";
-  const value = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
-  const solo = list.filter((c) => c.bidders === 1).length;
-  const ranked = rankRisks(list);
-  const ctrl = readControls(url);
-  const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
-  return layout({
-    title: name,
-    nav: "officers",
-    body: `
-<a class="back" href="/officers">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456\u0432</a>
-${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
-<h1>${esc(name)}</h1>
-<p class="sub">\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0430 \u043E\u0441\u043E\u0431\u0430 \u0432 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445${entity ? ` \u2014 ${esc(readableName(entity))}` : ""}.</p>
 
-<p class="statline">
-  <b>${list.length}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043F\u0456\u0434 \u043F\u0438\u0442\u0430\u043D\u043D\u044F\u043C \xB7
-  <b>${shortMoney(value)}</b> \u0437\u0430\u0433\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430 \xB7
-  <b>${solo}</b> \u0437 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
-  <b>${ranked.length}</b> \u0440\u0456\u0437\u043D\u0438\u0445 \u043E\u0437\u043D\u0430\u043A
-</p>
-
-<div class="card">
-  <dl class="facts">
-    <dt>\u041F\u043E\u0448\u0442\u0430</dt><dd>${esc(email ?? "\u2014")}</dd>
-    <dt>\u0422\u0435\u043B\u0435\u0444\u043E\u043D</dt><dd>${esc(phone ?? "\u2014")}</dd>
-    <dt>\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0430</dt><dd><a href="/entity/${encodeURIComponent(entityEdrpou)}">${esc(readableName(entity))}</a></dd>
-  </dl>
-  <p class="faint" style="margin-top:.9rem">\u0414\u0430\u043D\u0456 \u0432\u0437\u044F\u0442\u043E \u0437 \u043A\u0430\u0440\u0442\u043E\u043A \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0443 Prozorro, \u0434\u0435 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0441\u0430\u043C \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0443 \u043E\u0441\u043E\u0431\u0443. \u041E\u0434\u043D\u0443 \u043B\u044E\u0434\u0438\u043D\u0443 \u043C\u0456\u0436 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438 \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043E \u0437\u0430 \u043F\u043E\u0448\u0442\u043E\u044E \u2014 \u0432\u043E\u043D\u0430 \u0441\u0442\u0430\u0431\u0456\u043B\u044C\u043D\u0456\u0448\u0430 \u0437\u0430 \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044F \u0456\u043C\u0435\u043D\u0456.</p>
-</div>
-
-<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0457\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
-<p class="hint">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0437\u043D\u0430\u043A, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438. <strong>\u041D\u0435 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432\u0438\u043D\u0430.</strong></p>
-${groupedRiskCards(ranked)}
-
-<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
-${sortBar(dossierAction, ctrl)}
-${filterPanel(dossierAction, ctrl)}
-${listBody(shown, ctrl, dossierAction, { showOfficer: false })}
-
-<p class="note">\u0426\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 \u043D\u0435 \u0454 \u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F\u043C \u043F\u0440\u043E \u043F\u0440\u0430\u0432\u043E\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0437 \u0431\u043E\u043A\u0443 \u043D\u0430\u0437\u0432\u0430\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438. \u0412\u043E\u043D\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454, \u0449\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0443 \u044F\u043A\u0438\u0445 \u0446\u044E \u043E\u0441\u043E\u0431\u0443 \u0432\u043A\u0430\u0437\u0430\u043D\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u043E\u044E \u043E\u0441\u043E\u0431\u043E\u044E.</p>
-`
-  });
-}
-function supplierPage(edrpou, url) {
-  const dossierAction = `/supplier/${encodeURIComponent(edrpou)}`;
-  const list = db.cases.filter((c) => c.winner_edrpou === edrpou);
-  if (list.length === 0) return notFound();
-  const name = list.find((c) => c.winner_name)?.winner_name ?? edrpou;
-  const value = list.reduce((sum2, c) => sum2 + (c.winner_amount ?? c.value_amount ?? 0), 0);
-  const ranked = rankRisks(list);
-  const buyers = new Set(list.map((c) => c.entity_edrpou).filter(Boolean));
-  const solo = list.filter((c) => c.bidders === 1).length;
-  const ctrl = readControls(url);
-  const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
-  return layout({
-    title: name,
-    nav: "suppliers",
-    body: `
-<a class="back" href="/suppliers">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456\u0432</a>
-<h1>${esc(readableName(name))}</h1>
-<p class="sub">\u041F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A \xB7 \u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)}</p>
-${star("supplier", edrpou, "/supplier/" + encodeURIComponent(edrpou), { label: true })}
-
-<p class="statline">
-  <b>${list.length}</b> \u043F\u0435\u0440\u0435\u043C\u043E\u0433 \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \xB7
-  <b>${shortMoney(value)}</b> \u0441\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0456\u0432 \xB7
-  <b>${solo}</b> \u0434\u0435 \u0431\u0443\u0432 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
-  <b>${buyers.size}</b> \u0440\u0456\u0437\u043D\u0438\u0445 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432
-</p>
-
-<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0446\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
-${groupedRiskCards(ranked)}
-
-<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
-${sortBar(dossierAction, ctrl)}
-${filterPanel(dossierAction, ctrl)}
-${listBody(shown, ctrl, dossierAction)}
-
-<p class="note">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0445\u043E\u043F\u043B\u044E\u0454 \u043B\u0438\u0448\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0439 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456, \u044F\u043A\u0456 \u0432\u0436\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E. \u0426\u0435 \u043D\u0435 \u043F\u043E\u0432\u043D\u0430 \u0456\u0441\u0442\u043E\u0440\u0456\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457 \u043F\u043E \u0423\u043A\u0440\u0430\u0457\u043D\u0456.</p>
-`
-  });
-}
+// server/pages/entity.ts
 function entityPage(edrpou, url) {
   const dossierAction = `/entity/${encodeURIComponent(edrpou)}`;
-  const list = db.cases.filter((c) => c.entity_edrpou === edrpou);
+  const list = dataset().cases.filter((c) => c.entity_edrpou === edrpou);
   if (list.length === 0) return notFound();
   const name = list.find((c) => c.entity_name)?.entity_name ?? edrpou;
   const value = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
@@ -2652,12 +2819,106 @@ ${rankedOfficers.map(
 ${groupedRiskCards(ranked)}
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
-${sortBar(dossierAction, ctrl)}
-${filterPanel(dossierAction, ctrl)}
+${controlBar(dossierAction, ctrl)}
 ${listBody(shown, ctrl, dossierAction, { showEntity: false })}
 `
   });
 }
+
+// server/pages/officer.ts
+function officerPage(key, url) {
+  const dossierAction = `/officer/${encodeURIComponent(key)}`;
+  const list = dataset().cases.filter((c) => c.officer_key === key);
+  if (list.length === 0) return notFound();
+  const name = list.find((c) => c.officer_name)?.officer_name ?? key;
+  const email = list.find((c) => c.officer_email)?.officer_email ?? null;
+  const phone = list.find((c) => c.officer_phone)?.officer_phone ?? null;
+  const entity = list.find((c) => c.entity_name)?.entity_name ?? null;
+  const entityEdrpou = list.find((c) => c.entity_edrpou)?.entity_edrpou ?? "";
+  const value = list.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+  const solo = list.filter((c) => c.bidders === 1).length;
+  const ranked = rankRisks(list);
+  const ctrl = readControls(url);
+  const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
+  return layout({
+    title: name,
+    nav: "officers",
+    body: `
+<a class="back" href="/officers">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456\u0432</a>
+${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
+<h1>${esc(name)}</h1>
+<p class="sub">\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0430 \u043E\u0441\u043E\u0431\u0430 \u0432 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445${entity ? ` \u2014 ${esc(readableName(entity))}` : ""}.</p>
+
+<p class="statline">
+  <b>${list.length}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043F\u0456\u0434 \u043F\u0438\u0442\u0430\u043D\u043D\u044F\u043C \xB7
+  <b>${shortMoney(value)}</b> \u0437\u0430\u0433\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430 \xB7
+  <b>${solo}</b> \u0437 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
+  <b>${ranked.length}</b> \u0440\u0456\u0437\u043D\u0438\u0445 \u043E\u0437\u043D\u0430\u043A
+</p>
+
+<div class="card">
+  <dl class="facts">
+    <dt>\u041F\u043E\u0448\u0442\u0430</dt><dd>${esc(email ?? "\u2014")}</dd>
+    <dt>\u0422\u0435\u043B\u0435\u0444\u043E\u043D</dt><dd>${esc(phone ?? "\u2014")}</dd>
+    <dt>\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0430</dt><dd><a href="/entity/${encodeURIComponent(entityEdrpou)}">${esc(readableName(entity))}</a></dd>
+  </dl>
+  <p class="faint" style="margin-top:.9rem">\u0414\u0430\u043D\u0456 \u0432\u0437\u044F\u0442\u043E \u0437 \u043A\u0430\u0440\u0442\u043E\u043A \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0443 Prozorro, \u0434\u0435 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0441\u0430\u043C \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0443 \u043E\u0441\u043E\u0431\u0443. \u041E\u0434\u043D\u0443 \u043B\u044E\u0434\u0438\u043D\u0443 \u043C\u0456\u0436 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438 \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043E \u0437\u0430 \u043F\u043E\u0448\u0442\u043E\u044E \u2014 \u0432\u043E\u043D\u0430 \u0441\u0442\u0430\u0431\u0456\u043B\u044C\u043D\u0456\u0448\u0430 \u0437\u0430 \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044F \u0456\u043C\u0435\u043D\u0456.</p>
+</div>
+
+<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0457\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
+<p class="hint">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0437\u043D\u0430\u043A, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438. <strong>\u041D\u0435 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432\u0438\u043D\u0430.</strong></p>
+${groupedRiskCards(ranked)}
+
+<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
+${controlBar(dossierAction, ctrl)}
+${listBody(shown, ctrl, dossierAction, { showOfficer: false })}
+
+<p class="note">\u0426\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 \u043D\u0435 \u0454 \u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F\u043C \u043F\u0440\u043E \u043F\u0440\u0430\u0432\u043E\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0437 \u0431\u043E\u043A\u0443 \u043D\u0430\u0437\u0432\u0430\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438. \u0412\u043E\u043D\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454, \u0449\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0443 \u044F\u043A\u0438\u0445 \u0446\u044E \u043E\u0441\u043E\u0431\u0443 \u0432\u043A\u0430\u0437\u0430\u043D\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u043E\u044E \u043E\u0441\u043E\u0431\u043E\u044E.</p>
+`
+  });
+}
+
+// server/pages/supplier.ts
+function supplierPage(edrpou, url) {
+  const dossierAction = `/supplier/${encodeURIComponent(edrpou)}`;
+  const list = dataset().cases.filter((c) => c.winner_edrpou === edrpou);
+  if (list.length === 0) return notFound();
+  const name = list.find((c) => c.winner_name)?.winner_name ?? edrpou;
+  const value = list.reduce((sum2, c) => sum2 + (c.winner_amount ?? c.value_amount ?? 0), 0);
+  const ranked = rankRisks(list);
+  const buyers = new Set(list.map((c) => c.entity_edrpou).filter(Boolean));
+  const solo = list.filter((c) => c.bidders === 1).length;
+  const ctrl = readControls(url);
+  const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
+  return layout({
+    title: name,
+    nav: "suppliers",
+    body: `
+<a class="back" href="/suppliers">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456\u0432</a>
+<h1>${esc(readableName(name))}</h1>
+<p class="sub">\u041F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A \xB7 \u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)}</p>
+${star("supplier", edrpou, "/supplier/" + encodeURIComponent(edrpou), { label: true })}
+
+<p class="statline">
+  <b>${list.length}</b> \u043F\u0435\u0440\u0435\u043C\u043E\u0433 \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \xB7
+  <b>${shortMoney(value)}</b> \u0441\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0456\u0432 \xB7
+  <b>${solo}</b> \u0434\u0435 \u0431\u0443\u0432 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
+  <b>${buyers.size}</b> \u0440\u0456\u0437\u043D\u0438\u0445 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432
+</p>
+
+<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0446\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
+${groupedRiskCards(ranked)}
+
+<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
+${controlBar(dossierAction, ctrl)}
+${listBody(shown, ctrl, dossierAction)}
+
+<p class="note">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0445\u043E\u043F\u043B\u044E\u0454 \u043B\u0438\u0448\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0439 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456, \u044F\u043A\u0456 \u0432\u0436\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E. \u0426\u0435 \u043D\u0435 \u043F\u043E\u0432\u043D\u0430 \u0456\u0441\u0442\u043E\u0440\u0456\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457 \u043F\u043E \u0423\u043A\u0440\u0430\u0457\u043D\u0456.</p>
+`
+  });
+}
+
+// server/components/directory.ts
 var DIR_SORTS = [
   { value: "value", label: "\u0437\u0430 \u0441\u0443\u043C\u043E\u044E, \u0441\u043F\u0430\u0434\u0430\u043D\u043D\u044F" },
   { value: "value-asc", label: "\u0437\u0430 \u0441\u0443\u043C\u043E\u044E, \u0437\u0440\u043E\u0441\u0442\u0430\u043D\u043D\u044F" },
@@ -2730,9 +2991,11 @@ ${rows.length > 150 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043
 `
   });
 }
+
+// server/pages/entities.ts
 function entitiesPage(url) {
   const byEntity = /* @__PURE__ */ new Map();
-  for (const entry of db.cases) {
+  for (const entry of dataset().cases) {
     const key = entry.entity_edrpou ?? "";
     if (!key) continue;
     const acc = byEntity.get(key) ?? { name: entry.entity_name ?? key, count: 0, value: 0 };
@@ -2758,9 +3021,11 @@ function entitiesPage(url) {
     }))
   });
 }
+
+// server/pages/officers.ts
 function officersPage(url) {
   const byOfficer = /* @__PURE__ */ new Map();
-  for (const entry of db.cases) {
+  for (const entry of dataset().cases) {
     if (!entry.officer_key) continue;
     const acc = byOfficer.get(entry.officer_key) ?? {
       name: entry.officer_name ?? entry.officer_key,
@@ -2790,9 +3055,11 @@ function officersPage(url) {
     }))
   });
 }
+
+// server/pages/suppliers.ts
 function suppliersPage(url) {
   const bySupplier = /* @__PURE__ */ new Map();
-  for (const entry of db.cases) {
+  for (const entry of dataset().cases) {
     const key = entry.winner_edrpou ?? "";
     if (!key) continue;
     const acc = bySupplier.get(key) ?? { name: entry.winner_name ?? key, count: 0, value: 0, solo: 0 };
@@ -2819,9 +3086,11 @@ function suppliersPage(url) {
     }))
   });
 }
+
+// server/pages/railway.ts
 function railwayBlocks() {
   const by = /* @__PURE__ */ new Map();
-  for (const entry of db.cases) {
+  for (const entry of dataset().cases) {
     const scope = railwayScope(entry);
     if (!scope) continue;
     const list = by.get(scope) ?? [];
@@ -2894,9 +3163,7 @@ function railwayPage(url) {
 </details>
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456</h2>
-${presetBar("/railway", url, c)}
-${sortBar("/railway", c)}
-${filterPanel("/railway", c, { hideRail: true })}
+${controlBar("/railway", c, { hideRail: true }, { url })}
 ${listBody(filtered, c, "/railway")}
 
 <h2>\u0425\u0442\u043E \u0437\u0430\u043A\u0443\u043F\u043E\u0432\u0443\u0454</h2>
@@ -2954,6 +3221,8 @@ ${topSuppliers.map(
 `
   });
 }
+
+// server/pages/article.ts
 function articlePage(code, url) {
   const article = ARTICLES[code];
   if (!article) return notFound();
@@ -2962,7 +3231,7 @@ function articlePage(code, url) {
   const articleAction = `/article/${article.code}`;
   const jointHidden = jointOnly ? '<input type="hidden" name="at" value="1">' : "";
   const ctrl = readControls(url);
-  let list = db.cases.filter(
+  let list = dataset().cases.filter(
     (c) => c.region === REGION && c.risks.some((r) => relevant.has(r))
   );
   if (jointOnly) list = list.filter((c) => isJointStock(c.entity_name) || isJointStock(c.winner_name));
@@ -3026,19 +3295,20 @@ function articlePage(code, url) {
     ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438</a>` : ""}
   </div>
 </form>
-${sortBar(articleAction, ctrl, jointHidden)}
-${filterPanel(articleAction, ctrl, {}, jointHidden)}
+${controlBar(articleAction, ctrl, {}, { extra: jointHidden })}
 ${listBody(shown, ctrl, articleAction)}
 
 <p class="note">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u0441\u0444\u043E\u0440\u043C\u043E\u0432\u0430\u043D\u043E \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E \u0437\u0430 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0412\u0456\u043D \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u0444\u0430\u043A\u0442 \u043F\u0440\u0430\u0432\u043E\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0456 \u043D\u0435 \u0454 \u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F\u043C \u0449\u043E\u0434\u043E \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u043D\u0430\u0437\u0432\u0430\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438 \u0447\u0438 \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457. \u041D\u0430\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u043A\u0440\u043E\u043A \u2014 \u0432\u0438\u0442\u0440\u0435\u0431\u0443\u0432\u0430\u0442\u0438 \u0441\u0430\u043C\u0456 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0439 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0457\u0445.</p>
 `
   });
 }
+
+// server/pages/updates.ts
 function updatesPage(url) {
-  const runs = [...db.runs].sort((a, b) => b.started_at.localeCompare(a.started_at));
+  const runs = [...dataset().runs].sort((a, b) => b.started_at.localeCompare(a.started_at));
   const latest = runs[0];
   const newIds = new Set(latest?.new_tender_ids ?? []);
-  const freshAll = db.cases.filter((x) => newIds.has(x.tender_id));
+  const freshAll = dataset().cases.filter((x) => newIds.has(x.tender_id));
   const c = readControls(url);
   const fresh = applyControls(freshAll, c, RAILWAY_EDRPOU);
   return layout({
@@ -3056,8 +3326,7 @@ ${latest ? `<p class="statline">
 </p>` : '<div class="empty">\u0416\u043E\u0434\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0443 \u0449\u0435 \u043D\u0435 \u0431\u0443\u043B\u043E. \u0412\u0438\u043A\u043E\u043D\u0430\u0439\u0442\u0435 <code>npm run daily</code>.</div>'}
 
 ${freshAll.length > 0 ? `<h2>\u041D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0441\u0442\u0430\u043D\u043D\u044C\u043E\u0433\u043E \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F</h2>
-${sortBar("/updates", c)}
-${filterPanel("/updates", c)}
+${controlBar("/updates", c)}
 ${listBody(fresh, c, "/updates")}` : latest ? `<h2>\u041D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0441\u0442\u0430\u043D\u043D\u044C\u043E\u0433\u043E \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F</h2><div class="empty">\u041D\u043E\u0432\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043D\u0435 \u0437\u2019\u044F\u0432\u0438\u043B\u043E\u0441\u044F. \u0426\u0435 \u043D\u043E\u0440\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u2014 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043D\u0435 \u0449\u043E\u0434\u043D\u044F \u0434\u043E\u0434\u0430\u0454 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438.</div>` : ""}
 
 <h2>\u0406\u0441\u0442\u043E\u0440\u0456\u044F \u0437\u0430\u043F\u0443\u0441\u043A\u0456\u0432</h2>
@@ -3078,8 +3347,10 @@ ${runs.slice(0, 30).map(
 `
   });
 }
+
+// server/pages/prices.ts
 function pricesPage(url) {
-  const withFindings = db.cases.filter((c2) => c2.findings.length > 0);
+  const withFindings = dataset().cases.filter((c2) => c2.findings.length > 0);
   const gapOf = (c2) => c2.findings.reduce((total, f) => {
     const e = f.evidence;
     return total + (e.overpayment ?? e.extra_cost ?? 0);
@@ -3113,9 +3384,7 @@ function pricesPage(url) {
   </div>
 </details>
 
-${presetBar("/prices", url, c)}
-${sortBar("/prices", c)}
-${filterPanel("/prices", c, { hidePrice: true })}
+${controlBar("/prices", c, { hidePrice: true }, { url })}
 
 ${listBody(list, c, "/prices")}
 
@@ -3123,9 +3392,11 @@ ${listBody(list, c, "/prices")}
 `
   });
 }
+
+// server/pages/lookup.ts
 function profileOf(edrpou) {
-  const asBuyer = db.cases.filter((c) => c.entity_edrpou === edrpou);
-  const asWinner = db.cases.filter((c) => c.winner_edrpou === edrpou);
+  const asBuyer = dataset().cases.filter((c) => c.entity_edrpou === edrpou);
+  const asWinner = dataset().cases.filter((c) => c.winner_edrpou === edrpou);
   const name = asBuyer.find((c) => c.entity_name)?.entity_name ?? asWinner.find((c) => c.winner_name)?.winner_name ?? null;
   return { asBuyer, asWinner, name };
 }
@@ -3168,149 +3439,10 @@ ${found && profile ? `${star("entity", code, "/lookup?edrpou=" + encodeURICompon
 `
   });
 }
-function starredPage(saved, url) {
-  const tenders = saved.filter((f) => f.kind === "tender").map((f) => db.byTender.get(f.id)).filter((c2) => Boolean(c2));
-  const missingTenders = saved.filter((f) => f.kind === "tender").length - tenders.length;
-  const c = readControls(url);
-  const filteredTenders = applyControls(tenders, c, RAILWAY_EDRPOU);
-  const companyRows = saved.filter((f) => f.kind === "entity" || f.kind === "supplier").map((f) => {
-    const list = f.kind === "entity" ? db.cases.filter((c2) => c2.entity_edrpou === f.id) : db.cases.filter((c2) => c2.winner_edrpou === f.id);
-    const name = f.kind === "entity" ? list.find((c2) => c2.entity_name)?.entity_name : list.find((c2) => c2.winner_name)?.winner_name;
-    return {
-      fav: f,
-      href: `/${f.kind === "entity" ? "entity" : "supplier"}/${encodeURIComponent(f.id)}`,
-      name: readableName(name ?? "") || f.id,
-      role: f.kind === "entity" ? "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A" : "\u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A",
-      count: list.length,
-      value: list.reduce((sum2, c2) => sum2 + (c2.value_amount ?? 0), 0)
-    };
-  });
-  const officerRows = saved.filter((f) => f.kind === "officer").map((f) => {
-    const list = db.cases.filter((c2) => c2.officer_key === f.id);
-    return {
-      fav: f,
-      href: `/officer/${encodeURIComponent(f.id)}`,
-      name: list.find((c2) => c2.officer_name)?.officer_name ?? f.id,
-      entity: readableName(list.find((c2) => c2.entity_name)?.entity_name ?? ""),
-      count: list.length,
-      value: list.reduce((sum2, c2) => sum2 + (c2.value_amount ?? 0), 0)
-    };
-  });
-  const section = (title, count, inner) => count === 0 ? "" : `<h2>${esc(title)} \u2014 ${count}</h2>${inner}`;
-  return layout({
-    title: "\u041E\u0431\u0440\u0430\u043D\u0435",
-    nav: "starred",
-    body: `
-<h1>\u041E\u0431\u0440\u0430\u043D\u0435</h1>
-<p class="sub">\u0423\u0441\u0435, \u0449\u043E \u0432\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0438 \u0437\u0456\u0440\u043E\u0447\u043A\u043E\u044E: \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438, \u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A\u0438, \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456. \u0421\u043F\u0438\u0441\u043E\u043A \u0437\u0431\u0435\u0440\u0456\u0433\u0430\u0454\u0442\u044C\u0441\u044F \u0443 \u0432\u0430\u0448\u043E\u043C\u0443 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0456 \u0439 \u043D\u0435 \u043F\u0440\u0438\u0432'\u044F\u0437\u0430\u043D\u0438\u0439 \u0434\u043E \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u043E\u0433\u043E \u0437\u0430\u043F\u0438\u0441\u0443.</p>
 
-<form class="filters" method="get" action="/lookup">
-  <div class="filter-row">
-    <input type="search" name="edrpou" placeholder="\u0417\u043D\u0430\u0439\u0442\u0438 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423 \u2014 \u043D\u0430\u043F\u0440\u0438\u043A\u043B\u0430\u0434, 00131954" aria-label="\u0404\u0414\u0420\u041F\u041E\u0423" inputmode="numeric">
-    <button type="submit">\u0417\u043D\u0430\u0439\u0442\u0438</button>
-  </div>
-</form>
-
-${saved.length === 0 ? `<div class="empty">\u041F\u043E\u043A\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E. \u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u2606 \u0431\u0456\u043B\u044F \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457 \u0447\u0438 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u044F.</div>` : ""}
-
-${section(
-      "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
-      tenders.length,
-      `${sortBar("/starred", c)}${filterPanel("/starred", c)}${listBody(filteredTenders, c, "/starred")}${missingTenders > 0 ? `<p class="note">${missingTenders} ${plural(missingTenders, "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0430", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u0456", "\u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0431\u0456\u043B\u044C\u0448\u0435 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E")} \u0432 \u0431\u0430\u0437\u0456.</p>` : ""}`
-    )}
-
-${section(
-      "\u041A\u043E\u043C\u043F\u0430\u043D\u0456\u0457",
-      companyRows.length,
-      `<div class="rows">${companyRows.map(
-        (r) => `<div class="row">
-  <div class="who">
-    <div class="name">${star(r.fav.kind, r.fav.id, "/starred")}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
-    <div class="meta">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(r.fav.id)} \xB7 ${esc(r.role)} \xB7 ${r.count} ${plural(r.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}</div>
-  </div>
-  <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
-</div>`
-      ).join("")}</div>`
-    )}
-
-${section(
-      "\u041F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
-      officerRows.length,
-      `<div class="rows">${officerRows.map(
-        (r) => `<div class="row">
-  <div class="who">
-    <div class="name">${star("officer", r.fav.id, "/starred")}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
-    <div class="meta">${esc(r.entity)} \xB7 ${r.count} ${plural(r.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}</div>
-  </div>
-  <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
-</div>`
-      ).join("")}</div>`
-    )}
-`
-  });
-}
-function indicatorsPage() {
-  const counted = new Map(rankRisks(db.cases));
-  const ranked = db.rules.map((r) => [r.risk_id, counted.get(r.risk_id) ?? 0]).sort((a, b) => b[1] - a[1]);
-  return layout({
-    title: "\u0429\u043E \u043C\u0438 \u0448\u0443\u043A\u0430\u0454\u043C\u043E",
-    nav: "indicators",
-    body: `
-<h1>\u0429\u043E \u043C\u0438 \u0448\u0443\u043A\u0430\u0454\u043C\u043E</h1>
-<p class="sub">\u0427\u043E\u0442\u0438\u0440\u043D\u0430\u0434\u0446\u044F\u0442\u044C \u043E\u0437\u043D\u0430\u043A, \u0437\u0430 \u044F\u043A\u0438\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u043A\u043E\u0436\u043D\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0449\u043E \u043A\u043E\u0436\u043D\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u043E\u044E \u043C\u043E\u0432\u043E\u044E \u0456 \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0440\u0430\u0437\u0456\u0432 \u0432\u043E\u043D\u0430 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0430 \u0432 ${esc(REGION)} \u0442\u0430 \u043D\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456.</p>
-${groupedRiskCards(ranked)}
-`
-  });
-}
-function aboutPage() {
-  return layout({
-    title: "\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443",
-    nav: "about",
-    body: `
-<h1>\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443</h1>
-<p class="sub">\u0429\u043E \u043F\u043E\u043A\u0430\u0437\u0443\u0454 \u0446\u0435\u0439 \u0441\u0430\u0439\u0442, \u0437\u0432\u0456\u0434\u043A\u0438 \u0431\u0435\u0440\u0435 \u0434\u0430\u043D\u0456 \u0456 \u0447\u043E\u0433\u043E \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C.</p>
-
-<div class="card">
-  <h3>\u0417\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456</h3>
-  <p class="lead">\u0414\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u0438\u0445 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u0440\u0438\u0437\u0438\u043A\u0443 Prozorro \u2014 \u043D\u0430\u043A\u0430\u0437 \u041C\u0456\u043D\u0444\u0456\u043D\u0443 \u2116 476 \u0432\u0456\u0434 27 \u0432\u0435\u0440\u0435\u0441\u043D\u044F 2024 \u0440\u043E\u043A\u0443. \u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u043A\u043E\u0436\u043D\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u0437\u0430 \u0447\u0438\u043D\u043D\u0438\u043C \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u043E\u043C \u043E\u0437\u043D\u0430\u043A \u0456 \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u043E.</p>
-  <p>\u041C\u0438 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u043C\u043E \u0446\u0435\u0439 \u043C\u0430\u0441\u0438\u0432, \u0432\u0456\u0434\u0431\u0438\u0440\u0430\u0454\u043C\u043E ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0457 \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB, \u0434\u043E\u043F\u043E\u0432\u043D\u044E\u0454\u043C\u043E \u043A\u0430\u0440\u0442\u043A\u0430\u043C\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 Prozorro \u2014 \u0437\u0432\u0456\u0434\u043A\u0438 \u0431\u0435\u0440\u0435\u043C\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0443 \u043E\u0441\u043E\u0431\u0443, \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432 \u0456 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u2014 \u0456 \u043F\u043E\u0434\u0430\u0454\u043C\u043E \u0442\u0430\u043A, \u0449\u043E\u0431 \u0437 \u0446\u0438\u043C \u043C\u043E\u0436\u043D\u0430 \u0431\u0443\u043B\u043E \u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0442\u0438.</p>
-</div>
-
-<div class="card">
-  <h3>\u0422\u0440\u0438 \u0440\u0456\u0432\u043D\u0456 \u0434\u043E\u0441\u0442\u043E\u0432\u0456\u0440\u043D\u043E\u0441\u0442\u0456</h3>
-  <p><span class="tier confirmed">\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430</span> &nbsp;\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u043F\u0440\u043E\u0432\u0435\u043B\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433 \u0456 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
-  <p><span class="tier state">\u041F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430</span> &nbsp;\u0421\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438. \u0426\u0435 \u043F\u0456\u0434\u043E\u0437\u0440\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0438 \u0437 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F\u043C \u043D\u0430 \u043D\u043E\u0440\u043C\u0443 \u0437\u0430\u043A\u043E\u043D\u0443 \u2014 \u0441\u0430\u043C\u0435 \u0446\u0435 \u043F\u043E\u043A\u0430\u0437\u0430\u043D\u043E \u043D\u0430 \u0441\u0430\u0439\u0442\u0456 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456.</p>
-  <p><span class="tier own">\u041F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043C\u0438</span> &nbsp;\u041D\u0430\u0448 \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A: \u0446\u0456\u043D\u0430 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E \u043F\u0440\u043E\u0442\u0438 \u043A\u0430\u0442\u0430\u043B\u043E\u0436\u043D\u043E\u0457. \u041F\u0456\u0434\u043A\u043B\u044E\u0447\u0430\u0454\u0442\u044C\u0441\u044F \u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0438\u043C \u0435\u0442\u0430\u043F\u043E\u043C.</p>
-  <p>\u041D\u0438\u0436\u0447\u0438\u0439 \u0440\u0456\u0432\u0435\u043D\u044C \u043D\u0456\u043A\u043E\u043B\u0438 \u043D\u0435 \u043F\u043E\u0434\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A \u0432\u0438\u0449\u0438\u0439.</p>
-</div>
-
-<div class="card">
-  <h3>\u041F\u0440\u043E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456\u0432</h3>
-  <p>\u0406\u043C'\u044F, \u043F\u043E\u0448\u0442\u0430 \u0439 \u0442\u0435\u043B\u0435\u0444\u043E\u043D \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438 \u0432\u0437\u044F\u0442\u0456 \u0437 \u043A\u0430\u0440\u0442\u043A\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432 Prozorro, \u0434\u0435 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0441\u0430\u043C \u0457\u0445 \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454. \u041E\u0434\u043D\u0443 \u043B\u044E\u0434\u0438\u043D\u0443 \u043C\u0456\u0436 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438 \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043E \u0437\u0430 \u043F\u043E\u0448\u0442\u043E\u044E, \u0431\u043E \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044F \u0456\u043C\u0435\u043D\u0456 \u0440\u0456\u0437\u043D\u0438\u0442\u044C\u0441\u044F.</p>
-  <p>\u0421\u0442\u043E\u0440\u0456\u043D\u043A\u0430 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u044F \u043F\u043E\u043A\u0430\u0437\u0443\u0454, \u0443 \u0441\u043A\u0456\u043B\u044C\u043A\u043E\u0445 \u0439\u043E\u0433\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0456 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438 \u0456 \u0437\u0430 \u044F\u043A\u0438\u043C\u0438 \u043D\u043E\u0440\u043C\u0430\u043C\u0438 \u0437\u0430\u043A\u043E\u043D\u0443. <strong>\u0426\u0435 \u043D\u0435 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432\u0438\u043D\u0430.</strong></p>
-</div>
-
-<div class="card">
-  <h3>\u0427\u043E\u043C\u0443 \u0442\u0443\u0442 \u043D\u0435\u043C\u0430\u0454 \u0441\u0443\u0434\u0438\u043C\u043E\u0441\u0442\u0435\u0439</h3>
-  <p>\u0404\u0434\u0438\u043D\u0438\u0439 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u0439 \u0440\u0435\u0454\u0441\u0442\u0440 \u0441\u0443\u0434\u043E\u0432\u0438\u0445 \u0440\u0456\u0448\u0435\u043D\u044C \u0437\u0430\u043A\u0440\u0438\u0442\u0438\u0439 CAPTCHA, \u0430 \u0432 \u0442\u0435\u043A\u0441\u0442\u0430\u0445 \u043A\u0440\u0438\u043C\u0456\u043D\u0430\u043B\u044C\u043D\u0438\u0445 \u0440\u0456\u0448\u0435\u043D\u044C \u0456\u043C\u0435\u043D\u0430 \u0437\u0430\u043C\u0456\u043D\u0435\u043D\u0456 \u043D\u0430 \xAB\u041E\u0421\u041E\u0411\u0410_1\xBB \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u043D\u043E \u0434\u043E \u0437\u0430\u043A\u043E\u043D\u043E\u0434\u0430\u0432\u0441\u0442\u0432\u0430 \u043F\u0440\u043E \u0437\u0430\u0445\u0438\u0441\u0442 \u043F\u0435\u0440\u0441\u043E\u043D\u0430\u043B\u044C\u043D\u0438\u0445 \u0434\u0430\u043D\u0438\u0445. \u0417\u0456\u0441\u0442\u0430\u0432\u0438\u0442\u0438 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456\u0437 \u043B\u044E\u0434\u0438\u043D\u043E\u044E \u0437\u0430 \u0437\u0431\u0456\u0433\u043E\u043C \u043F\u0440\u0456\u0437\u0432\u0438\u0449\u0430 \u043D\u0435\u043C\u043E\u0436\u043B\u0438\u0432\u043E \u043D\u0430\u0434\u0456\u0439\u043D\u043E, \u0430 \u043F\u043E\u043C\u0438\u043B\u043A\u0430 \u0442\u0443\u0442 \u2014 \u0446\u0435 \u0437\u0432\u0438\u043D\u0443\u0432\u0430\u0447\u0435\u043D\u043D\u044F \u043D\u0435\u0432\u0438\u043D\u043D\u043E\u0433\u043E.</p>
-  <p>\u0422\u043E\u043C\u0443 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454 \u043B\u0438\u0448\u0435 \u0442\u0435, \u0449\u043E \u043C\u043E\u0436\u043D\u0430 \u0434\u043E\u0432\u0435\u0441\u0442\u0438: \u044F\u043A\u0456 \u043E\u0437\u043D\u0430\u043A\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0432\u0438\u044F\u0432\u0438\u043B\u0430 \u0432 \u043A\u043E\u043D\u043A\u0440\u0435\u0442\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u043A\u043E\u043D\u043A\u0440\u0435\u0442\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438.</p>
-</div>
-
-<div class="card">
-  <h3>\u0427\u043E\u0433\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C</h3>
-  <p>\u0412\u043E\u043D\u0430 \u043D\u0435 \u043E\u0433\u043E\u043B\u043E\u0448\u0443\u0454 \u0432\u0438\u043D\u0443 \u0456 \u043D\u0435 \u043D\u0430\u0437\u0438\u0432\u0430\u0454 \u0436\u043E\u0434\u043D\u0443 \u0444\u0456\u0440\u043C\u0443 \u0447\u0438 \u043B\u044E\u0434\u0438\u043D\u0443 \u0437\u043B\u043E\u0447\u0438\u043D\u0446\u0435\u043C. \u0412\u043E\u043D\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454 \u043E\u0437\u043D\u0430\u043A\u0438 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0456 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u044E\u0442\u044C \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0456 \u0437\u0430\u0432\u0436\u0434\u0438 \u0434\u0430\u0454 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u043D\u0430 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E, \u0449\u043E\u0431 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u043C\u043E\u0436\u043D\u0430 \u0431\u0443\u043B\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0432\u0440\u0443\u0447\u043D\u0443.</p>
-</div>
-`
-  });
-}
-function notFound() {
-  return layout({
-    title: "\u041D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E",
-    body: `<h1>\u041D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E</h1><p class="sub">\u0422\u0430\u043A\u043E\u0457 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438 \u043D\u0435\u043C\u0430\u0454. <a href="/">\u0414\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u043D\u0430\u0445\u0456\u0434\u043E\u043A \u2192</a></p>`
-  });
-}
+// server/app.ts
 function render(url, saved = []) {
-  starred = saved;
+  setStarred(saved);
   const path = decodeURIComponent(url.pathname);
   if (path === "/lookup") {
     const code = normaliseEdrpou(url.searchParams.get("edrpou") ?? "");
@@ -3333,14 +3465,14 @@ function render(url, saved = []) {
     if (rest.endsWith("/report") || rest.endsWith("/report.txt")) {
       const asText = rest.endsWith(".txt");
       const id = rest.slice(0, rest.lastIndexOf("/report"));
-      const entry = db.byTender.get(id);
+      const entry = dataset().byTender.get(id);
       if (!entry) return { status: 404, body: notFound() };
-      const sameEntity = db.cases.filter((x) => x.entity_edrpou && x.entity_edrpou === entry.entity_edrpou);
-      const sameOfficer = entry.officer_key ? db.cases.filter((x) => x.officer_key === entry.officer_key) : [];
-      const sameWinner = entry.winner_edrpou ? db.cases.filter((x) => x.winner_edrpou === entry.winner_edrpou) : [];
+      const sameEntity = dataset().cases.filter((x) => x.entity_edrpou && x.entity_edrpou === entry.entity_edrpou);
+      const sameOfficer = entry.officer_key ? dataset().cases.filter((x) => x.officer_key === entry.officer_key) : [];
+      const sameWinner = entry.winner_edrpou ? dataset().cases.filter((x) => x.winner_edrpou === entry.winner_edrpou) : [];
       const ctx = {
         entry,
-        rules: db.ruleById,
+        rules: dataset().ruleById,
         sameEntity: sameEntity.length,
         sameOfficer: sameOfficer.length,
         sameWinner: sameWinner.length,
@@ -3364,26 +3496,36 @@ function render(url, saved = []) {
 
 // server/auth-pages.ts
 var SHELL_STYLES = `
-:root{color-scheme:light;--paper:#F6F8F9;--surface:#FFFFFF;--ink:#17222B;--ink-soft:#4A5966;
---line:#DDE4E8;--accent:#17607F;--accent-bg:#E6F0F4;--alarm:#A03A2B;--alarm-bg:#FBE9E5;
---shadow:0 1px 2px rgba(23,34,43,.04),0 8px 24px -18px rgba(23,34,43,.26);--radius:5px;
---f-display:"Literata",Georgia,serif;--f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif}
+:root{
+  color-scheme:light;
+  /* Same scale as the site (server/html.ts) \u2014 kept local rather than shared
+     because this shell has no import path back to that stylesheet. */
+  --s1:.25rem; --s2:.5rem; --s3:.75rem; --s4:1rem;
+  --s5:1.5rem; --s6:2rem;  --s7:3rem;   --s8:4rem;
+  --paper:#FCFCFA;--surface:#FFFFFF;--ink:#14181A;--ink-soft:#565B60;
+  --line:#E4E3DD;--accent:#0F5C8C;--accent-bg:#E8F0F7;--alarm:#B02418;--alarm-bg:#FBEAE7;
+  --shadow:0 12px 32px -20px rgba(20,24,26,.45);--radius:8px;
+  --f-display:"Ysabeau","Segoe UI",system-ui,sans-serif;--f-body:"Ysabeau","Segoe UI",system-ui,sans-serif}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-background:var(--paper);color:var(--ink);font-family:var(--f-body);padding:1.5rem}
+background:var(--paper);color:var(--ink);font-family:var(--f-body);padding:var(--s5)}
 .box{max-width:26rem;width:100%;background:var(--surface);border:1px solid var(--line);
-border-radius:var(--radius);box-shadow:var(--shadow);padding:2rem 1.75rem;text-align:center}
-h1{font-family:var(--f-display);font-weight:700;font-size:1.4rem;margin:0 0 .6rem}
-p{color:var(--ink-soft);font-size:.96rem;line-height:1.55;margin:0 0 1.5rem}
-p.denied{background:var(--alarm-bg);color:var(--alarm);border-radius:var(--radius);padding:.7rem 1rem;font-size:.9rem}
-a.btn{display:inline-flex;align-items:center;gap:.6rem;background:var(--accent);color:#fff;
-text-decoration:none;font-weight:500;padding:.7rem 1.4rem;border-radius:var(--radius)}
+border-radius:var(--radius);box-shadow:var(--shadow);padding:var(--s6) var(--s5);text-align:center}
+h1{font-family:var(--f-display);font-weight:700;font-size:1.4rem;margin:0 0 var(--s3)}
+p{color:var(--ink-soft);font-size:.96rem;line-height:1.55;margin:0 0 var(--s5)}
+p.denied{background:var(--alarm-bg);color:var(--alarm);border-radius:var(--radius);padding:var(--s3) var(--s4);font-size:.9rem}
+a.btn{display:inline-flex;align-items:center;gap:var(--s3);background:var(--accent);color:#fff;
+text-decoration:none;font-weight:500;padding:var(--s3) var(--s5);border-radius:var(--radius)}
 a.btn:hover{filter:brightness(1.08)}
 `;
 function shell(title, body) {
   return `<!doctype html>
 <html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} \u2014 Tender Radar</title><style>${SHELL_STYLES}</style></head>
+<title>${esc(title)} \u2014 Tender Radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ysabeau:wght@300..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>${SHELL_STYLES}</style></head>
 <body><div class="box">${body}</div></body></html>`;
 }
 function loginPage() {

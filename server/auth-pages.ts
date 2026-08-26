@@ -3,27 +3,37 @@
 import { esc } from "./html.ts";
 
 const SHELL_STYLES = `
-:root{color-scheme:light;--paper:#F6F8F9;--surface:#FFFFFF;--ink:#17222B;--ink-soft:#4A5966;
---line:#DDE4E8;--accent:#17607F;--accent-bg:#E6F0F4;--alarm:#A03A2B;--alarm-bg:#FBE9E5;
---shadow:0 1px 2px rgba(23,34,43,.04),0 8px 24px -18px rgba(23,34,43,.26);--radius:5px;
---f-display:"Literata",Georgia,serif;--f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif}
+:root{
+  color-scheme:light;
+  /* Same scale as the site (server/html.ts) — kept local rather than shared
+     because this shell has no import path back to that stylesheet. */
+  --s1:.25rem; --s2:.5rem; --s3:.75rem; --s4:1rem;
+  --s5:1.5rem; --s6:2rem;  --s7:3rem;   --s8:4rem;
+  --paper:#FCFCFA;--surface:#FFFFFF;--ink:#14181A;--ink-soft:#565B60;
+  --line:#E4E3DD;--accent:#0F5C8C;--accent-bg:#E8F0F7;--alarm:#B02418;--alarm-bg:#FBEAE7;
+  --shadow:0 12px 32px -20px rgba(20,24,26,.45);--radius:8px;
+  --f-display:"Ysabeau","Segoe UI",system-ui,sans-serif;--f-body:"Ysabeau","Segoe UI",system-ui,sans-serif}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-background:var(--paper);color:var(--ink);font-family:var(--f-body);padding:1.5rem}
+background:var(--paper);color:var(--ink);font-family:var(--f-body);padding:var(--s5)}
 .box{max-width:26rem;width:100%;background:var(--surface);border:1px solid var(--line);
-border-radius:var(--radius);box-shadow:var(--shadow);padding:2rem 1.75rem;text-align:center}
-h1{font-family:var(--f-display);font-weight:700;font-size:1.4rem;margin:0 0 .6rem}
-p{color:var(--ink-soft);font-size:.96rem;line-height:1.55;margin:0 0 1.5rem}
-p.denied{background:var(--alarm-bg);color:var(--alarm);border-radius:var(--radius);padding:.7rem 1rem;font-size:.9rem}
-a.btn{display:inline-flex;align-items:center;gap:.6rem;background:var(--accent);color:#fff;
-text-decoration:none;font-weight:500;padding:.7rem 1.4rem;border-radius:var(--radius)}
+border-radius:var(--radius);box-shadow:var(--shadow);padding:var(--s6) var(--s5);text-align:center}
+h1{font-family:var(--f-display);font-weight:700;font-size:1.4rem;margin:0 0 var(--s3)}
+p{color:var(--ink-soft);font-size:.96rem;line-height:1.55;margin:0 0 var(--s5)}
+p.denied{background:var(--alarm-bg);color:var(--alarm);border-radius:var(--radius);padding:var(--s3) var(--s4);font-size:.9rem}
+a.btn{display:inline-flex;align-items:center;gap:var(--s3);background:var(--accent);color:#fff;
+text-decoration:none;font-weight:500;padding:var(--s3) var(--s5);border-radius:var(--radius)}
 a.btn:hover{filter:brightness(1.08)}
 `;
 
 function shell(title: string, body: string): string {
   return `<!doctype html>
 <html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} — Tender Radar</title><style>${SHELL_STYLES}</style></head>
+<title>${esc(title)} — Tender Radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ysabeau:wght@300..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>${SHELL_STYLES}</style></head>
 <body><div class="box">${body}</div></body></html>`;
 }
 
