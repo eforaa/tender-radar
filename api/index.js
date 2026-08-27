@@ -784,6 +784,8 @@ select:disabled{opacity:.5;cursor:not-allowed}
 .row .amount .big{font-family:var(--f-display);font-weight:700;font-size:1.05rem;line-height:1.3;font-variant-numeric:tabular-nums;white-space:nowrap}
 .row .amount .exact{font-family:var(--f-mono);font-size:.72rem;color:var(--ink-faint);white-space:nowrap;display:block;margin-top:var(--s1)}
 .row .flags{grid-column:2 / -1;display:flex;flex-wrap:wrap;gap:var(--s1);margin-top:var(--s1)}
+/* The compact signal replaces the chip list on the phone; desktop keeps chips. */
+.signal{display:none}
 
 a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .flag.alarm{border-color:var(--alarm);background:var(--alarm-bg);color:var(--alarm);font-weight:500}
@@ -867,6 +869,13 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
 @media (max-width:44rem){
   body{font-size:16px}
 
+  /* The phone job is scanning the feed, so the first screen must be tenders,
+     not onboarding. The explainer strip and the stat block are things a
+     returning reader has already read; the /about link keeps them a tap away. */
+  .sub,.primer,details.help{display:none}
+  h1{font-size:1.3rem}
+  .statline{font-size:.8rem;color:var(--ink-faint)}
+
   /* header: the drawer already lists every section, so the inline links are
      duplication that costs a whole row on a narrow screen */
   .nav{display:none}
@@ -922,16 +931,26 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
      rides along with it instead of floating on its own line. Buyer/title
      comes next, flags last \u2014 nobody scrolls to a chip before the number. */
   .row{display:flex;flex-direction:column;gap:var(--s1);position:relative;padding:var(--s3) var(--s4) var(--s3) calc(var(--s4) + var(--s4));}
-  .row .dot{position:absolute;left:var(--s4);top:1.1rem;grid-row:auto;margin-top:0}
+  /* the dot is the only severity cue the phone keeps: red for a proven or
+     priced-anomaly row, amber for "worth a look", grey for the rest. */
+  .row .dot{position:absolute;left:var(--s4);top:1.1rem;grid-row:auto;margin-top:0;width:.5rem;height:.5rem;border-radius:50%;background:var(--ink-faint)}
+  .row.sev-proven .dot,.row.sev-high .dot{background:var(--alarm)}
+  .row.sev-medium .dot{background:var(--warn)}
   .row .amount{order:-2;text-align:left;margin-top:0;display:flex;align-items:baseline;gap:var(--s2)}
   .row .amount .big{font-size:1.05rem;font-variant-numeric:tabular-nums}
-  .row .amount .exact{display:inline;margin-left:0}
+  /* the tender ref is scanning noise on the phone; it stays on the tender page */
+  .row .amount .exact{display:none}
   .row .who{order:-1}
   .row .name{font-size:.98rem;display:flex;align-items:flex-start;gap:var(--s1)}
   .row .name a{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .row .meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .row .flags{order:0;margin-top:var(--s1);gap:var(--s1)}
-  .row .flags .flag{font-size:.74rem;padding:var(--s1) var(--s2);line-height:1.35}
+  /* one short line instead of a stack of sentence chips; the chips are the
+     desktop view, the full list is on the tender page */
+  .row .flags{display:none}
+  /* Kept to a single line come what may: not every risk has a short label, so
+     the fallback is the full rule name \u2014 the ellipsis is what guarantees the
+     line stays minimal regardless of the data. */
+  .row .signal{display:block;order:0;margin-top:var(--s1);font-size:.85rem;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* the worst tap target on the page before this: a 1.15rem glyph with no
      hit-box padding. It now clears 44px on both sides; float is dropped so
      the extra hit area does not overlap the title text next to it. No
@@ -2120,6 +2139,14 @@ function rowSeverity(entry) {
   if (entry.bidders === 1 || entry.risks.length >= 3) return "medium";
   return "low";
 }
+function signalLine(entry) {
+  if (entry.audit?.violation) return "\u041F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0434\u043E\u0432\u0435\u0434\u0435\u043D\u043E";
+  const n = entry.risks.length;
+  if (n === 0) return "";
+  const topRisk = rankRisks([entry])[0]?.[0] ?? entry.risks[0];
+  const count = `${n} ${plural(n, "\u043E\u0437\u043D\u0430\u043A\u0430", "\u043E\u0437\u043D\u0430\u043A\u0438", "\u043E\u0437\u043D\u0430\u043A")}`;
+  return `${count} \xB7 ${esc(shortRisk(topRisk))}`;
+}
 var SEVERITY_TITLE = {
   proven: "\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F",
   high: "\u041C\u0438 \u0437\u043D\u0430\u0439\u0448\u043B\u0438 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u0456\u0441\u0442\u044C \u0443 \u0446\u0456\u043D\u0456",
@@ -2214,6 +2241,7 @@ function caseRow(entry, opts = {}) {
     ${entry.risks.slice(0, MAX_ROW_FLAGS).map(riskFlag).join("")}
     ${entry.risks.length > MAX_ROW_FLAGS ? `<a class="flag more" href="/tender/${encodeURIComponent(entry.tender_id)}">\u0449\u0435 ${entry.risks.length - MAX_ROW_FLAGS}</a>` : ""}
   </div>
+  <div class="signal">${signalLine(entry)}</div>
 </div>`;
 }
 
