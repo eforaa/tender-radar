@@ -1,9 +1,9 @@
 import { MONITORING_REASONS, VIOLATION_TYPES, readableName } from "../../src/labels.ts";
-import { esc, date, trim, shortMoney } from "../html.ts";
+import { esc, date, trim, shortMoney, plural } from "../html.ts";
 import { type Case } from "../data.ts";
 import { isStarred, type FavKind } from "../favourites.ts";
 import { starredList } from "../context.ts";
-import { riskFlag } from "./risk.ts";
+import { riskFlag, shortRisk, rankRisks } from "./risk.ts";
 
 /** Chips beyond this crowd the row; the rest are one click away. */
 const MAX_ROW_FLAGS = 3;
@@ -21,6 +21,20 @@ export function rowSeverity(entry: Case): "proven" | "high" | "medium" | "clear"
   if (entry.audit && !entry.audit.violation) return "clear";
   if (entry.bidders === 1 || entry.risks.length >= 3) return "medium";
   return "low";
+}
+
+/**
+ * The one-line signal the phone shows in place of the full chip list. A proven
+ * violation is the whole story; otherwise it is a count and the single most
+ * common risk, short — the detail lives on the tender page behind a tap.
+ */
+export function signalLine(entry: Case): string {
+  if (entry.audit?.violation) return "Порушення доведено";
+  const n = entry.risks.length;
+  if (n === 0) return "";
+  const topRisk = rankRisks([entry])[0]?.[0] ?? entry.risks[0];
+  const count = `${n} ${plural(n, "ознака", "ознаки", "ознак")}`;
+  return `${count} · ${esc(shortRisk(topRisk))}`;
 }
 
 const SEVERITY_TITLE: Record<string, string> = {
@@ -159,5 +173,6 @@ export function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?:
         : ""
     }
   </div>
+  <div class="signal">${signalLine(entry)}</div>
 </div>`;
 }
