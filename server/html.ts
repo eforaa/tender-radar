@@ -418,7 +418,10 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   .nav{display:none}
   .top .inner{padding:var(--s2) max(var(--s4),env(safe-area-inset-right)) var(--s2) max(var(--s4),env(safe-area-inset-left));gap:var(--s2) var(--s3)}
   .brand{font-size:1rem}
-  .burger{width:2.75rem;height:2.75rem}
+  /* On desktop .nav's margin-left:auto pushes the burger to the right edge;
+     the phone hides .nav, so the burger needs its own push or it hugs the
+     logo. This keeps the logo left and the burger at the far right. */
+  .burger{width:2.75rem;height:2.75rem;margin-left:auto}
   .starred-btn{min-height:2.75rem;padding:var(--s2) var(--s3)}
   .starred-btn span{display:none}
   .drawer{width:min(20rem,88vw)}
