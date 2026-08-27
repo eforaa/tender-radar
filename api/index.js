@@ -1544,6 +1544,9 @@ function reportHtml(ctx) {
   .toolbar{max-width:52rem;margin:var(--s4) auto 0;padding:0 var(--s7);display:flex;gap:var(--s3);flex-wrap:wrap}
   .toolbar a,.toolbar button{font:inherit;font-size:.92rem;text-decoration:none;color:var(--accent);background:#fff;border:1px solid var(--line);border-radius:5px;padding:var(--s2) var(--s4);cursor:pointer}
   .toolbar a:hover,.toolbar button:hover{border-color:var(--accent)}
+  .print-hint{max-width:52rem;margin:var(--s2) auto 0;padding:0 var(--s7);color:var(--soft);font-size:.85rem}
+  .print-hint kbd{font-family:var(--f-mono);font-size:.85em;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-sm,4px);padding:0 var(--s1)}
+  @media print{.print-hint{display:none}}
   /* No serif on paper either: a second voice here would be the same
      inconsistency the site just dropped. Weight and size still carry the
      hierarchy, same as the site's own h2. */
@@ -1567,9 +1570,13 @@ function reportHtml(ctx) {
 <body>
 <div class="toolbar">
   <a href="/tender/${encodeURIComponent(entry.tender_id)}">\u2190 \u0434\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
-  <button type="button" onclick="window.print()">\u0414\u0440\u0443\u043A \u0430\u0431\u043E \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u043D\u044F \u0443 PDF</button>
+  <button type="button" onclick="window.print()">\u0414\u0440\u0443\u043A\u0443\u0432\u0430\u0442\u0438 / \u0437\u0431\u0435\u0440\u0435\u0433\u0442\u0438 \u044F\u043A PDF</button>
   <a href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0438\u0442\u0438 \u0442\u0435\u043A\u0441\u0442\u043E\u043C</a>
 </div>
+<!-- The button calls window.print(), which some mobile browsers ignore. The
+     Ctrl+P path always works because this page carries its own @media print
+     rules, so the hint is the reliable route, not a footnote. -->
+<p class="print-hint">\u041D\u0435 \u0432\u0456\u0434\u043A\u0440\u0438\u043B\u043E\u0441\u044F \u0432\u0456\u043A\u043D\u043E \u0434\u0440\u0443\u043A\u0443? \u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C <kbd>Ctrl</kbd>+<kbd>P</kbd> (\u043D\u0430 Mac <kbd>\u2318</kbd>+<kbd>P</kbd>) \u0456 \u0432\u0438\u0431\u0435\u0440\u0456\u0442\u044C \xAB\u0417\u0431\u0435\u0440\u0435\u0433\u0442\u0438 \u044F\u043A PDF\xBB.</p>
 <div class="sheet">
   <h1>${esc(title)}</h1>
   <div class="ref">${esc(entry.tender_ref || entry.tender_id)}</div>
@@ -2683,7 +2690,7 @@ ${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_i
 ${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
 
 <div class="actions">
-  <a class="action primary" href="/tender/${encodeURIComponent(entry.tender_id)}/report">\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0438\u0442\u0438 \u0437\u0432\u0456\u0442 \u2014 PDF \u0430\u0431\u043E \u0434\u0440\u0443\u043A</a>
+  <a class="action primary" href="/tender/${encodeURIComponent(entry.tender_id)}/report">\u0417\u0432\u0456\u0442 \u0434\u043B\u044F \u0434\u0440\u0443\u043A\u0443 \u0442\u0430 PDF</a>
   <a class="action" href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">\u0422\u0435\u043A\u0441\u0442\u043E\u0432\u0438\u043C \u0444\u0430\u0439\u043B\u043E\u043C</a>
   <a class="action" href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E \u0432 Prozorro</a>
 </div>

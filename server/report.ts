@@ -358,6 +358,9 @@ export function reportHtml(ctx: ReportContext): string {
   .toolbar{max-width:52rem;margin:var(--s4) auto 0;padding:0 var(--s7);display:flex;gap:var(--s3);flex-wrap:wrap}
   .toolbar a,.toolbar button{font:inherit;font-size:.92rem;text-decoration:none;color:var(--accent);background:#fff;border:1px solid var(--line);border-radius:5px;padding:var(--s2) var(--s4);cursor:pointer}
   .toolbar a:hover,.toolbar button:hover{border-color:var(--accent)}
+  .print-hint{max-width:52rem;margin:var(--s2) auto 0;padding:0 var(--s7);color:var(--soft);font-size:.85rem}
+  .print-hint kbd{font-family:var(--f-mono);font-size:.85em;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-sm,4px);padding:0 var(--s1)}
+  @media print{.print-hint{display:none}}
   /* No serif on paper either: a second voice here would be the same
      inconsistency the site just dropped. Weight and size still carry the
      hierarchy, same as the site's own h2. */
@@ -381,9 +384,13 @@ export function reportHtml(ctx: ReportContext): string {
 <body>
 <div class="toolbar">
   <a href="/tender/${encodeURIComponent(entry.tender_id)}">← до закупівлі</a>
-  <button type="button" onclick="window.print()">Друк або збереження у PDF</button>
+  <button type="button" onclick="window.print()">Друкувати / зберегти як PDF</button>
   <a href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">Завантажити текстом</a>
 </div>
+<!-- The button calls window.print(), which some mobile browsers ignore. The
+     Ctrl+P path always works because this page carries its own @media print
+     rules, so the hint is the reliable route, not a footnote. -->
+<p class="print-hint">Не відкрилося вікно друку? Натисніть <kbd>Ctrl</kbd>+<kbd>P</kbd> (на Mac <kbd>⌘</kbd>+<kbd>P</kbd>) і виберіть «Зберегти як PDF».</p>
 <div class="sheet">
   <h1>${esc(title)}</h1>
   <div class="ref">${esc(entry.tender_ref || entry.tender_id)}</div>

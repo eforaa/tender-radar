@@ -30,7 +30,7 @@ ${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_i
 ${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
 
 <div class="actions">
-  <a class="action primary" href="/tender/${encodeURIComponent(entry.tender_id)}/report">Завантажити звіт — PDF або друк</a>
+  <a class="action primary" href="/tender/${encodeURIComponent(entry.tender_id)}/report">Звіт для друку та PDF</a>
   <a class="action" href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">Текстовим файлом</a>
   <a class="action" href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">Першоджерело в Prozorro</a>
 </div>
