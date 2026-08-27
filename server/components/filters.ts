@@ -28,8 +28,10 @@ export function presetsFor(action: string): Preset[] {
     { label: "Завищена ціна", hint: "ми порахували переплату", query: "price=1" },
     { label: "Без конкурентів", hint: "подався один учасник", query: "solo=1" },
     { label: "Від 100 млн", hint: "найбільші суми", query: "min=100000000" },
-    { label: "Кілька ознак", hint: "спрацювало 2 і більше", query: "sort=risks" },
-    { label: "Найновіші", hint: "свіжі закупівлі", query: "sort=date" },
+    // "Кілька ознак" and "Найновіші" used to live here too, but they are sorts,
+    // not filters — the sort bar already offers "більше ознак" and "новіші
+    // закупівлі". Kept out of the presets so the row stays short and the chips
+    // are all genuine filters.
   ];
   return action === "/prices" ? base.filter((p) => p.query !== "price=1") : base;
 }
