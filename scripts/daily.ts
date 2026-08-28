@@ -277,14 +277,21 @@ try {
           }
         }
 
-        // The admin chat gets the delivery report. Without it a broken
-        // broadcast is invisible: subscribers do not complain, they just
-        // stop hearing from us.
+        // The owner always gets the digest itself, plus a delivery report.
+        // Without the digest, configuring subscribers would silently stop the
+        // owner's own daily message — which is exactly what happened once the
+        // subscriber store was switched on with nobody subscribed yet. If the
+        // owner is already a subscriber they got the digest via the broadcast,
+        // so send them only the report to avoid a duplicate.
+        const adminId = Number(telegram.chatId);
+        const ownerAlreadyGotDigest = Number.isFinite(adminId) && chatIds.includes(adminId);
+        const report =
+          `<b>Розсилка:</b> доставлено ${outcome.sent}, ` +
+          `відписалося ${outcome.blocked.length}, помилок ${outcome.failed}`;
         await sendTelegramTo(
           telegram,
           telegram.chatId,
-          `<b>Розсилка</b>\nДоставлено: ${outcome.sent}\n` +
-            `Відписалося: ${outcome.blocked.length}\nПомилок: ${outcome.failed}`,
+          ownerAlreadyGotDigest ? report : `${text}\n\n${report}`,
         );
       } catch (err) {
         errors++;
