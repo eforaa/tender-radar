@@ -277,22 +277,27 @@ try {
           }
         }
 
-        // The owner always gets the digest itself, plus a delivery report.
-        // Without the digest, configuring subscribers would silently stop the
-        // owner's own daily message — which is exactly what happened once the
-        // subscriber store was switched on with nobody subscribed yet. If the
-        // owner is already a subscriber they got the digest via the broadcast,
-        // so send them only the report to avoid a duplicate.
+        // The owner/target chat always gets the digest itself. Without it,
+        // configuring subscribers would silently stop the owner's own daily
+        // message — which is exactly what happened once the subscriber store
+        // was switched on with nobody subscribed yet.
+        //
+        // The delivery report is appended ONLY when there were subscribers to
+        // deliver to. With none — the common case for a channel target — a
+        // "доставлено 0" line is just noise in front of readers, so the digest
+        // goes out clean. If the target is itself a subscriber it already got
+        // the digest via the broadcast, so it receives only the report.
         const adminId = Number(telegram.chatId);
         const ownerAlreadyGotDigest = Number.isFinite(adminId) && chatIds.includes(adminId);
         const report =
-          `<b>Розсилка:</b> доставлено ${outcome.sent}, ` +
-          `відписалося ${outcome.blocked.length}, помилок ${outcome.failed}`;
-        await sendTelegramTo(
-          telegram,
-          telegram.chatId,
-          ownerAlreadyGotDigest ? report : `${text}\n\n${report}`,
-        );
+          chatIds.length > 0
+            ? `<b>Розсилка:</b> доставлено ${outcome.sent}, ` +
+              `відписалося ${outcome.blocked.length}, помилок ${outcome.failed}`
+            : "";
+        const message = ownerAlreadyGotDigest
+          ? report
+          : [text, report].filter(Boolean).join("\n\n");
+        if (message) await sendTelegramTo(telegram, telegram.chatId, message);
       } catch (err) {
         errors++;
         log(`telegram broadcast failed — ${(err as Error).message}`);
