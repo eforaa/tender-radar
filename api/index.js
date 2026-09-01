@@ -1788,6 +1788,31 @@ function tenderDateOf(tenderRef) {
 function activeAward(awards) {
   return awards.find((a) => a.status === "active") ?? awards[0];
 }
+function mergeCardDetail(entry, card) {
+  const detail = card.tender;
+  const won = activeAward(card.awards);
+  return {
+    ...entry,
+    title: detail.title ?? null,
+    status: detail.status ?? null,
+    method: detail.method ?? null,
+    // The flag already carries these; only fall back to the card when the
+    // flag itself did not have them, matching the original priority.
+    entity_edrpou: entry.entity_edrpou ?? detail.entity_edrpou ?? null,
+    entity_name: entry.entity_name ?? detail.entity_name ?? null,
+    region: entry.region ?? detail.region ?? null,
+    value_amount: entry.value_amount ?? detail.value_amount ?? null,
+    officer_name: detail.officer_name ?? null,
+    officer_email: detail.officer_email ?? null,
+    officer_phone: detail.officer_phone ?? null,
+    officer_key: officerKey(detail),
+    winner_name: won?.supplier_name ?? null,
+    winner_edrpou: won?.supplier_edrpou ?? null,
+    winner_amount: won?.amount ?? null,
+    bidders: card.bids.length,
+    detailed: true
+  };
+}
 function violationTypes(row) {
   const conclusion = row.conclusion;
   const types = conclusion?.violationType;
@@ -1837,39 +1862,50 @@ async function loadDataset() {
     list.push(award);
     awardsByTender.set(award.tender_id, list);
   }
-  const bidCount = /* @__PURE__ */ new Map();
-  for (const bid of bids) bidCount.set(bid.tender_id, (bidCount.get(bid.tender_id) ?? 0) + 1);
+  const bidsByTender = /* @__PURE__ */ new Map();
+  for (const bid of bids) {
+    const list = bidsByTender.get(bid.tender_id) ?? [];
+    list.push(bid);
+    bidsByTender.set(bid.tender_id, list);
+  }
   const byTender = /* @__PURE__ */ new Map();
   for (const flag of flags) {
     let entry = byTender.get(flag.tender_id);
     if (!entry) {
       const detail = tenderById.get(flag.tender_id);
-      const won = activeAward(awardsByTender.get(flag.tender_id) ?? []);
       entry = {
         tender_id: flag.tender_id,
         tender_ref: flag.tender_ref || detail?.tender_id || "",
         tender_date: tenderDateOf(flag.tender_ref || detail?.tender_id || ""),
-        title: detail?.title ?? null,
-        status: detail?.status ?? null,
-        method: detail?.method ?? null,
-        entity_edrpou: flag.entity_edrpou ?? detail?.entity_edrpou ?? null,
-        entity_name: flag.entity_name ?? detail?.entity_name ?? null,
-        region: flag.region ?? detail?.region ?? null,
-        value_amount: flag.value_amount ?? detail?.value_amount ?? null,
+        title: null,
+        status: null,
+        method: null,
+        entity_edrpou: flag.entity_edrpou ?? null,
+        entity_name: flag.entity_name ?? null,
+        region: flag.region ?? null,
+        value_amount: flag.value_amount ?? null,
         date_assessed: flag.date_assessed,
         risks: [],
-        officer_name: detail?.officer_name ?? null,
-        officer_email: detail?.officer_email ?? null,
-        officer_phone: detail?.officer_phone ?? null,
-        officer_key: detail ? officerKey(detail) : null,
-        winner_name: won?.supplier_name ?? null,
-        winner_edrpou: won?.supplier_edrpou ?? null,
-        winner_amount: won?.amount ?? null,
-        bidders: bidCount.get(flag.tender_id) ?? 0,
-        detailed: Boolean(detail),
+        officer_name: null,
+        officer_email: null,
+        officer_phone: null,
+        officer_key: null,
+        winner_name: null,
+        winner_edrpou: null,
+        winner_amount: null,
+        bidders: 0,
+        detailed: false,
         findings: findingsByTender.get(flag.tender_id) ?? [],
         audit: auditByTender.get(flag.tender_id) ?? null
       };
+      if (detail) {
+        entry = mergeCardDetail(entry, {
+          tender: detail,
+          items: [],
+          bids: bidsByTender.get(flag.tender_id) ?? [],
+          awards: awardsByTender.get(flag.tender_id) ?? []
+        });
+      }
       byTender.set(flag.tender_id, entry);
     }
     if (!entry.tender_ref && flag.tender_ref) {
@@ -2701,10 +2737,54 @@ function notFound() {
   });
 }
 
+// src/store/supabase-cards.ts
+function loadSupabaseConfig(env = process.env) {
+  const url = env.SUPABASE_URL;
+  const serviceKey = env.SUPABASE_SERVICE_KEY;
+  return url && serviceKey ? { url, serviceKey } : null;
+}
+function headers(config, extra = {}) {
+  return {
+    apikey: config.serviceKey,
+    Authorization: `Bearer ${config.serviceKey}`,
+    "content-type": "application/json",
+    ...extra
+  };
+}
+async function getCard(config, id, fetchImpl = fetch) {
+  const base = `${config.url.replace(/\/$/, "")}/rest/v1`;
+  async function rows(path) {
+    const res = await fetchImpl(`${base}/${path}`, { method: "GET", headers: headers(config) });
+    if (!res.ok) throw new Error(`Supabase read returned ${res.status}`);
+    return await res.json();
+  }
+  const enc = encodeURIComponent(id);
+  const [tender] = await rows(`tenders?id=eq.${enc}`);
+  if (!tender) return null;
+  const [items, bids, awards] = await Promise.all([
+    rows(`tender_items?tender_id=eq.${enc}`),
+    rows(`bids?tender_id=eq.${enc}`),
+    rows(`awards?tender_id=eq.${enc}`)
+  ]);
+  return { tender, items, bids, awards };
+}
+
 // server/pages/tender.ts
-function tenderPage(tenderId) {
-  const entry = dataset().byTender.get(tenderId);
-  if (!entry) return notFound();
+async function tenderPage(tenderId) {
+  const base = dataset().byTender.get(tenderId);
+  if (!base) return notFound();
+  let entry = base;
+  if (!entry.detailed) {
+    const config = loadSupabaseConfig();
+    if (config) {
+      try {
+        const card = await getCard(config, tenderId);
+        if (card) entry = mergeCardDetail(base, card);
+      } catch (err) {
+        console.error(`supabase card fetch failed for ${tenderId} \u2014 ${err.message}`);
+      }
+    }
+  }
   const sameEntity = dataset().cases.filter((c) => c.entity_edrpou && c.entity_edrpou === entry.entity_edrpou);
   const sameOfficer = entry.officer_key ? dataset().cases.filter((c) => c.officer_key === entry.officer_key) : [];
   const officerValue = sameOfficer.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
@@ -3481,7 +3561,7 @@ ${found && profile ? `${star("entity", code, "/lookup?edrpou=" + encodeURICompon
 }
 
 // server/app.ts
-function render(url, saved = []) {
+async function render(url, saved = []) {
   setStarred(saved);
   const path = decodeURIComponent(url.pathname);
   if (path === "/lookup") {
@@ -3526,7 +3606,7 @@ function render(url, saved = []) {
         filename: `${entry.tender_ref || entry.tender_id}.txt`
       } : { status: 200, body: reportHtml(ctx) };
     }
-    return { status: 200, body: tenderPage(rest) };
+    return { status: 200, body: await tenderPage(rest) };
   }
   if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length), url) };
   if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length), url) };
@@ -3706,7 +3786,7 @@ function loadSubscriberConfig(env = process.env) {
 }
 function createSubscriberStore(config, fetchImpl = fetch) {
   const endpoint = `${config.url.replace(/\/$/, "")}/rest/v1/tg_subscribers`;
-  const headers = {
+  const headers2 = {
     apikey: config.serviceKey,
     Authorization: `Bearer ${config.serviceKey}`,
     "content-type": "application/json"
@@ -3725,7 +3805,7 @@ function createSubscriberStore(config, fetchImpl = fetch) {
     async add(chatId) {
       await call(endpoint, {
         method: "POST",
-        headers: { ...headers, Prefer: "resolution=merge-duplicates,return=minimal" },
+        headers: { ...headers2, Prefer: "resolution=merge-duplicates,return=minimal" },
         body: JSON.stringify({ chat_id: chatId, unsubscribed_at: null })
       });
     },
@@ -3733,14 +3813,14 @@ function createSubscriberStore(config, fetchImpl = fetch) {
     async remove(chatId) {
       await call(`${endpoint}?chat_id=eq.${chatId}`, {
         method: "PATCH",
-        headers: { ...headers, Prefer: "return=minimal" },
+        headers: { ...headers2, Prefer: "return=minimal" },
         body: JSON.stringify({ unsubscribed_at: (/* @__PURE__ */ new Date()).toISOString() })
       });
     },
     async listActive() {
       const res = await call(`${endpoint}?select=chat_id&unsubscribed_at=is.null`, {
         method: "GET",
-        headers
+        headers: headers2
       });
       const rows = await res.json();
       return rows.map((row) => row.chat_id);
@@ -3778,13 +3858,13 @@ async function sendTelegramTo(config, chatId, text) {
 }
 
 // server/router.ts
-function page(status, body, headers = {}) {
-  return { status, body, headers: { "content-type": "text/html; charset=utf-8", ...headers } };
+function page(status, body, headers2 = {}) {
+  return { status, body, headers: { "content-type": "text/html; charset=utf-8", ...headers2 } };
 }
 function redirect(location, setCookie) {
-  const headers = { location };
-  if (setCookie) headers["set-cookie"] = setCookie;
-  return { status: 302, body: "", headers };
+  const headers2 = { location };
+  if (setCookie) headers2["set-cookie"] = setCookie;
+  return { status: 302, body: "", headers: headers2 };
 }
 function safeBack(value) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/starred";
@@ -3834,7 +3914,7 @@ async function handle(req) {
   const config = loadAuthConfig();
   const secure = req.url.protocol === "https:";
   const saved = parseFavourites(readCookie(req.cookieHeader, FAVOURITES_COOKIE));
-  function serve() {
+  async function serve() {
     if (req.url.pathname === "/starred/toggle" && (req.method ?? "GET").toUpperCase() === "POST") {
       const form = new URLSearchParams(req.body ?? "");
       const kind = form.get("kind") ?? "";
@@ -3843,7 +3923,7 @@ async function handle(req) {
       if (!isFavKind(kind) || !id) return redirect(back);
       return redirect(back, favouritesCookie(toggleFavourite(saved, kind, id), secure));
     }
-    const rendered = render(req.url, saved);
+    const rendered = await render(req.url, saved);
     if (rendered.contentType) {
       return {
         status: rendered.status,
@@ -3856,7 +3936,7 @@ async function handle(req) {
     }
     return page(rendered.status, rendered.body);
   }
-  if (!config) return serve();
+  if (!config) return await serve();
   const redirectUri = `${req.url.origin}/auth/callback`;
   if (req.url.pathname === "/auth/login") {
     const state = randomState();
@@ -3890,7 +3970,7 @@ async function handle(req) {
   if (!email || !config.allowedEmails.has(email)) {
     return page(200, loginPage());
   }
-  return serve();
+  return await serve();
 }
 
 // api-src/handler.ts
@@ -3902,7 +3982,7 @@ async function handler(req, res) {
   if (req.method === "POST") {
     for await (const chunk of req) payload += chunk;
   }
-  const { status, body, headers } = await handle({
+  const { status, body, headers: headers2 } = await handle({
     url,
     cookieHeader: req.headers.cookie ?? null,
     method: req.method,
@@ -3910,7 +3990,7 @@ async function handler(req, res) {
     headers: req.headers
   });
   res.statusCode = status;
-  for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
+  for (const [key, value] of Object.entries(headers2)) res.setHeader(key, value);
   res.setHeader("cache-control", "private, no-store");
   res.setHeader("vary", "Cookie");
   res.end(body);
