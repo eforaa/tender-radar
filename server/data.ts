@@ -1,8 +1,9 @@
 // Loads the store once and joins it into the shapes the pages need.
 import { openStore } from "../src/config.ts";
 import { officerKey } from "../src/normalize/tender.ts";
-import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow, RunRow, FindingRow } from "../src/store/types.ts";
+import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow, BidRow, RunRow, FindingRow } from "../src/store/types.ts";
 import { violationEstablished, conclusionText, conclusionPublished } from "../src/normalize/monitoring.ts";
+import type { Card } from "../src/store/supabase-cards.ts";
 
 /** One entry per tender: the flags that fired plus whatever the card added. */
 /**
@@ -78,6 +79,40 @@ function activeAward(awards: AwardRow[]): AwardRow | undefined {
   return awards.find((a) => a.status === "active") ?? awards[0];
 }
 
+/**
+ * Attaches everything a fetched card can tell us about a tender: the
+ * responsible officer, who won, and how many bidders showed up. This is the
+ * one derivation for "detail", used both when the dataset is built from
+ * tenders already cached locally and when the tender page pulls a card from
+ * Supabase for one that was not — so a memory-built and a Supabase-built
+ * entry come out identical.
+ */
+export function mergeCardDetail(entry: Case, card: Card): Case {
+  const detail = card.tender;
+  const won = activeAward(card.awards);
+  return {
+    ...entry,
+    title: detail.title ?? null,
+    status: detail.status ?? null,
+    method: detail.method ?? null,
+    // The flag already carries these; only fall back to the card when the
+    // flag itself did not have them, matching the original priority.
+    entity_edrpou: entry.entity_edrpou ?? detail.entity_edrpou ?? null,
+    entity_name: entry.entity_name ?? detail.entity_name ?? null,
+    region: entry.region ?? detail.region ?? null,
+    value_amount: entry.value_amount ?? detail.value_amount ?? null,
+    officer_name: detail.officer_name ?? null,
+    officer_email: detail.officer_email ?? null,
+    officer_phone: detail.officer_phone ?? null,
+    officer_key: officerKey(detail),
+    winner_name: won?.supplier_name ?? null,
+    winner_edrpou: won?.supplier_edrpou ?? null,
+    winner_amount: won?.amount ?? null,
+    bidders: card.bids.length,
+    detailed: true,
+  };
+}
+
 /** The conclusion's violationType list, which the store keeps as unknown. */
 function violationTypes(row: { conclusion: unknown }): string[] {
   const conclusion = row.conclusion as { violationType?: unknown } | null;
@@ -137,40 +172,53 @@ export async function loadDataset(): Promise<Dataset> {
     awardsByTender.set(award.tender_id, list);
   }
 
-  const bidCount = new Map<string, number>();
-  for (const bid of bids) bidCount.set(bid.tender_id, (bidCount.get(bid.tender_id) ?? 0) + 1);
+  const bidsByTender = new Map<string, BidRow[]>();
+  for (const bid of bids) {
+    const list = bidsByTender.get(bid.tender_id) ?? [];
+    list.push(bid);
+    bidsByTender.set(bid.tender_id, list);
+  }
 
   const byTender = new Map<string, Case>();
   for (const flag of flags) {
     let entry = byTender.get(flag.tender_id);
     if (!entry) {
       const detail = tenderById.get(flag.tender_id);
-      const won = activeAward(awardsByTender.get(flag.tender_id) ?? []);
       entry = {
         tender_id: flag.tender_id,
         tender_ref: flag.tender_ref || detail?.tender_id || "",
         tender_date: tenderDateOf(flag.tender_ref || detail?.tender_id || ""),
-        title: detail?.title ?? null,
-        status: detail?.status ?? null,
-        method: detail?.method ?? null,
-        entity_edrpou: flag.entity_edrpou ?? detail?.entity_edrpou ?? null,
-        entity_name: flag.entity_name ?? detail?.entity_name ?? null,
-        region: flag.region ?? detail?.region ?? null,
-        value_amount: flag.value_amount ?? detail?.value_amount ?? null,
+        title: null,
+        status: null,
+        method: null,
+        entity_edrpou: flag.entity_edrpou ?? null,
+        entity_name: flag.entity_name ?? null,
+        region: flag.region ?? null,
+        value_amount: flag.value_amount ?? null,
         date_assessed: flag.date_assessed,
         risks: [],
-        officer_name: detail?.officer_name ?? null,
-        officer_email: detail?.officer_email ?? null,
-        officer_phone: detail?.officer_phone ?? null,
-        officer_key: detail ? officerKey(detail) : null,
-        winner_name: won?.supplier_name ?? null,
-        winner_edrpou: won?.supplier_edrpou ?? null,
-        winner_amount: won?.amount ?? null,
-        bidders: bidCount.get(flag.tender_id) ?? 0,
-        detailed: Boolean(detail),
+        officer_name: null,
+        officer_email: null,
+        officer_phone: null,
+        officer_key: null,
+        winner_name: null,
+        winner_edrpou: null,
+        winner_amount: null,
+        bidders: 0,
+        detailed: false,
         findings: findingsByTender.get(flag.tender_id) ?? [],
         audit: auditByTender.get(flag.tender_id) ?? null,
       };
+      // A tender already cached locally gets its detail merged in immediately,
+      // via the same derivation the tender page uses for a live Supabase card.
+      if (detail) {
+        entry = mergeCardDetail(entry, {
+          tender: detail,
+          items: [],
+          bids: bidsByTender.get(flag.tender_id) ?? [],
+          awards: awardsByTender.get(flag.tender_id) ?? [],
+        });
+      }
       byTender.set(flag.tender_id, entry);
     }
     if (!entry.tender_ref && flag.tender_ref) {

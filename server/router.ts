@@ -133,7 +133,7 @@ export async function handle(req: HttpRequest): Promise<HttpResponse> {
   const saved = parseFavourites(readCookie(req.cookieHeader, FAVOURITES_COOKIE));
 
   /** Everything past the gate — shared by the gated and ungated paths. */
-  function serve(): HttpResponse {
+  async function serve(): Promise<HttpResponse> {
     if (req.url.pathname === "/starred/toggle" && (req.method ?? "GET").toUpperCase() === "POST") {
       const form = new URLSearchParams(req.body ?? "");
       const kind = form.get("kind") ?? "";
@@ -143,7 +143,7 @@ export async function handle(req: HttpRequest): Promise<HttpResponse> {
       return redirect(back, favouritesCookie(toggleFavourite(saved, kind, id), secure));
     }
 
-    const rendered = render(req.url, saved);
+    const rendered = await render(req.url, saved);
     if (rendered.contentType) {
       return {
         status: rendered.status,
@@ -159,7 +159,7 @@ export async function handle(req: HttpRequest): Promise<HttpResponse> {
     return page(rendered.status, rendered.body);
   }
 
-  if (!config) return serve();
+  if (!config) return await serve();
 
   const redirectUri = `${req.url.origin}/auth/callback`;
 
@@ -203,5 +203,5 @@ export async function handle(req: HttpRequest): Promise<HttpResponse> {
     return page(200, loginPage());
   }
 
-  return serve();
+  return await serve();
 }

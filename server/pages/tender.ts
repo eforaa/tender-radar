@@ -5,10 +5,29 @@ import { star, alarms, auditSection } from "../components/case-row.ts";
 import { riskCard } from "../components/risk.ts";
 import { qualificationBlock, conclusionBlock } from "../components/verdict.ts";
 import { notFound } from "./static.ts";
+import { loadSupabaseConfig, getCard } from "../../src/store/supabase-cards.ts";
+import { mergeCardDetail } from "../data.ts";
 
-export function tenderPage(tenderId: string): string {
-  const entry = dataset().byTender.get(tenderId);
-  if (!entry) return notFound();
+export async function tenderPage(tenderId: string): Promise<string> {
+  const base = dataset().byTender.get(tenderId);
+  if (!base) return notFound();
+
+  // Every flagged tender has an entry, but most lack detail (officer, bidders,
+  // winner) — those cards were never fetched into the committed dataset. Pull
+  // the card live from Supabase and merge it in. A miss or an outage leaves
+  // the entry as-is, which renders the existing "not loaded" state.
+  let entry = base;
+  if (!entry.detailed) {
+    const config = loadSupabaseConfig();
+    if (config) {
+      try {
+        const card = await getCard(config, tenderId);
+        if (card) entry = mergeCardDetail(base, card);
+      } catch (err) {
+        console.error(`supabase card fetch failed for ${tenderId} — ${(err as Error).message}`);
+      }
+    }
+  }
 
   const sameEntity = dataset().cases.filter((c) => c.entity_edrpou && c.entity_edrpou === entry.entity_edrpou);
   const sameOfficer = entry.officer_key ? dataset().cases.filter((c) => c.officer_key === entry.officer_key) : [];

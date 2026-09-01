@@ -26,8 +26,8 @@ assert.ok(entityEdrpou, "entity has no entity_edrpou despite precondition");
 assert.ok(officerKey, "officer has no officer_key despite precondition");
 assert.ok(winnerEdrpou, "winner has no winner_edrpou despite precondition");
 
-function page(path: string) {
-  return render(new URL(`https://x.test${path}`));
+async function page(path: string) {
+  return await render(new URL(`https://x.test${path}`));
 }
 
 // Each route has a distinctive marker that only it renders. Markers found in server/app.ts:
@@ -57,8 +57,8 @@ const STATIC_ROUTES = [
 ] as const;
 
 for (const [path, marker] of STATIC_ROUTES) {
-  test(`${path} renders a page`, () => {
-    const res = page(path);
+  test(`${path} renders a page`, async () => {
+    const res = await page(path);
     assert.equal(res.status, 200, `${path} did not answer 200`);
     assert.ok(res.body.includes("<!doctype html>") || res.body.includes("<!DOCTYPE html>"),
       `${path} did not return a document`);
@@ -68,60 +68,60 @@ for (const [path, marker] of STATIC_ROUTES) {
   });
 }
 
-test("a tender dossier renders", () => {
-  const res = page(`/tender/${encodeURIComponent(anyCase.tender_id)}`);
+test("a tender dossier renders", async () => {
+  const res = await page(`/tender/${encodeURIComponent(anyCase.tender_id)}`);
   assert.equal(res.status, 200);
   assert.ok(anyCase.tender_ref, "tender fixture has no tender_ref");
   assert.ok(res.body.includes(anyCase.tender_ref));
 });
 
-test("an entity dossier renders", () => {
-  const res = page(`/entity/${encodeURIComponent(entityEdrpou)}`);
+test("an entity dossier renders", async () => {
+  const res = await page(`/entity/${encodeURIComponent(entityEdrpou)}`);
   assert.equal(res.status, 200);
   assert.ok(res.body.includes(entityEdrpou), "entity page does not contain entity_edrpou");
   assert.ok(!res.body.includes("Такої сторінки немає"), "entity page rendered not-found");
 });
 
-test("an officer dossier renders", () => {
-  const res = page(`/officer/${encodeURIComponent(officerKey)}`);
+test("an officer dossier renders", async () => {
+  const res = await page(`/officer/${encodeURIComponent(officerKey)}`);
   assert.equal(res.status, 200);
   const identifyingText = withOfficer.officer_name || officerKey;
   assert.ok(res.body.includes(identifyingText), "officer page does not contain officer name or key");
   assert.ok(!res.body.includes("Такої сторінки немає"), "officer page rendered not-found");
 });
 
-test("a supplier dossier renders", () => {
-  const res = page(`/supplier/${encodeURIComponent(winnerEdrpou)}`);
+test("a supplier dossier renders", async () => {
+  const res = await page(`/supplier/${encodeURIComponent(winnerEdrpou)}`);
   assert.equal(res.status, 200);
   assert.ok(res.body.includes(winnerEdrpou), "supplier page does not contain winner_edrpou");
   assert.ok(!res.body.includes("Такої сторінки немає"), "supplier page rendered not-found");
 });
 
-test("an unknown path is a 404, not a crash", () => {
-  assert.equal(page("/no-such-page").status, 404);
+test("an unknown path is a 404, not a crash", async () => {
+  assert.equal((await page("/no-such-page")).status, 404);
 });
 
-test("an unknown tender id is a 404", () => {
-  assert.equal(page("/tender/UA-0000-00-00-000000-x/report").status, 404);
+test("an unknown tender id is a 404", async () => {
+  assert.equal((await page("/tender/UA-0000-00-00-000000-x/report")).status, 404);
 });
 
-test("the text report downloads as a file", () => {
-  const res = page(`/tender/${encodeURIComponent(anyCase.tender_id)}/report.txt`);
+test("the text report downloads as a file", async () => {
+  const res = await page(`/tender/${encodeURIComponent(anyCase.tender_id)}/report.txt`);
   assert.equal(res.status, 200);
   assert.match(res.contentType ?? "", /text\/plain/);
   assert.ok(res.filename?.endsWith(".txt"));
 });
 
-test("the HTML report renders as a page", () => {
-  const res = page(`/tender/${encodeURIComponent(anyCase.tender_id)}/report`);
+test("the HTML report renders as a page", async () => {
+  const res = await page(`/tender/${encodeURIComponent(anyCase.tender_id)}/report`);
   assert.equal(res.status, 200);
   assert.ok(res.body.includes("<!doctype html>") || res.body.includes("<!DOCTYPE html>"),
     "HTML report did not return a document");
   assert.ok(res.body.length > 500, "HTML report returned a suspiciously short body");
 });
 
-test("an article page renders", () => {
-  const res = page("/article/366");
+test("an article page renders", async () => {
+  const res = await page("/article/366");
   assert.equal(res.status, 200);
   assert.ok(res.body.includes("<!doctype html>") || res.body.includes("<!DOCTYPE html>"),
     "article page did not return a document");
@@ -130,8 +130,8 @@ test("an article page renders", () => {
   assert.ok(!res.body.includes("Такої сторінки немає"), "article page rendered not-found");
 });
 
-test("filters and grouping survive a round trip through the feed", () => {
-  const res = page("/?sort=value_desc&group=entity&preset=proven");
+test("filters and grouping survive a round trip through the feed", async () => {
+  const res = await page("/?sort=value_desc&group=entity&preset=proven");
   assert.equal(res.status, 200);
   assert.ok(res.body.length > 500);
 });

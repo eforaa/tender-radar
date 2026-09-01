@@ -29,7 +29,7 @@ export type Rendered = { status: number; body: string; contentType?: string; fil
  * Resolves one URL to a page. Pure with respect to I/O, so the same code
  * serves the local Node server and a serverless function.
  */
-export function render(url: URL, saved: Favourite[] = []): Rendered {
+export async function render(url: URL, saved: Favourite[] = []): Promise<Rendered> {
   // caseRow is called from a dozen places; threading the list through every
   // one of them would add a parameter to each. Set it once per request.
   setStarred(saved);
@@ -82,7 +82,7 @@ export function render(url: URL, saved: Favourite[] = []): Rendered {
           }
         : { status: 200, body: reportHtml(ctx) };
     }
-    return { status: 200, body: tenderPage(rest) };
+    return { status: 200, body: await tenderPage(rest) };
   }
   if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length), url) };
   if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length), url) };
