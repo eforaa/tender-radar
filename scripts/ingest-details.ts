@@ -4,10 +4,12 @@
 import { fetchTender } from "../src/sources/openprocurement.ts";
 import { normalizeTender } from "../src/normalize/tender.ts";
 import { openStore } from "../src/config.ts";
+import { loadSupabaseConfig, upsertCard } from "../src/store/supabase-cards.ts";
 import type { TenderRow, TenderItemRow, BidRow, AwardRow } from "../src/store/types.ts";
 
 const CONCURRENCY = Number(process.env.TR_CONCURRENCY ?? 6);
 const store = openStore();
+const supabase = loadSupabaseConfig();
 
 const flags = await store.allRiskFlags();
 const wanted = [...new Set(flags.map((f) => f.tender_id))];
@@ -42,6 +44,14 @@ async function worker(queue: string[]): Promise<void> {
       items.push(...normalized.items);
       bids.push(...normalized.bids);
       awards.push(...normalized.awards);
+      if (supabase) {
+        try {
+          await upsertCard(supabase, normalized);
+        } catch (err) {
+          failed++;
+          if (failed <= 5) console.log(`  ${id}: supabase upsert failed — ${(err as Error).message}`);
+        }
+      }
     } catch (err) {
       failed++;
       if (failed <= 5) console.log(`  ${id}: ${(err as Error).message}`);
