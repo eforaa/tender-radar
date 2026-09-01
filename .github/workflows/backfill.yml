@@ -1,0 +1,36 @@
+name: Бекофіл карток у Supabase
+
+# One-off, run by hand. Fetches the full card for every flagged tender that
+# Supabase does not yet hold and writes it straight into the database — never
+# into the git-backed JSON store, which cannot carry nationwide detail. It is
+# resumable: a re-run skips the ids already stored, so if the 6-hour job limit
+# cuts it off, dispatch it again and it continues.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: backfill-cards
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Встановити залежності
+        run: npm ci
+
+      - name: Наповнити картки
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          # Someone else's public API, no deadline: keep the parallelism gentle.
+          TR_CONCURRENCY: "4"
+        run: npm run backfill:cards
