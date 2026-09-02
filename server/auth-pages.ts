@@ -13,6 +13,9 @@ const SHELL_STYLES = `
   --line:#252C42;--accent:#4F7CFF;--accent-bg:#1B2547;--alarm:#FF6B6B;--alarm-bg:#2A1620;
   --shadow:0 16px 40px -20px rgba(0,0,0,.6);--radius:12px;
   --f-display:"DM Sans","Segoe UI",system-ui,sans-serif;--f-body:"DM Sans","Segoe UI",system-ui,sans-serif}
+:root[data-theme="light"]{color-scheme:light;--paper:#FBFBFD;--surface:#FFFFFF;--ink:#14181A;--ink-soft:#565B60;
+  --line:#E4E6EE;--accent:#3D5FE0;--accent-bg:#EAEEFF;--alarm:#C0392B;--alarm-bg:#FBEAE7;
+  --shadow:0 12px 32px -20px rgba(20,24,26,.28)}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
 background:var(--paper);color:var(--ink);font-family:var(--f-body);padding:var(--s5)}
@@ -33,7 +36,8 @@ function shell(title: string, body: string): string {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<style>${SHELL_STYLES}</style></head>
+<style>${SHELL_STYLES}</style>
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script></head>
 <body><div class="box">${body}</div></body></html>`;
 }
 

@@ -109,6 +109,20 @@ const STYLES = `
   --f-body:"DM Sans","Segoe UI",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",Consolas,monospace;
 }
+/* Light theme: same indigo brand on paper. Chosen by the header toggle, which
+   stamps data-theme="light" on <html> and remembers it. Only the colours flip;
+   the scale, radius and fonts stay. */
+:root[data-theme="light"]{
+  color-scheme:light;
+  --paper:#FBFBFD; --surface:#FFFFFF; --surface-2:#F1F3F8;
+  --ink:#14181A; --ink-soft:#565B60; --ink-faint:#8B9096;
+  --line:#E4E6EE; --line-soft:#EEF0F6;
+  --accent:#3D5FE0; --accent-bg:#EAEEFF;
+  --alarm:#C0392B; --alarm-bg:#FBEAE7;
+  --warn:#9A6A15;  --warn-bg:#FAF2DE;
+  --calm:#1E7A46;  --calm-bg:#E6F4EC;
+  --shadow:0 12px 32px -20px rgba(20,24,26,.28);
+}
 *{box-sizing:border-box}
 pre,table{overflow-x:auto;max-width:100%}
 html{scroll-behavior:smooth}
@@ -289,6 +303,12 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 .starred-btn{display:inline-flex;align-items:center;gap:var(--s2);text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:var(--s1) var(--s3);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
 .starred-btn:hover{color:var(--accent);border-color:var(--accent)}
 .starred-btn.on{color:var(--accent);background:var(--accent-bg);border-color:var(--accent);font-weight:500}
+.theme-btn{display:inline-flex;align-items:center;justify-content:center;width:2.4rem;height:2.4rem;padding:0;cursor:pointer;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--ink-soft);font-size:1.05rem;line-height:1}
+.theme-btn:hover{color:var(--accent);border-color:var(--accent)}
+/* Dark shows the sun (tap for light); light shows the moon (tap for dark). */
+.theme-moon{display:none}
+:root[data-theme="light"] .theme-sun{display:none}
+:root[data-theme="light"] .theme-moon{display:inline}
 .filter-label{font-size:.92rem;color:var(--ink-faint);white-space:nowrap}
 select:disabled{opacity:.5;cursor:not-allowed}
 
@@ -430,6 +450,7 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   /* On desktop .nav's margin-left:auto pushes the burger to the right edge;
      the phone hides .nav, so the burger needs its own push or it hugs the
      logo. This keeps the logo left and the burger at the far right. */
+  .theme-btn{width:2.75rem;height:2.75rem}
   .burger{width:2.75rem;height:2.75rem;margin-left:auto}
   .starred-btn{min-height:2.75rem;padding:var(--s2) var(--s3)}
   .starred-btn span{display:none}
@@ -587,6 +608,9 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>${STYLES}</style>
+<!-- The site's only script: it applies the saved theme before the first paint,
+     so a light-theme reader never sees a dark flash. Everything else is CSS. -->
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
 <input type="checkbox" id="menu-toggle" class="sr-only" aria-label="Показати всі розділи">
@@ -598,6 +622,7 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
     <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>Про систему</a>
   </nav>
   <a class="starred-btn${opts.nav === "starred" ? " on" : ""}" href="/starred" title="Обране">★<span>Обране</span></a>
+  <button class="theme-btn" type="button" title="Світла або темна тема" aria-label="Перемкнути тему" onclick="(function(){try{var r=document.documentElement,n=r.dataset.theme==='light'?'dark':'light';r.dataset.theme=n;localStorage.setItem('theme',n);}catch(e){}})()"><span class="theme-sun">☀</span><span class="theme-moon">☾</span></button>
   <label class="burger" for="menu-toggle" role="button" aria-label="Усі розділи" title="Усі розділи"><span></span><span></span><span></span></label>
 </div></header>
 <label class="scrim" for="menu-toggle" aria-hidden="true"></label>
