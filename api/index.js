@@ -572,6 +572,20 @@ var STYLES = `
   --f-body:"DM Sans","Segoe UI",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",Consolas,monospace;
 }
+/* Light theme: same indigo brand on paper. Chosen by the header toggle, which
+   stamps data-theme="light" on <html> and remembers it. Only the colours flip;
+   the scale, radius and fonts stay. */
+:root[data-theme="light"]{
+  color-scheme:light;
+  --paper:#FBFBFD; --surface:#FFFFFF; --surface-2:#F1F3F8;
+  --ink:#14181A; --ink-soft:#565B60; --ink-faint:#8B9096;
+  --line:#E4E6EE; --line-soft:#EEF0F6;
+  --accent:#3D5FE0; --accent-bg:#EAEEFF;
+  --alarm:#C0392B; --alarm-bg:#FBEAE7;
+  --warn:#9A6A15;  --warn-bg:#FAF2DE;
+  --calm:#1E7A46;  --calm-bg:#E6F4EC;
+  --shadow:0 12px 32px -20px rgba(20,24,26,.28);
+}
 *{box-sizing:border-box}
 pre,table{overflow-x:auto;max-width:100%}
 html{scroll-behavior:smooth}
@@ -752,6 +766,12 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 .starred-btn{display:inline-flex;align-items:center;gap:var(--s2);text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:var(--s1) var(--s3);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
 .starred-btn:hover{color:var(--accent);border-color:var(--accent)}
 .starred-btn.on{color:var(--accent);background:var(--accent-bg);border-color:var(--accent);font-weight:500}
+.theme-btn{display:inline-flex;align-items:center;justify-content:center;width:2.4rem;height:2.4rem;padding:0;cursor:pointer;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--ink-soft);font-size:1.05rem;line-height:1}
+.theme-btn:hover{color:var(--accent);border-color:var(--accent)}
+/* Dark shows the sun (tap for light); light shows the moon (tap for dark). */
+.theme-moon{display:none}
+:root[data-theme="light"] .theme-sun{display:none}
+:root[data-theme="light"] .theme-moon{display:inline}
 .filter-label{font-size:.92rem;color:var(--ink-faint);white-space:nowrap}
 select:disabled{opacity:.5;cursor:not-allowed}
 
@@ -893,6 +913,7 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   /* On desktop .nav's margin-left:auto pushes the burger to the right edge;
      the phone hides .nav, so the burger needs its own push or it hugs the
      logo. This keeps the logo left and the burger at the far right. */
+  .theme-btn{width:2.75rem;height:2.75rem}
   .burger{width:2.75rem;height:2.75rem;margin-left:auto}
   .starred-btn{min-height:2.75rem;padding:var(--s2) var(--s3)}
   .starred-btn span{display:none}
@@ -1039,6 +1060,9 @@ function layout(opts) {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>${STYLES}</style>
+<!-- The site's only script: it applies the saved theme before the first paint,
+     so a light-theme reader never sees a dark flash. Everything else is CSS. -->
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body>
 <input type="checkbox" id="menu-toggle" class="sr-only" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0432\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
@@ -1050,6 +1074,7 @@ function layout(opts) {
     <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443</a>
   </nav>
   <a class="starred-btn${opts.nav === "starred" ? " on" : ""}" href="/starred" title="\u041E\u0431\u0440\u0430\u043D\u0435">\u2605<span>\u041E\u0431\u0440\u0430\u043D\u0435</span></a>
+  <button class="theme-btn" type="button" title="\u0421\u0432\u0456\u0442\u043B\u0430 \u0430\u0431\u043E \u0442\u0435\u043C\u043D\u0430 \u0442\u0435\u043C\u0430" aria-label="\u041F\u0435\u0440\u0435\u043C\u043A\u043D\u0443\u0442\u0438 \u0442\u0435\u043C\u0443" onclick="(function(){try{var r=document.documentElement,n=r.dataset.theme==='light'?'dark':'light';r.dataset.theme=n;localStorage.setItem('theme',n);}catch(e){}})()"><span class="theme-sun">\u2600</span><span class="theme-moon">\u263E</span></button>
   <label class="burger" for="menu-toggle" role="button" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438" title="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438"><span></span><span></span><span></span></label>
 </div></header>
 <label class="scrim" for="menu-toggle" aria-hidden="true"></label>
@@ -3648,6 +3673,9 @@ var SHELL_STYLES = `
   --line:#252C42;--accent:#4F7CFF;--accent-bg:#1B2547;--alarm:#FF6B6B;--alarm-bg:#2A1620;
   --shadow:0 16px 40px -20px rgba(0,0,0,.6);--radius:12px;
   --f-display:"DM Sans","Segoe UI",system-ui,sans-serif;--f-body:"DM Sans","Segoe UI",system-ui,sans-serif}
+:root[data-theme="light"]{color-scheme:light;--paper:#FBFBFD;--surface:#FFFFFF;--ink:#14181A;--ink-soft:#565B60;
+  --line:#E4E6EE;--accent:#3D5FE0;--accent-bg:#EAEEFF;--alarm:#C0392B;--alarm-bg:#FBEAE7;
+  --shadow:0 12px 32px -20px rgba(20,24,26,.28)}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
 background:var(--paper);color:var(--ink);font-family:var(--f-body);padding:var(--s5)}
@@ -3667,7 +3695,8 @@ function shell(title, body) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<style>${SHELL_STYLES}</style></head>
+<style>${SHELL_STYLES}</style>
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script></head>
 <body><div class="box">${body}</div></body></html>`;
 }
 function loginPage() {
