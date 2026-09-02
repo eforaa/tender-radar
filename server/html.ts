@@ -156,6 +156,17 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
 .drawer a:hover{background:var(--surface-2);color:var(--accent)}
 .drawer a[aria-current]{background:var(--accent-bg);color:var(--accent);font-weight:500;box-shadow:inset 3px 0 0 var(--accent)}
 .drawer small{color:var(--ink-faint);font-size:.82rem;font-weight:400}
+/* A collapsible group of related pages. The summary looks like a drawer link
+   but carries a chevron that rotates when the group opens; the children are
+   indented so the grouping reads at a glance. */
+.drawer-group{border-bottom:1px solid var(--line-soft)}
+.drawer-group>summary{display:flex;flex-direction:column;gap:var(--s1);padding:var(--s3) var(--s4);cursor:pointer;color:var(--ink);font-size:.99rem;list-style:none;position:relative}
+.drawer-group>summary::-webkit-details-marker{display:none}
+.drawer-group>summary::after{content:"";position:absolute;right:var(--s4);top:var(--s4);width:.5rem;height:.5rem;border-right:2px solid var(--ink-faint);border-bottom:2px solid var(--ink-faint);transform:rotate(45deg);transition:transform .2s ease}
+.drawer-group[open]>summary::after{transform:rotate(225deg)}
+.drawer-group>summary:hover{background:var(--surface-2);color:var(--accent)}
+.drawer-group>a{padding-left:var(--s6);background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
+.drawer-group>a:last-child{border-bottom:0}
 
 @media (prefers-reduced-motion: reduce){.drawer,.scrim,.filters-drawer,.filters-scrim{transition-duration:.01ms}}
 
@@ -532,9 +543,15 @@ const MENU = [
   { href: "/starred", nav: "starred", label: "Обране", hint: "усе, що ви позначили зірочкою" },
   { href: "/lookup", nav: "lookup", label: "Пошук за ЄДРПОУ", hint: "перевірити будь-яке підприємство" },
   { href: "/article/366", nav: "article-366", label: "Підроблення документів", hint: "розбіжності в договорах і звітах" },
-  { href: "/entities", nav: "entities", label: "Хто купує", hint: "установи-замовники" },
-  { href: "/suppliers", nav: "suppliers", label: "Хто продає", hint: "компанії-переможці" },
-  { href: "/officers", nav: "officers", label: "Хто відповідає", hint: "посадовці, що вели закупівлі" },
+  {
+    label: "Хто є хто",
+    hint: "замовники, переможці, посадовці",
+    children: [
+      { href: "/entities", nav: "entities", label: "Хто купує", hint: "установи-замовники" },
+      { href: "/suppliers", nav: "suppliers", label: "Хто продає", hint: "компанії-переможці" },
+      { href: "/officers", nav: "officers", label: "Хто відповідає", hint: "посадовці, що вели закупівлі" },
+    ],
+  },
   { href: "/indicators", nav: "indicators", label: "Що ми перевіряємо", hint: "усі ознаки простими словами" },
   { href: "/updates", nav: "updates", label: "Що нового", hint: "останнє оновлення бази" },
   { href: "/about", nav: "about", label: "Про систему", hint: "звідки дані і чого вона не робить" },
@@ -589,10 +606,21 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
     <strong>Розділи</strong>
     <label class="drawer-close" for="menu-toggle" role="button" aria-label="Закрити">&times;</label>
   </div>
-  ${MENU.map(
-    (item) =>
-      `<a href="${item.href}"${opts.nav === item.nav ? ' aria-current="page"' : ""}>${item.label}<small>${item.hint}</small></a>`,
-  ).join("")}
+  ${MENU.map((item) => {
+    if (!item.children) {
+      return `<a href="${item.href}"${opts.nav === item.nav ? ' aria-current="page"' : ""}>${item.label}<small>${item.hint}</small></a>`;
+    }
+    // A collapsible group so the three directory pages do not crowd the drawer.
+    // <details> is the CSS-only disclosure this whole site relies on; it opens
+    // itself when the reader is already on one of its pages.
+    const here = item.children.some((c) => c.nav === opts.nav);
+    return `<details class="drawer-group"${here ? " open" : ""}>
+    <summary>${item.label}<small>${item.hint}</small></summary>
+    ${item.children
+      .map((c) => `<a href="${c.href}"${opts.nav === c.nav ? ' aria-current="page"' : ""}>${c.label}<small>${c.hint}</small></a>`)
+      .join("")}
+  </details>`;
+  }).join("")}
 </nav>
 <main class="wrap">
 ${opts.body}
