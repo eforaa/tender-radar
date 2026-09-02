@@ -619,6 +619,17 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
 .drawer a:hover{background:var(--surface-2);color:var(--accent)}
 .drawer a[aria-current]{background:var(--accent-bg);color:var(--accent);font-weight:500;box-shadow:inset 3px 0 0 var(--accent)}
 .drawer small{color:var(--ink-faint);font-size:.82rem;font-weight:400}
+/* A collapsible group of related pages. The summary looks like a drawer link
+   but carries a chevron that rotates when the group opens; the children are
+   indented so the grouping reads at a glance. */
+.drawer-group{border-bottom:1px solid var(--line-soft)}
+.drawer-group>summary{display:flex;flex-direction:column;gap:var(--s1);padding:var(--s3) var(--s4);cursor:pointer;color:var(--ink);font-size:.99rem;list-style:none;position:relative}
+.drawer-group>summary::-webkit-details-marker{display:none}
+.drawer-group>summary::after{content:"";position:absolute;right:var(--s4);top:var(--s4);width:.5rem;height:.5rem;border-right:2px solid var(--ink-faint);border-bottom:2px solid var(--ink-faint);transform:rotate(45deg);transition:transform .2s ease}
+.drawer-group[open]>summary::after{transform:rotate(225deg)}
+.drawer-group>summary:hover{background:var(--surface-2);color:var(--accent)}
+.drawer-group>a{padding-left:var(--s6);background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
+.drawer-group>a:last-child{border-bottom:0}
 
 @media (prefers-reduced-motion: reduce){.drawer,.scrim,.filters-drawer,.filters-scrim{transition-duration:.01ms}}
 
@@ -993,9 +1004,15 @@ var MENU = [
   { href: "/starred", nav: "starred", label: "\u041E\u0431\u0440\u0430\u043D\u0435", hint: "\u0443\u0441\u0435, \u0449\u043E \u0432\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0438 \u0437\u0456\u0440\u043E\u0447\u043A\u043E\u044E" },
   { href: "/lookup", nav: "lookup", label: "\u041F\u043E\u0448\u0443\u043A \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423", hint: "\u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0431\u0443\u0434\u044C-\u044F\u043A\u0435 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E" },
   { href: "/article/366", nav: "article-366", label: "\u041F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432", hint: "\u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445 \u0456 \u0437\u0432\u0456\u0442\u0430\u0445" },
-  { href: "/entities", nav: "entities", label: "\u0425\u0442\u043E \u043A\u0443\u043F\u0443\u0454", hint: "\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438-\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438" },
-  { href: "/suppliers", nav: "suppliers", label: "\u0425\u0442\u043E \u043F\u0440\u043E\u0434\u0430\u0454", hint: "\u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457-\u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456" },
-  { href: "/officers", nav: "officers", label: "\u0425\u0442\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0454", hint: "\u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456, \u0449\u043E \u0432\u0435\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456" },
+  {
+    label: "\u0425\u0442\u043E \u0454 \u0445\u0442\u043E",
+    hint: "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438, \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456, \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
+    children: [
+      { href: "/entities", nav: "entities", label: "\u0425\u0442\u043E \u043A\u0443\u043F\u0443\u0454", hint: "\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438-\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438" },
+      { href: "/suppliers", nav: "suppliers", label: "\u0425\u0442\u043E \u043F\u0440\u043E\u0434\u0430\u0454", hint: "\u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457-\u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456" },
+      { href: "/officers", nav: "officers", label: "\u0425\u0442\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0454", hint: "\u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456, \u0449\u043E \u0432\u0435\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456" }
+    ]
+  },
   { href: "/indicators", nav: "indicators", label: "\u0429\u043E \u043C\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E", hint: "\u0443\u0441\u0456 \u043E\u0437\u043D\u0430\u043A\u0438 \u043F\u0440\u043E\u0441\u0442\u0438\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438" },
   { href: "/updates", nav: "updates", label: "\u0429\u043E \u043D\u043E\u0432\u043E\u0433\u043E", hint: "\u043E\u0441\u0442\u0430\u043D\u043D\u0454 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0431\u0430\u0437\u0438" },
   { href: "/about", nav: "about", label: "\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443", hint: "\u0437\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456 \u0456 \u0447\u043E\u0433\u043E \u0432\u043E\u043D\u0430 \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C" }
@@ -1041,9 +1058,16 @@ function layout(opts) {
     <strong>\u0420\u043E\u0437\u0434\u0456\u043B\u0438</strong>
     <label class="drawer-close" for="menu-toggle" role="button" aria-label="\u0417\u0430\u043A\u0440\u0438\u0442\u0438">&times;</label>
   </div>
-  ${MENU.map(
-    (item) => `<a href="${item.href}"${opts.nav === item.nav ? ' aria-current="page"' : ""}>${item.label}<small>${item.hint}</small></a>`
-  ).join("")}
+  ${MENU.map((item) => {
+    if (!item.children) {
+      return `<a href="${item.href}"${opts.nav === item.nav ? ' aria-current="page"' : ""}>${item.label}<small>${item.hint}</small></a>`;
+    }
+    const here = item.children.some((c) => c.nav === opts.nav);
+    return `<details class="drawer-group"${here ? " open" : ""}>
+    <summary>${item.label}<small>${item.hint}</small></summary>
+    ${item.children.map((c) => `<a href="${c.href}"${opts.nav === c.nav ? ' aria-current="page"' : ""}>${c.label}<small>${c.hint}</small></a>`).join("")}
+  </details>`;
+  }).join("")}
 </nav>
 <main class="wrap">
 ${opts.body}
