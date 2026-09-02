@@ -704,7 +704,7 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 
 /* one-click starting points */
 .presets{display:flex;flex-wrap:wrap;gap:var(--s2);margin:0 0 var(--s3)}
-.preset{text-decoration:none;font-size:.88rem;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:var(--s2) var(--s4);white-space:nowrap}
+.preset{text-decoration:none;font-size:.8rem;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:var(--s1) var(--s3);white-space:nowrap}
 .preset:hover{border-color:var(--accent);color:var(--accent)}
 .preset.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
 
