@@ -547,31 +547,29 @@ function trim(text, max = 130) {
 }
 var STYLES = `
 :root{
-  color-scheme: light;
+  color-scheme: dark;
 
-  /* Rhythm. Every spacing value in this file comes from here \u2014 the old file
-     had twenty ad-hoc values, and that irregularity is what read as clutter. */
+  /* Rhythm. Every spacing value in this file comes from here. */
   --s1:.25rem; --s2:.5rem;  --s3:.75rem; --s4:1rem;
   --s5:1.5rem; --s6:2rem;   --s7:3rem;   --s8:4rem;
 
-  /* Paper, not screen: the old palette had a cold blue cast that dated it. */
-  --paper:#FCFCFA; --surface:#FFFFFF; --surface-2:#F3F3EF;
-  --ink:#14181A; --ink-soft:#565B60; --ink-faint:#8B9096;
-  --line:#E4E3DD; --line-soft:#EFEEE9;
+  /* AiVocado Office design language: a dark navy ground, translucent panels,
+     an indigo accent with a faint magenta ambient glow. */
+  --paper:#0A0E1A; --surface:#10152A; --surface-2:#161C33;
+  --ink:#E2E8F0; --ink-soft:#9AA5B8; --ink-faint:#6B7688;
+  --line:#252C42; --line-soft:#1B2138;
 
-  --accent:#0F5C8C; --accent-bg:#E8F0F7;
-  --alarm:#B02418; --alarm-bg:#FBEAE7;
-  --warn:#8A6100;  --warn-bg:#FAF2DE;
-  --calm:#1E6B43;  --calm-bg:#E6F1EA;
+  --accent:#4F7CFF; --accent-bg:#1B2547;
+  --alarm:#FF6B6B; --alarm-bg:#2A1620;
+  --warn:#E0A83E;  --warn-bg:#241D12;
+  --calm:#4ADE80;  --calm-bg:#122417;
 
-  /* One shadow, for the drawer that genuinely floats. Cards use their border. */
-  --shadow:0 12px 32px -20px rgba(20,24,26,.45);
-  --radius:8px; --radius-sm:4px;
+  --shadow:0 16px 40px -20px rgba(0,0,0,.6);
+  --radius:12px; --radius-sm:8px;
 
-  /* One voice instead of the safe serif-plus-grotesque pair. Ysabeau is a
-     Garamond-boned sans that carries both display sizes and body copy. */
-  --f-display:"Ysabeau","Segoe UI",system-ui,sans-serif;
-  --f-body:"Ysabeau","Segoe UI",system-ui,sans-serif;
+  /* DM Sans, carried from AiVocado Office \u2014 one voice, display and body. */
+  --f-display:"DM Sans","Segoe UI",system-ui,sans-serif;
+  --f-body:"DM Sans","Segoe UI",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",Consolas,monospace;
 }
 *{box-sizing:border-box}
@@ -729,7 +727,7 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 .star-form{display:inline;margin:0}
 .star{background:none;border:0;padding:0 var(--s2) 0 0;margin:0;cursor:pointer;font-size:1.15rem;line-height:1;color:var(--ink-faint);border-radius:var(--radius);vertical-align:baseline}
 .star:hover{color:var(--warn)}
-.star.on{color:#D9A21B}
+.star.on{color:#FBBF24}
 .star span{display:none}
 .name .star{float:left}
 
@@ -771,7 +769,7 @@ select:disabled{opacity:.5;cursor:not-allowed}
 .sev-high .dot{background:var(--alarm)}
 .sev-medium .dot{background:var(--warn)}
 .sev-clear .dot{background:var(--calm)}
-.sev-low .dot{background:#C4D0D6}
+.sev-low .dot{background:var(--ink-faint)}
 
 .row .who{min-width:0}
 .row .name{font-size:1rem;font-weight:600;line-height:1.4;letter-spacing:-.005em;overflow-wrap:anywhere}
@@ -1022,7 +1020,7 @@ function layout(opts) {
 <meta property="og:image" content="/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ysabeau:wght@300..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>${STYLES}</style>
 </head>
 <body>
@@ -3617,15 +3615,15 @@ async function render(url, saved = []) {
 // server/auth-pages.ts
 var SHELL_STYLES = `
 :root{
-  color-scheme:light;
-  /* Same scale as the site (server/html.ts) \u2014 kept local rather than shared
+  color-scheme:dark;
+  /* Same tokens as the site (server/html.ts) \u2014 kept local rather than shared
      because this shell has no import path back to that stylesheet. */
   --s1:.25rem; --s2:.5rem; --s3:.75rem; --s4:1rem;
   --s5:1.5rem; --s6:2rem;  --s7:3rem;   --s8:4rem;
-  --paper:#FCFCFA;--surface:#FFFFFF;--ink:#14181A;--ink-soft:#565B60;
-  --line:#E4E3DD;--accent:#0F5C8C;--accent-bg:#E8F0F7;--alarm:#B02418;--alarm-bg:#FBEAE7;
-  --shadow:0 12px 32px -20px rgba(20,24,26,.45);--radius:8px;
-  --f-display:"Ysabeau","Segoe UI",system-ui,sans-serif;--f-body:"Ysabeau","Segoe UI",system-ui,sans-serif}
+  --paper:#0A0E1A;--surface:#10152A;--ink:#E2E8F0;--ink-soft:#9AA5B8;
+  --line:#252C42;--accent:#4F7CFF;--accent-bg:#1B2547;--alarm:#FF6B6B;--alarm-bg:#2A1620;
+  --shadow:0 16px 40px -20px rgba(0,0,0,.6);--radius:12px;
+  --f-display:"DM Sans","Segoe UI",system-ui,sans-serif;--f-body:"DM Sans","Segoe UI",system-ui,sans-serif}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
 background:var(--paper);color:var(--ink);font-family:var(--f-body);padding:var(--s5)}
@@ -3644,7 +3642,7 @@ function shell(title, body) {
 <title>${esc(title)} \u2014 Tender Radar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ysabeau:wght@300..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>${SHELL_STYLES}</style></head>
 <body><div class="box">${body}</div></body></html>`;
 }
