@@ -93,7 +93,7 @@ const STYLES = `
   /* AiVocado Office design language: a dark navy ground, translucent panels,
      an indigo accent with a faint magenta ambient glow. */
   --paper:#0A0E1A; --surface:#10152A; --surface-2:#161C33;
-  --ink:#E2E8F0; --ink-soft:#9AA5B8; --ink-faint:#6B7688;
+  --ink:#E2E8F0; --ink-soft:#9AA5B8; --ink-faint:#8791A4;
   --line:#252C42; --line-soft:#1B2138;
 
   --accent:#4F7CFF; --accent-bg:#1B2547;

@@ -1,0 +1,36 @@
+name: Перенести картки з Supabase у базу
+
+# One-off, run by hand once TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are set.
+# Copies the detail cards and Telegram subscribers the old Supabase project
+# holds into the new database, so the backfill hours already spent are kept.
+# Safe to re-run — every write is an upsert. Supabase still serves reads after
+# its free quota is exhausted, which is all this needs.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: backfill-cards
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Встановити залежності
+        run: npm ci
+
+      - name: Перенести
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: npm run migrate:supabase
