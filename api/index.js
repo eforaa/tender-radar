@@ -64,9 +64,9 @@ function serialiseFavourites(favourites) {
 function isStarred(favourites, kind, id) {
   return favourites.some((f) => f.kind === kind && f.id === id);
 }
-function toggleFavourite(current, kind, id) {
-  if (!isUsableId(id)) return current;
-  return isStarred(current, kind, id) ? current.filter((f) => !(f.kind === kind && f.id === id)) : [{ kind, id }, ...current];
+function toggleFavourite(current2, kind, id) {
+  if (!isUsableId(id)) return current2;
+  return isStarred(current2, kind, id) ? current2.filter((f) => !(f.kind === kind && f.id === id)) : [{ kind, id }, ...current2];
 }
 function favouritesCookie(favourites, secure) {
   const value = serialiseFavourites(favourites);
@@ -621,8 +621,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
 .scrim{position:fixed;inset:0;background:rgba(10,18,24,.42);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease;z-index:40;cursor:pointer}
 #menu-toggle:checked ~ .scrim{opacity:1;visibility:visible}
 
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(20rem,86vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
-#menu-toggle:checked ~ .drawer{transform:translateX(0)}
+/* visibility, not just transform: an off-screen drawer that is still
+   "visible" keeps its dozen links in the tab order ahead of the content. */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(20rem,86vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;transition:transform .28s cubic-bezier(.32,.72,.32,1),visibility .28s;overflow-y:auto}
+#menu-toggle:checked ~ .drawer{transform:translateX(0);visibility:visible}
+/* Skip link: the first tab stop, visible only while focused. */
+.skip{position:absolute;left:-999px;top:var(--s2);z-index:100;background:var(--accent);color:#fff;padding:var(--s2) var(--s4);border-radius:var(--radius);text-decoration:none;font-weight:500}
+.skip:focus{left:var(--s4)}
 
 .drawer-head{display:flex;align-items:center;justify-content:space-between;padding:var(--s4) var(--s4);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
 .drawer-head strong{font-family:var(--f-display);font-size:1.02rem;font-weight:700}
@@ -721,7 +726,7 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
    that only exists for the cramped case. */
 .filters-trigger{display:none}
 .filters-scrim{display:none}
-.filters-drawer{position:static;transform:none;width:auto;box-shadow:none;border:0;background:transparent;overflow:visible}
+.filters-drawer{position:static;transform:none;visibility:visible;width:auto;box-shadow:none;border:0;background:transparent;overflow:visible}
 .filters-drawer .drawer-head{display:none}
 .filters-drawer-body{padding:0}
 
@@ -816,6 +821,10 @@ select:disabled{opacity:.5;cursor:not-allowed}
 /* The compact signal replaces the chip list on the phone; desktop keeps chips. */
 .signal{display:none}
 
+/* Base chip. Every coloured variant below builds on this; without it the
+   risk chips and "\u0449\u0435 N" links rendered as bare text. */
+.flags{display:flex;flex-wrap:wrap;gap:var(--s1)}
+.flag{display:inline-flex;align-items:center;font-size:.8rem;line-height:1.3;padding:var(--s1) var(--s2);border:1px solid var(--line);border-radius:999px;color:var(--ink-soft);text-decoration:none;white-space:nowrap}
 a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .flag.alarm{border-color:var(--alarm);background:var(--alarm-bg);color:var(--alarm);font-weight:500}
 .flag.warn{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
@@ -857,10 +866,14 @@ dl.facts dd{margin:0;font-size:1rem}
 dl.facts dd strong{font-weight:600}
 
 /* ---------- misc ---------- */
-.pager{display:flex;gap:var(--s3);align-items:center;margin-top:var(--s5);font-size:.94rem}
-.pager a{padding:var(--s2) var(--s4);border:1px solid var(--line);background:var(--surface);text-decoration:none}
+.pager{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;margin-top:var(--s5);font-size:.94rem}
+.pager a{padding:var(--s2) var(--s3);border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);text-decoration:none;min-height:2.4rem;display:inline-flex;align-items:center}
 .pager a:hover{border-color:var(--accent)}
 .pager span{color:var(--ink-faint)}
+.pager .jump{display:inline-flex;align-items:center;gap:var(--s2);color:var(--ink-faint);margin:0 auto}
+.pager .jump input{width:4.5rem;padding:var(--s1) var(--s2);border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font:inherit;text-align:center}
+.pager .jump button{padding:var(--s1) var(--s3);border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);color:var(--accent);font:inherit;cursor:pointer}
+.pager .jump button:hover{border-color:var(--accent)}
 .empty{background:var(--surface);border:1px dashed var(--line);padding:var(--s7) var(--s5);text-align:center;color:var(--ink-soft)}
 .card ul{margin:var(--s1) 0 var(--s4);padding-left:var(--s4);color:var(--ink-soft);max-width:68ch}
 .card li{margin-bottom:var(--s2)}
@@ -898,10 +911,13 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
 @media (max-width:44rem){
   body{font-size:16px}
 
-  /* The phone job is scanning the feed, so the first screen must be tenders,
-     not onboarding. The explainer strip and the stat block are things a
-     returning reader has already read; the /about link keeps them a tap away. */
-  .sub,.primer,details.help{display:none}
+  /* The phone job is scanning the feed, so on the LIST pages the first screen
+     must be tenders, not onboarding: the explainer strip and the help fold
+     go. Everywhere else the subtitle carries facts \u2014 a \u0404\u0414\u0420\u041F\u041E\u0423, an
+     institution, the latest run \u2014 so it stays. */
+  .primer{display:none}
+  body[data-nav="feed"] .sub,body[data-nav="railway"] .sub,body[data-nav="prices"] .sub,body[data-nav="starred"] .sub,
+  body[data-nav="feed"] details.help,body[data-nav="railway"] details.help,body[data-nav="prices"] details.help{display:none}
   h1{font-size:1.3rem}
   .statline{font-size:.8rem;color:var(--ink-faint)}
 
@@ -924,7 +940,6 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   h1{font-size:1.25rem;max-width:none;margin-bottom:var(--s1)}
   h2{font-size:1.15rem;margin-top:var(--s5)}
   .sub{font-size:.88rem;margin-bottom:var(--s2)}
-  .statline{display:none}
   .presets{margin-bottom:var(--s2)}
   .sortbar{margin-bottom:var(--s2)}
   .sub,.hint,.card p,.card ul,.note,details.sub p{max-width:none}
@@ -953,8 +968,9 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   .filters-trigger{display:flex;align-items:center;justify-content:center;gap:var(--s2);width:100%;min-height:2.75rem;margin:0 0 var(--s3);padding:var(--s2) var(--s4);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--accent);font-size:.95rem;font-weight:500;cursor:pointer}
   .filters-scrim{display:block}
   #filters-toggle:checked ~ .filters-scrim{opacity:1;visibility:visible}
-  .filters-drawer{position:fixed;top:0;right:0;bottom:0;left:auto;width:min(22rem,88vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
-  #filters-toggle:checked ~ .filters-drawer{transform:translateX(0)}
+  .filters-drawer{position:fixed;top:0;right:0;bottom:0;left:auto;width:min(22rem,88vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;transition:transform .28s cubic-bezier(.32,.72,.32,1),visibility .28s;overflow-y:auto}
+  #filters-toggle:checked ~ .filters-drawer{transform:translateX(0);visibility:visible}
+  #filters-toggle:focus-visible ~ .filters-trigger{outline:2px solid var(--accent);outline-offset:2px}
   .filters-drawer .drawer-head{display:flex}
   .filters-drawer-body{padding:var(--s4)}
 
@@ -1064,7 +1080,8 @@ function layout(opts) {
      so a light-theme reader never sees a dark flash. Everything else is CSS. -->
 <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
-<body>
+<body data-nav="${esc(opts.nav ?? "")}">
+<a class="skip" href="#main">\u0414\u043E \u0432\u043C\u0456\u0441\u0442\u0443</a>
 <input type="checkbox" id="menu-toggle" class="sr-only" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0432\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
 <header class="top"><div class="inner">
   <a class="brand" href="/"><img class="brand-mark" src="/icon-192.png" alt="" width="28" height="28" decoding="async">Tender<span>&nbsp;Radar</span></a>
@@ -1094,7 +1111,7 @@ function layout(opts) {
   </details>`;
   }).join("")}
 </nav>
-<main class="wrap">
+<main class="wrap" id="main">
 ${opts.body}
 </main>
 </body>
@@ -1981,8 +1998,15 @@ console.log(
   `loaded ${db.flagCount} flags across ${db.cases.length} tenders (${db.cases.filter((c) => c.detailed).length} with full cards)`
 );
 var starred = [];
+var current = "";
 function dataset() {
   return db;
+}
+function setCurrentPath(path) {
+  current = path;
+}
+function currentPath() {
+  return current;
 }
 function setStarred(list) {
   starred = list;
@@ -2084,7 +2108,8 @@ function readControls(url) {
     max: Number(url.searchParams.get("max") ?? "") || 0,
     group: isDimension(rawGroup) ? rawGroup : "",
     then: isDimension(rawThen) ? rawThen : "",
-    page: Math.max(1, Number(url.searchParams.get("page") ?? 1))
+    // `|| 1`, not just Math.max: `?page=abc` is NaN, and NaN survives max().
+    page: Math.max(1, Math.floor(Number(url.searchParams.get("page") ?? 1) || 1))
   };
 }
 function activeCount(c) {
@@ -2105,7 +2130,7 @@ function activeCount(c) {
 }
 function isFiltered(c) {
   return Boolean(
-    c.q || c.risk || c.region || c.railOnly || c.soloOnly || c.priceOnly || c.dateFrom || c.dateTo || c.min > 0 || c.max > 0
+    c.q || c.risk || c.region || c.railOnly || c.soloOnly || c.priceOnly || c.audit || c.dateFrom || c.dateTo || c.min > 0 || c.max > 0
   );
 }
 function applyControls(cases, c, railwayCodes, opts = {}) {
@@ -2130,7 +2155,7 @@ function applyControls(cases, c, railwayCodes, opts = {}) {
     (a, b) => c.sort === "date" ? String(b.tender_date ?? "").localeCompare(String(a.tender_date ?? "")) : c.sort === "date-asc" ? String(a.tender_date ?? "").localeCompare(String(b.tender_date ?? "")) : c.sort === "assessed" ? String(b.date_assessed ?? "").localeCompare(String(a.date_assessed ?? "")) : c.sort === "value-asc" ? (a.value_amount ?? 0) - (b.value_amount ?? 0) : c.sort === "risks" ? b.risks.length - a.risks.length || (b.value_amount ?? 0) - (a.value_amount ?? 0) : (b.value_amount ?? 0) - (a.value_amount ?? 0)
   );
 }
-function keepControls(action, c, over = {}) {
+function controlParams(c) {
   const p = new URLSearchParams();
   if (c.q) p.set("q", c.q);
   if (c.risk) p.set("risk", c.risk);
@@ -2146,9 +2171,19 @@ function keepControls(action, c, over = {}) {
   if (c.max > 0) p.set("max", String(c.max));
   if (c.group) p.set("group", c.group);
   if (c.then) p.set("then", c.then);
-  for (const [k, v] of Object.entries(over)) p.set(k, v);
+  return p;
+}
+function keepControls(action, c, over = {}) {
+  const p = controlParams(c);
+  for (const [k, v] of Object.entries(over)) {
+    if (v) p.set(k, v);
+    else p.delete(k);
+  }
   const query2 = p.toString();
   return query2 ? `${action}?${query2}` : action;
+}
+function hiddenControls(c, esc2, skip = []) {
+  return [...controlParams(c).entries()].filter(([k]) => !skip.includes(k)).map(([k, v]) => `<input type="hidden" name="${esc2(k)}" value="${esc2(v)}">`).join("");
 }
 
 // server/components/risk.ts
@@ -2313,7 +2348,7 @@ function caseRow(entry, opts = {}) {
   return `<div class="row sev-${severity}">
   <span class="dot" title="${esc(SEVERITY_TITLE[severity])}" aria-label="${esc(SEVERITY_TITLE[severity])}"></span>
   <div class="who">
-    <div class="name">${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
+    <div class="name">${star("tender", entry.tender_id, currentPath() || "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
     <div class="meta">${meta.join(" \xB7 ")}</div>
     ${people.length ? `<div class="meta">${people.join(" \xB7 ")}</div>` : ""}
   </div>
@@ -2349,18 +2384,13 @@ function presetsFor(action) {
   return action === "/prices" ? base.filter((p) => p.query !== "price=1") : base;
 }
 function presetBar(action, url, c) {
-  const current = new URLSearchParams();
-  if (c.audit) current.set("audit", c.audit);
-  if (c.priceOnly) current.set("price", "1");
-  if (c.soloOnly) current.set("solo", "1");
-  if (c.min > 0) current.set("min", String(c.min));
-  if (c.sort !== "value") current.set("sort", c.sort);
-  const currentKey = current.toString();
+  const cleared = { ...c, audit: "", priceOnly: false, soloOnly: false, min: 0, page: 1 };
+  const current2 = keepControls(action, { ...c, page: 1 });
   return `<div class="presets">
   ${presetsFor(action).map((p) => {
-    const active = p.query === currentKey;
-    const href = p.query ? `${action}?${p.query}` : action;
-    return `<a class="preset${active ? " on" : ""}" href="${esc(href)}" title="${esc(p.hint)}">${esc(p.label)}</a>`;
+    const href = keepControls(action, cleared, Object.fromEntries(new URLSearchParams(p.query)));
+    const active = href === current2;
+    return `<a class="preset${active ? " on" : ""}" href="${esc(href)}" title="${esc(p.hint)}"${active ? ' aria-current="true"' : ""}>${esc(p.label)}</a>`;
   }).join("")}
 </div>`;
 }
@@ -2413,21 +2443,48 @@ function groupBlock(group, depth) {
   </div>
 </details>`;
 }
+var bounds = null;
+function datasetBounds() {
+  const ds = dataset();
+  if (bounds && bounds.of === ds) return bounds;
+  let earliest = "";
+  let latest = "";
+  let lo = Infinity;
+  let hi = 0;
+  const regionSet = /* @__PURE__ */ new Set();
+  for (const x of ds.cases) {
+    const d = x.tender_date ?? "";
+    if (d) {
+      if (!earliest || d < earliest) earliest = d;
+      if (d > latest) latest = d;
+    }
+    if (x.region) regionSet.add(x.region);
+    const n = x.value_amount ?? 0;
+    if (n > 0) {
+      if (n < lo) lo = n;
+      if (n > hi) hi = n;
+    }
+  }
+  bounds = {
+    of: ds,
+    earliest,
+    latest,
+    regions: [...regionSet].sort(),
+    rangeHint: hi > 0 ? `\u0443 \u0431\u0430\u0437\u0456 \u0432\u0456\u0434 ${shortMoney(lo)} \u0434\u043E ${shortMoney(hi)}` : ""
+  };
+  return bounds;
+}
 function filterPanel(action, c, opts = {}, extra = "") {
   const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
-  const stamps = dataset().cases.map((x) => x.tender_date ?? "").filter(Boolean).sort();
-  const earliest = stamps[0] ?? "";
-  const latest = stamps[stamps.length - 1] ?? "";
-  const regions = [...new Set(dataset().cases.map((x) => x.region ?? "").filter(Boolean))].sort();
-  const amounts = dataset().cases.map((x) => x.value_amount ?? 0).filter((n) => n > 0);
-  const rangeHint = amounts.length ? `\u0443 \u0431\u0430\u0437\u0456 \u0432\u0456\u0434 ${shortMoney(Math.min(...amounts))} \u0434\u043E ${shortMoney(Math.max(...amounts))}` : "";
+  const { earliest, latest, regions, rangeHint } = datasetBounds();
   const active = activeCount(c);
-  const anything = isFiltered(c) || Boolean(c.group);
+  const open = isFiltered(c) || Boolean(c.group);
+  const showReset = open || c.sort !== "value";
   return `<form class="filters" method="get" action="${esc(action)}">
   <input type="hidden" name="q" value="${esc(c.q)}">
   ${extra}
-  <details class="filters-more"${anything ? " open" : ""}>
-    <summary>\u0411\u0456\u043B\u044C\u0448\u0435 \u0444\u0456\u043B\u044C\u0442\u0440\u0456\u0432${active > 0 ? ` <span class="badge">${active}</span>` : ""}${anything ? ` <a class="reset" href="${esc(action)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0435</a>` : ""}</summary>
+  <details class="filters-more"${open ? " open" : ""}>
+    <summary>\u0411\u0456\u043B\u044C\u0448\u0435 \u0444\u0456\u043B\u044C\u0442\u0440\u0456\u0432${active > 0 ? ` <span class="badge">${active}</span>` : ""}${showReset ? ` <a class="reset" href="${esc(action)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0435</a>` : ""}</summary>
     <div class="inner">
       <div class="filter-row">
         <select name="risk" aria-label="\u041E\u0437\u043D\u0430\u043A\u0430">
@@ -2469,7 +2526,7 @@ function filterPanel(action, c, opts = {}, extra = "") {
         ${opts.hideRail ? "" : `<label class="check"><input type="checkbox" name="rail" value="1"${c.railOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</label>`}
         <label class="check"><input type="checkbox" name="solo" value="1"${c.soloOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432</label>
         ${opts.hidePrice ? "" : `<label class="check"><input type="checkbox" name="price" value="1"${c.priceOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0434\u0435 \u0446\u0456\u043D\u0430 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u0430</label>`}
-        <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
+        <button type="submit">\u0417\u0430\u0441\u0442\u043E\u0441\u0443\u0432\u0430\u0442\u0438 \u0444\u0456\u043B\u044C\u0442\u0440\u0438</button>
       </div>
     </div>
   </details>
@@ -2503,7 +2560,8 @@ function resultLine(list, c, groupCount) {
 }
 function listBody(list, c, action, rowOpts = {}) {
   if (list.length === 0) {
-    return '<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0447\u0430\u0441\u0442\u0438\u043D\u0443 \u0444\u0456\u043B\u044C\u0442\u0440\u0456\u0432.</div>';
+    const dropSearch = c.q ? ` <a href="${esc(keepControls(action, c, { q: "" }))}">\u041F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u043F\u043E\u0448\u0443\u043A \xAB${esc(c.q)}\xBB</a> \xB7` : "";
+    return `<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F.<br>${dropSearch} <a href="${esc(action)}">\u0421\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0438</a></div>`;
   }
   if (c.group) {
     const groups = buildGroups(list, c.group, c.then, shortRisk);
@@ -2512,14 +2570,14 @@ function listBody(list, c, action, rowOpts = {}) {
     return `${resultLine(list, c, groups.length)}${shown.map((g) => groupBlock(g, 0)).join("")}${hidden > 0 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E ${MAX_GROUPS} \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0438\u0445 ${plural(MAX_GROUPS, "\u0433\u0440\u0443\u043F\u0443", "\u0433\u0440\u0443\u043F\u0438", "\u0433\u0440\u0443\u043F")} \u0456\u0437 ${groups.length.toLocaleString("uk-UA")}. \u0417\u0432\u0443\u0437\u044C\u0442\u0435 \u0432\u0438\u0431\u0456\u0440\u043A\u0443 \u0444\u0456\u043B\u044C\u0442\u0440\u0430\u043C\u0438, \u0449\u043E\u0431 \u043F\u043E\u0431\u0430\u0447\u0438\u0442\u0438 \u0440\u0435\u0448\u0442\u0443.</p>` : ""}`;
   }
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
-  const page2 = Math.min(c.page, pages);
-  const slice = list.slice((page2 - 1) * PAGE_SIZE, page2 * PAGE_SIZE);
+  const page3 = Math.min(c.page, pages);
+  const slice = list.slice((page3 - 1) * PAGE_SIZE, page3 * PAGE_SIZE);
   return `${resultLine(list, c, 0)}
 <div class="rows">${slice.map((x) => caseRow(x, rowOpts)).join("")}</div>
 ${pages > 1 ? `<div class="pager">
-  ${page2 > 1 ? `<a href="${keepControls(action, c, { page: String(page2 - 1) })}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
-  <span>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 ${page2} \u0437 ${pages}</span>
-  ${page2 < pages ? `<a href="${keepControls(action, c, { page: String(page2 + 1) })}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a>` : ""}
+  ${page3 > 1 ? `<a href="${keepControls(action, c)}" title="\u041F\u0435\u0440\u0448\u0430 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430" aria-label="\u041F\u0435\u0440\u0448\u0430 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430">\xAB</a><a href="${keepControls(action, c, { page: String(page3 - 1) })}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
+  <form class="jump" method="get" action="${esc(action)}">${hiddenControls(c, esc)}<label>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 <input type="number" name="page" value="${page3}" min="1" max="${pages}" aria-label="\u041D\u043E\u043C\u0435\u0440 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438"> \u0437 ${pages.toLocaleString("uk-UA")}</label><button type="submit">\u041F\u0435\u0440\u0435\u0439\u0442\u0438</button></form>
+  ${page3 < pages ? `<a href="${keepControls(action, c, { page: String(page3 + 1) })}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a><a href="${keepControls(action, c, { page: String(pages) })}" title="\u041E\u0441\u0442\u0430\u043D\u043D\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430" aria-label="\u041E\u0441\u0442\u0430\u043D\u043D\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430">\xBB</a>` : ""}
 </div>` : ""}`;
 }
 
@@ -2780,7 +2838,13 @@ function aboutPage() {
 function notFound() {
   return layout({
     title: "\u041D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E",
-    body: `<h1>\u041D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E</h1><p class="sub">\u0422\u0430\u043A\u043E\u0457 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438 \u043D\u0435\u043C\u0430\u0454. <a href="/">\u0414\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u043D\u0430\u0445\u0456\u0434\u043E\u043A \u2192</a></p>`
+    body: `<h1>\u041D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E</h1>
+<p class="sub">\u0422\u0430\u043A\u043E\u0457 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438 \u043D\u0435\u043C\u0430\u0454 \u2014 \u043C\u043E\u0436\u043B\u0438\u0432\u043E, \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u0437\u0430\u0441\u0442\u0430\u0440\u0456\u043B\u043E \u0430\u0431\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E.</p>
+<div class="actions">
+  <a class="action primary" href="/">\u0423\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
+  <a class="action" href="/lookup">\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423</a>
+  <a class="action" href="/updates">\u0429\u043E \u043D\u043E\u0432\u043E\u0433\u043E \u0432 \u0431\u0430\u0437\u0456</a>
+</div>`
   });
 }
 
@@ -2865,13 +2929,20 @@ async function tenderPage(tenderId) {
   }
   const sameEntity = dataset().cases.filter((c) => c.entity_edrpou && c.entity_edrpou === entry.entity_edrpou);
   const sameOfficer = entry.officer_key ? dataset().cases.filter((c) => c.officer_key === entry.officer_key) : [];
-  const officerValue = sameOfficer.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
   const sameWinner = entry.winner_edrpou ? dataset().cases.filter((c) => c.winner_edrpou === entry.winner_edrpou) : [];
-  const winnerValue = sameWinner.reduce((sum2, c) => sum2 + (c.winner_amount ?? c.value_amount ?? 0), 0);
+  const others = (list) => list.filter((c) => c.tender_id !== entry.tender_id);
+  const otherOfficer = others(sameOfficer);
+  const otherWinner = others(sameWinner);
+  const officerValue = otherOfficer.reduce((sum2, c) => sum2 + (c.value_amount ?? 0), 0);
+  const winnerValue = otherWinner.reduce((sum2, c) => sum2 + (c.winner_amount ?? c.value_amount ?? 0), 0);
   const title = entry.title || readableName(entry.entity_name) || "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F";
   const signals = alarms(entry);
+  const prozorro = `https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}`;
+  const buyer = readableName(entry.entity_name);
   return layout({
-    title: entry.tender_ref || entry.tender_id,
+    // The tab and any link preview name the thing, not just its number.
+    title: `${trim(title, 60)} \xB7 ${shortMoney(entry.value_amount)}`,
+    description: `${buyer ? `${buyer} \xB7 ` : ""}${money(entry.value_amount)} \xB7 ${signals[0] ?? (entry.risks.length ? `${entry.risks.length} ${plural(entry.risks.length, "\u043E\u0437\u043D\u0430\u043A\u0430", "\u043E\u0437\u043D\u0430\u043A\u0438", "\u043E\u0437\u043D\u0430\u043A")} \u0440\u0438\u0437\u0438\u043A\u0443` : "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438")} \xB7 ${entry.tender_ref || entry.tender_id}`,
     body: `
 <a class="back" href="/">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u043D\u0430\u0445\u0456\u0434\u043E\u043A</a>
 ${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id), { label: true })}
@@ -2890,7 +2961,7 @@ ${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.m
   <dl class="facts">
     <dt>\u0421\u0443\u043C\u0430</dt><dd><strong>${money(entry.value_amount)}</strong> <span class="faint">(${shortMoney(entry.value_amount)})</span></dd>
     <dt>\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A</dt><dd><a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">${esc(readableName(entry.entity_name))}</a><br><span class="faint">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(entry.entity_edrpou ?? "\u2014")}</span></dd>
-    <dt>\u0420\u0435\u0433\u0456\u043E\u043D</dt><dd>${esc(entry.region ?? "\u2014")}</dd>
+    <dt>\u0420\u0435\u0433\u0456\u043E\u043D</dt><dd>${entry.region ? `<a href="/?region=${encodeURIComponent(entry.region)}">${esc(entry.region)}</a>` : "\u2014"}</dd>
     ${entry.method ? `<dt>\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0430</dt><dd>${esc(procedureLabel(entry.method) ?? "\u2014")}</dd>` : ""}
     ${entry.detailed ? `<dt>\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432</dt><dd>${entry.bidders === 1 ? "<strong>\u043E\u0434\u0438\u043D</strong> \u2014 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u0457 \u043D\u0435 \u0431\u0443\u043B\u043E" : entry.bidders || "\u2014"}</dd>` : ""}
     <dt>\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</dt><dd>${date(entry.tender_date)}</dd>
@@ -2902,23 +2973,23 @@ ${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.m
 <h2>\u0425\u0442\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0432 \u0437\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E</h2>
 ${entry.officer_name ? `<div class="card">
   <h3><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a></h3>
-  <p class="lead">\u0426\u044F \u043E\u0441\u043E\u0431\u0430 \u0432\u043A\u0430\u0437\u0430\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E \u0449\u0435 \u0443 <strong>${sameOfficer.length}</strong> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0440\u0430\u0437\u043E\u043C \u043D\u0430 <strong>${shortMoney(officerValue)}</strong>.</p>
+  <p class="lead">${otherOfficer.length ? `\u0426\u044F \u043E\u0441\u043E\u0431\u0430 \u0432\u043A\u0430\u0437\u0430\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E \u0449\u0435 \u0443 <strong>${otherOfficer.length}</strong> ${plural(otherOfficer.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0440\u0430\u0437\u043E\u043C \u043D\u0430 <strong>${shortMoney(officerValue)}</strong>.` : "\u0406\u043D\u0448\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0437\u0430 \u0446\u0456\u0454\u044E \u043E\u0441\u043E\u0431\u043E\u044E \u0432 \u0431\u0430\u0437\u0456 \u043D\u0435\u043C\u0430\u0454."}</p>
   <dl class="facts">
     <dt>\u041F\u043E\u0448\u0442\u0430</dt><dd>${esc(entry.officer_email ?? "\u2014")}</dd>
     <dt>\u0422\u0435\u043B\u0435\u0444\u043E\u043D</dt><dd>${esc(entry.officer_phone ?? "\u2014")}</dd>
   </dl>
   <p style="margin-top:.9rem"><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0434\u043E\u0441\u044C\u0454 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u044F \u2192</a></p>
-</div>` : `<div class="card"><p>\u041A\u0430\u0440\u0442\u043A\u0443 \u0446\u0456\u0454\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E, \u0442\u043E\u043C\u0443 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0430 \u043E\u0441\u043E\u0431\u0430 \u043D\u0435\u0432\u0456\u0434\u043E\u043C\u0430.</p></div>`}
+</div>` : `<div class="card"><p>\u041A\u0430\u0440\u0442\u043A\u0443 \u0446\u0456\u0454\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E, \u0442\u043E\u043C\u0443 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0430 \u043E\u0441\u043E\u0431\u0430 \u043D\u0435\u0432\u0456\u0434\u043E\u043C\u0430.</p><p><a href="${prozorro}" target="_blank" rel="noopener">\u041F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0443 \u043E\u0441\u043E\u0431\u0443 \u0432 Prozorro \u2192</a></p></div>`}
 
 <h2>\u0425\u0442\u043E \u0432\u0438\u0433\u0440\u0430\u0432</h2>
 ${entry.winner_name ? `<div class="card">
   <h3><a href="/supplier/${encodeURIComponent(entry.winner_edrpou ?? "")}">${esc(readableName(entry.winner_name))}</a></h3>
-  <p class="lead">\u0426\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u043B\u0430 \u0449\u0435 \u0443 <strong>${sameWinner.length}</strong> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0440\u0430\u0437\u043E\u043C \u043D\u0430 <strong>${shortMoney(winnerValue)}</strong>.</p>
+  <p class="lead">${otherWinner.length ? `\u0426\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u043B\u0430 \u0449\u0435 \u0443 <strong>${otherWinner.length}</strong> ${plural(otherWinner.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0440\u0430\u0437\u043E\u043C \u043D\u0430 <strong>${shortMoney(winnerValue)}</strong>.` : "\u0406\u043D\u0448\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0437\u0430 \u0446\u0456\u0454\u044E \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0454\u044E \u0432 \u0431\u0430\u0437\u0456 \u043D\u0435\u043C\u0430\u0454."}</p>
   <dl class="facts">
     <dt>\u0404\u0414\u0420\u041F\u041E\u0423</dt><dd>${esc(entry.winner_edrpou ?? "\u2014")}</dd>
     <dt>\u0421\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443</dt><dd>${money(entry.winner_amount)}</dd>
   </dl>
-</div>` : `<div class="card"><p>\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0430\u0431\u043E \u043A\u0430\u0440\u0442\u043A\u0443 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E.</p></div>`}
+</div>` : `<div class="card"><p>\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0430\u0431\u043E \u043A\u0430\u0440\u0442\u043A\u0443 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E.</p><p><a href="${prozorro}" target="_blank" rel="noopener">\u041F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u0432 Prozorro \u2192</a></p></div>`}
 
 ${entry.findings.length ? `<h2>\u0421\u043A\u0456\u043B\u044C\u043A\u0438 \u0446\u0435 \u043A\u043E\u0448\u0442\u0443\u0454 \u0432 \u0456\u043D\u0448\u0438\u0445</h2>
 <p class="hint">\u0420\u0430\u0445\u0443\u0432\u0430\u043B\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430, \u043D\u0435 \u0434\u0435\u0440\u0436\u0430\u0432\u0430. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0447\u0438\u0441\u043B\u0430.</p>
@@ -2944,7 +3015,7 @@ ${entry.findings.map((f) => {
 
 ${auditSection(entry)}
 <h2>\u0429\u043E \u0442\u0443\u0442 \u043D\u0435 \u0442\u0430\u043A</h2>
-<p class="hint">\u0421\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u043E ${entry.risks.length} ${plural(entry.risks.length, "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432")} \u0456\u0437 \u0447\u043E\u0442\u0438\u0440\u043D\u0430\u0434\u0446\u044F\u0442\u0438 \u0447\u0438\u043D\u043D\u0438\u0445.</p>
+<p class="hint">\u0421\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u043E ${entry.risks.length} ${plural(entry.risks.length, "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432")} \u0456\u0437 ${dataset().rules.length} \u0447\u0438\u043D\u043D\u0438\u0445. <a href="/indicators">\u0429\u043E \u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u043A\u043E\u0436\u0435\u043D \u2192</a></p>
 ${entry.risks.map((r) => riskCard(r)).join("")}
 
 <h2>\u041F\u0440\u0430\u0432\u043E\u0432\u0430 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F</h2>
@@ -3173,12 +3244,12 @@ function directoryPage(opts) {
 <h1>${esc(opts.heading)}</h1>
 <p class="sub">${opts.intro}</p>
 ${dirBar(opts.action, c)}
-<p class="hint">${c.q ? "\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E" : "\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E"} <strong>${rows.length.toLocaleString("uk-UA")}</strong> \u043D\u0430 ${shortMoney(total)}.</p>
-${rows.length === 0 ? '<div class="empty">\u0417\u0430 \u0446\u0438\u043C \u0437\u0430\u043F\u0438\u0442\u043E\u043C \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F.</div>' : `<div class="rows">
+<p class="hint">${c.q ? "\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E" : "\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E"} <strong>${rows.length.toLocaleString("uk-UA")}</strong> ${plural(rows.length, "\u0437\u0430\u043F\u0438\u0441", "\u0437\u0430\u043F\u0438\u0441\u0438", "\u0437\u0430\u043F\u0438\u0441\u0456\u0432")} \u043D\u0430 ${shortMoney(total)}.</p>
+${rows.length === 0 ? `<div class="empty">\u0417\u0430 \u0446\u0438\u043C \u0437\u0430\u043F\u0438\u0442\u043E\u043C \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F.<br><a href="${esc(opts.action)}">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0432\u0441\u0456\u0445</a> \xB7 <a href="/lookup${c.q ? `?edrpou=${encodeURIComponent(c.q)}` : ""}">\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423</a></div>` : `<div class="rows">
 ${rows.slice(0, 150).map(
       (r) => `<div class="row">
   <div class="who">
-    <div class="name">${r.kind && r.id ? star(r.kind, r.id, r.href) : ""}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="name">${r.kind && r.id ? star(r.kind, r.id, currentPath() || r.href) : ""}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
     <div class="meta">${r.meta}</div>
   </div>
   <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>
@@ -3641,6 +3712,7 @@ ${found && profile ? `${star("entity", code, "/lookup?edrpou=" + encodeURICompon
 // server/app.ts
 async function render(url, saved = []) {
   setStarred(saved);
+  setCurrentPath(url.pathname + url.search);
   const path = decodeURIComponent(url.pathname);
   if (path === "/lookup") {
     const code = normaliseEdrpou(url.searchParams.get("edrpou") ?? "");
@@ -3657,7 +3729,7 @@ async function render(url, saved = []) {
   if (path === "/prices") return { status: 200, body: pricesPage(url) };
   if (path === "/indicators") return { status: 200, body: indicatorsPage() };
   if (path === "/about") return { status: 200, body: aboutPage() };
-  if (path.startsWith("/article/")) return { status: 200, body: articlePage(path.slice("/article/".length), url) };
+  if (path.startsWith("/article/")) return page(articlePage(path.slice("/article/".length), url));
   if (path.startsWith("/tender/")) {
     const rest = path.slice("/tender/".length);
     if (rest.endsWith("/report") || rest.endsWith("/report.txt")) {
@@ -3684,12 +3756,15 @@ async function render(url, saved = []) {
         filename: `${entry.tender_ref || entry.tender_id}.txt`
       } : { status: 200, body: reportHtml(ctx) };
     }
-    return { status: 200, body: await tenderPage(rest) };
+    return page(await tenderPage(rest));
   }
-  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length), url) };
-  if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length), url) };
-  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length), url) };
+  if (path.startsWith("/entity/")) return page(entityPage(path.slice("/entity/".length), url));
+  if (path.startsWith("/officer/")) return page(officerPage(path.slice("/officer/".length), url));
+  if (path.startsWith("/supplier/")) return page(supplierPage(path.slice("/supplier/".length), url));
   return { status: 404, body: notFound() };
+}
+function page(body) {
+  return { status: body === notFound() ? 404 : 200, body };
 }
 
 // server/auth-pages.ts
@@ -3921,7 +3996,7 @@ async function sendTelegramTo(config, chatId, text) {
 }
 
 // server/router.ts
-function page(status, body, headers = {}) {
+function page2(status, body, headers = {}) {
   return { status, body, headers: { "content-type": "text/html; charset=utf-8", ...headers } };
 }
 function redirect(location, setCookie) {
@@ -3997,7 +4072,7 @@ async function handle(req) {
         }
       };
     }
-    return page(rendered.status, rendered.body);
+    return page2(rendered.status, rendered.body);
   }
   if (!config) return await serve();
   const redirectUri = `${req.url.origin}/auth/callback`;
@@ -4013,17 +4088,17 @@ async function handle(req) {
     const returnedState = req.url.searchParams.get("state");
     const expectedState = readCookie(req.cookieHeader, STATE_COOKIE);
     if (!code || !returnedState || !expectedState || returnedState !== expectedState) {
-      return page(400, deniedPage("\u041D\u0435\u0434\u0456\u0439\u0441\u043D\u0438\u0439 \u0437\u0430\u043F\u0438\u0442 \u043D\u0430 \u0432\u0445\u0456\u0434. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0449\u0435 \u0440\u0430\u0437."), {
+      return page2(400, deniedPage("\u041D\u0435\u0434\u0456\u0439\u0441\u043D\u0438\u0439 \u0437\u0430\u043F\u0438\u0442 \u043D\u0430 \u0432\u0445\u0456\u0434. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0449\u0435 \u0440\u0430\u0437."), {
         "set-cookie": clearStateCookie(secure)
       });
     }
     const identity = await exchangeCode(config, code, redirectUri);
     const clearState = clearStateCookie(secure);
     if (!identity || !identity.emailVerified) {
-      return page(403, deniedPage("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u043F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0438 \u043F\u043E\u0448\u0442\u0443 Google."), { "set-cookie": clearState });
+      return page2(403, deniedPage("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u043F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0438 \u043F\u043E\u0448\u0442\u0443 Google."), { "set-cookie": clearState });
     }
     if (!config.allowedEmails.has(identity.email)) {
-      return page(403, deniedPage(`\u0414\u043E\u0441\u0442\u0443\u043F \u0434\u043B\u044F ${identity.email} \u043D\u0435 \u043D\u0430\u0434\u0430\u043D\u043E. \u0417\u0432\u0435\u0440\u043D\u0456\u0442\u044C\u0441\u044F \u0434\u043E \u0432\u043B\u0430\u0441\u043D\u0438\u043A\u0430 \u0441\u0430\u0439\u0442\u0443.`), {
+      return page2(403, deniedPage(`\u0414\u043E\u0441\u0442\u0443\u043F \u0434\u043B\u044F ${identity.email} \u043D\u0435 \u043D\u0430\u0434\u0430\u043D\u043E. \u0417\u0432\u0435\u0440\u043D\u0456\u0442\u044C\u0441\u044F \u0434\u043E \u0432\u043B\u0430\u0441\u043D\u0438\u043A\u0430 \u0441\u0430\u0439\u0442\u0443.`), {
         "set-cookie": clearState
       });
     }
@@ -4031,7 +4106,7 @@ async function handle(req) {
   }
   const email = readSessionEmail(req.cookieHeader, config.sessionSecret);
   if (!email || !config.allowedEmails.has(email)) {
-    return page(200, loginPage());
+    return page2(200, loginPage());
   }
   return await serve();
 }
