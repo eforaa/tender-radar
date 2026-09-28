@@ -750,7 +750,9 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 .action:hover{border-color:var(--accent);background:var(--accent-bg)}
 .action.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
 .action.primary:hover{filter:brightness(1.08);background:var(--accent)}
-.action.primary::before{content:"\u2913";font-size:1.05rem}
+/* The download glyph belongs to the report link only, not to every primary
+   action \u2014 a 404 page's "all tenders" button is not a download. */
+.action.download::before{content:"\u2913";font-size:1.05rem}
 .block-head{font-family:var(--f-display);font-weight:700;font-size:1.1rem;margin:var(--s5) 0 var(--s2)}
 .badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:600;min-width:1.3rem;height:1.3rem;border-radius:1rem;display:inline-flex;align-items:center;justify-content:center;padding:0 var(--s2)}
 /* star toggle \u2014 a form so the site still needs no scripts */
@@ -843,6 +845,10 @@ a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .card p{margin:0 0 var(--s3);color:var(--ink-soft);max-width:68ch}
 .card p:last-child{margin-bottom:0}
 .card p.lead{color:var(--ink);font-size:1.02rem}
+/* The one-line verdict at the top of a tender page. */
+.verdict.compact{padding:var(--s3) var(--s4);margin-bottom:var(--s5)}
+.verdict.compact h3{margin:0;font-size:1rem;font-weight:500;line-height:1.5}
+.verdict.compact h3 a{white-space:nowrap;margin-left:var(--s2)}
 .legal{border-left:3px solid var(--accent);background:var(--accent-bg);padding:var(--s3) var(--s4);font-size:.94rem;color:var(--ink);max-width:none;border-radius:0 var(--radius) var(--radius) 0}
 .legal.reading{border-left-color:var(--warn);background:var(--warn-bg)}
 details.sub{margin:var(--s4) 0 var(--s1);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
@@ -2221,7 +2227,7 @@ function riskCard(riskId, count) {
   ${rule?.name && label ? `<p class="faint"><strong>\u041E\u0444\u0456\u0446\u0456\u0439\u043D\u0435 \u0444\u043E\u0440\u043C\u0443\u043B\u044E\u0432\u0430\u043D\u043D\u044F:</strong> ${esc(rule.name)}</p>` : ""}
   ${norm}
   ${criminal}
-  <p class="code">\u0406\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 ${esc(riskId)} \xB7 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C</p>
+  <p class="code">\u0406\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 ${esc(riskId)} \xB7 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \xB7 <a href="/?risk=${encodeURIComponent(riskId)}">\u0443\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u0446\u0456\u0454\u044E \u043E\u0437\u043D\u0430\u043A\u043E\u044E \u2192</a></p>
 </div>`;
 }
 function groupedRiskCards(ranked) {
@@ -2345,10 +2351,12 @@ function caseRow(entry, opts = {}) {
     );
   }
   const severity = rowSeverity(entry);
+  const here = currentPath();
+  const tenderHref = `/tender/${encodeURIComponent(entry.tender_id)}${here && !here.startsWith("/tender/") ? `?from=${encodeURIComponent(here)}` : ""}`;
   return `<div class="row sev-${severity}">
-  <span class="dot" title="${esc(SEVERITY_TITLE[severity])}" aria-label="${esc(SEVERITY_TITLE[severity])}"></span>
+  <span class="dot" title="${esc(SEVERITY_TITLE[severity])}" aria-hidden="true"></span><span class="sr-only">${esc(SEVERITY_TITLE[severity])}.</span>
   <div class="who">
-    <div class="name">${star("tender", entry.tender_id, currentPath() || "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
+    <div class="name">${star("tender", entry.tender_id, here || tenderHref)}<a href="${esc(tenderHref)}">${esc(title)}</a></div>
     <div class="meta">${meta.join(" \xB7 ")}</div>
     ${people.length ? `<div class="meta">${people.join(" \xB7 ")}</div>` : ""}
   </div>
@@ -2360,7 +2368,7 @@ function caseRow(entry, opts = {}) {
     ${auditFlag(entry)}
     ${alarms(entry).map((a) => `<span class="flag alarm">${esc(a)}</span>`).join("")}
     ${entry.risks.slice(0, MAX_ROW_FLAGS).map(riskFlag).join("")}
-    ${entry.risks.length > MAX_ROW_FLAGS ? `<a class="flag more" href="/tender/${encodeURIComponent(entry.tender_id)}">\u0449\u0435 ${entry.risks.length - MAX_ROW_FLAGS}</a>` : ""}
+    ${entry.risks.length > MAX_ROW_FLAGS ? `<a class="flag more" href="${esc(tenderHref)}">\u0449\u0435 ${entry.risks.length - MAX_ROW_FLAGS}</a>` : ""}
   </div>
   <div class="signal">${signalLine(entry)}</div>
 </div>`;
@@ -2558,7 +2566,9 @@ function resultLine(list, c, groupCount) {
   const base = isFiltered(c) ? `\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(value)}.` : `\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E <strong>${list.length.toLocaleString("uk-UA")}</strong> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u043D\u0430 ${shortMoney(value)}.`;
   return `<p class="hint">${base}${c.group ? ` \u0417\u0433\u0440\u0443\u043F\u043E\u0432\u0430\u043D\u043E \u0443 <strong>${groupCount}</strong> ${plural(groupCount, "\u0433\u0440\u0443\u043F\u0443", "\u0433\u0440\u0443\u043F\u0438", "\u0433\u0440\u0443\u043F")}.` : ""}</p>`;
 }
-function listBody(list, c, action, rowOpts = {}) {
+function listBody(list, c, action, rowOpts = {}, extra = {}) {
+  const link = (over) => keepControls(action, c, { ...extra, ...over });
+  const extraHidden = Object.entries(extra).map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`).join("");
   if (list.length === 0) {
     const dropSearch = c.q ? ` <a href="${esc(keepControls(action, c, { q: "" }))}">\u041F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u043F\u043E\u0448\u0443\u043A \xAB${esc(c.q)}\xBB</a> \xB7` : "";
     return `<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F.<br>${dropSearch} <a href="${esc(action)}">\u0421\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0438</a></div>`;
@@ -2575,9 +2585,9 @@ function listBody(list, c, action, rowOpts = {}) {
   return `${resultLine(list, c, 0)}
 <div class="rows">${slice.map((x) => caseRow(x, rowOpts)).join("")}</div>
 ${pages > 1 ? `<div class="pager">
-  ${page3 > 1 ? `<a href="${keepControls(action, c)}" title="\u041F\u0435\u0440\u0448\u0430 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430" aria-label="\u041F\u0435\u0440\u0448\u0430 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430">\xAB</a><a href="${keepControls(action, c, { page: String(page3 - 1) })}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
-  <form class="jump" method="get" action="${esc(action)}">${hiddenControls(c, esc)}<label>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 <input type="number" name="page" value="${page3}" min="1" max="${pages}" aria-label="\u041D\u043E\u043C\u0435\u0440 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438"> \u0437 ${pages.toLocaleString("uk-UA")}</label><button type="submit">\u041F\u0435\u0440\u0435\u0439\u0442\u0438</button></form>
-  ${page3 < pages ? `<a href="${keepControls(action, c, { page: String(page3 + 1) })}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a><a href="${keepControls(action, c, { page: String(pages) })}" title="\u041E\u0441\u0442\u0430\u043D\u043D\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430" aria-label="\u041E\u0441\u0442\u0430\u043D\u043D\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430">\xBB</a>` : ""}
+  ${page3 > 1 ? `<a href="${link({})}" title="\u041F\u0435\u0440\u0448\u0430 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430" aria-label="\u041F\u0435\u0440\u0448\u0430 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430">\xAB</a><a href="${link({ page: String(page3 - 1) })}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
+  <form class="jump" method="get" action="${esc(action)}">${hiddenControls(c, esc)}${extraHidden}<label>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 <input type="number" name="page" value="${page3}" min="1" max="${pages}" aria-label="\u041D\u043E\u043C\u0435\u0440 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0438"> \u0437 ${pages.toLocaleString("uk-UA")}</label><button type="submit">\u041F\u0435\u0440\u0435\u0439\u0442\u0438</button></form>
+  ${page3 < pages ? `<a href="${link({ page: String(page3 + 1) })}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a><a href="${link({ page: String(pages) })}" title="\u041E\u0441\u0442\u0430\u043D\u043D\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430" aria-label="\u041E\u0441\u0442\u0430\u043D\u043D\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430">\xBB</a>` : ""}
 </div>` : ""}`;
 }
 
@@ -2682,11 +2692,19 @@ ${q.criminal.map(
 </div>`
   ).join("")}`;
 }
+function levelLabel(level) {
+  return level === "high" ? "\u0412\u0438\u0441\u043E\u043A\u0438\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442" : level === "medium" ? "\u0421\u0435\u0440\u0435\u0434\u043D\u0456\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442" : "\u041D\u0438\u0437\u044C\u043A\u0438\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442";
+}
+function verdictSummary(entry, sameEntity, sameOfficer, sameWinner) {
+  const c = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
+  return `<div class="card verdict compact ${esc(c.level)}">
+  <h3><span class="verdict-tag">${esc(levelLabel(c.level))}</span> ${esc(c.headline)} <a href="#conclusion">\u0427\u043E\u043C\u0443 \u2192</a></h3>
+</div>`;
+}
 function conclusionBlock(entry, sameEntity, sameOfficer, sameWinner) {
   const c = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
-  const levelLabel = c.level === "high" ? "\u0412\u0438\u0441\u043E\u043A\u0438\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442" : c.level === "medium" ? "\u0421\u0435\u0440\u0435\u0434\u043D\u0456\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442" : "\u041D\u0438\u0437\u044C\u043A\u0438\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442";
   return `<div class="card verdict ${esc(c.level)}">
-  <h3><span class="verdict-tag">${esc(levelLabel)}</span> ${esc(c.headline)}</h3>
+  <h3><span class="verdict-tag">${esc(levelLabel(c.level))}</span> ${esc(c.headline)}</h3>
   ${c.observations.length > 0 ? `<ol class="findings">${c.observations.map(
     (o) => `<li class="w-${esc(o.weight)}">
     <strong>${esc(o.title)}</strong>
@@ -2785,11 +2803,11 @@ function indicatorsPage() {
   const counted = new Map(rankRisks(dataset().cases));
   const ranked = dataset().rules.map((r) => [r.risk_id, counted.get(r.risk_id) ?? 0]).sort((a, b) => b[1] - a[1]);
   return layout({
-    title: "\u0429\u043E \u043C\u0438 \u0448\u0443\u043A\u0430\u0454\u043C\u043E",
+    title: "\u0429\u043E \u043C\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E",
     nav: "indicators",
     body: `
-<h1>\u0429\u043E \u043C\u0438 \u0448\u0443\u043A\u0430\u0454\u043C\u043E</h1>
-<p class="sub">\u0427\u043E\u0442\u0438\u0440\u043D\u0430\u0434\u0446\u044F\u0442\u044C \u043E\u0437\u043D\u0430\u043A, \u0437\u0430 \u044F\u043A\u0438\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u043A\u043E\u0436\u043D\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0449\u043E \u043A\u043E\u0436\u043D\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u043E\u044E \u043C\u043E\u0432\u043E\u044E \u0456 \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0440\u0430\u0437\u0456\u0432 \u0432\u043E\u043D\u0430 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0430 \u0432 ${esc(REGION)} \u0442\u0430 \u043D\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456.</p>
+<h1>\u0429\u043E \u043C\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E</h1>
+<p class="sub">${dataset().rules.length} \u043E\u0437\u043D\u0430\u043A, \u0437\u0430 \u044F\u043A\u0438\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u043A\u043E\u0436\u043D\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0449\u043E \u043A\u043E\u0436\u043D\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u043E\u044E \u043C\u043E\u0432\u043E\u044E \u0456 \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0440\u0430\u0437\u0456\u0432 \u0432\u043E\u043D\u0430 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0430 \u043F\u043E \u0432\u0441\u0456\u0439 \u0423\u043A\u0440\u0430\u0457\u043D\u0456.</p>
 ${groupedRiskCards(ranked)}
 `
   });
@@ -2805,7 +2823,7 @@ function aboutPage() {
 <div class="card">
   <h3>\u0417\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456</h3>
   <p class="lead">\u0414\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u0438\u0445 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u0440\u0438\u0437\u0438\u043A\u0443 Prozorro \u2014 \u043D\u0430\u043A\u0430\u0437 \u041C\u0456\u043D\u0444\u0456\u043D\u0443 \u2116 476 \u0432\u0456\u0434 27 \u0432\u0435\u0440\u0435\u0441\u043D\u044F 2024 \u0440\u043E\u043A\u0443. \u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454 \u043A\u043E\u0436\u043D\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u0437\u0430 \u0447\u0438\u043D\u043D\u0438\u043C \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u043E\u043C \u043E\u0437\u043D\u0430\u043A \u0456 \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u043E.</p>
-  <p>\u041C\u0438 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u043C\u043E \u0446\u0435\u0439 \u043C\u0430\u0441\u0438\u0432, \u0432\u0456\u0434\u0431\u0438\u0440\u0430\u0454\u043C\u043E ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0457 \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB, \u0434\u043E\u043F\u043E\u0432\u043D\u044E\u0454\u043C\u043E \u043A\u0430\u0440\u0442\u043A\u0430\u043C\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 Prozorro \u2014 \u0437\u0432\u0456\u0434\u043A\u0438 \u0431\u0435\u0440\u0435\u043C\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0443 \u043E\u0441\u043E\u0431\u0443, \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432 \u0456 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u2014 \u0456 \u043F\u043E\u0434\u0430\u0454\u043C\u043E \u0442\u0430\u043A, \u0449\u043E\u0431 \u0437 \u0446\u0438\u043C \u043C\u043E\u0436\u043D\u0430 \u0431\u0443\u043B\u043E \u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0442\u0438.</p>
+  <p>\u041C\u0438 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u043C\u043E \u0446\u0435\u0439 \u043C\u0430\u0441\u0438\u0432 \u043F\u043E \u0432\u0441\u0456\u0439 \u0423\u043A\u0440\u0430\u0457\u043D\u0456 \u0439 \u0434\u043E\u043F\u043E\u0432\u043D\u044E\u0454\u043C\u043E \u0439\u043E\u0433\u043E \u043A\u0430\u0440\u0442\u043A\u0430\u043C\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 Prozorro \u2014 \u0437\u0432\u0456\u0434\u043A\u0438 \u0431\u0435\u0440\u0435\u043C\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0443 \u043E\u0441\u043E\u0431\u0443, \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432 \u0456 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F. \u041A\u0430\u0440\u0442\u043A\u0438 \u0432\u0436\u0435 \u0454 \u0434\u043B\u044F ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0439 \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB, \u0440\u0435\u0448\u0442\u0430 \u043A\u0440\u0430\u0457\u043D\u0438 \u0434\u043E\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u0442\u044C\u0441\u044F \u043F\u043E\u0441\u0442\u0443\u043F\u043E\u0432\u043E; \u043F\u043E\u043A\u0438 \u043A\u0430\u0440\u0442\u043A\u0438 \u043D\u0435\u043C\u0430\u0454, \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u043F\u043E\u043A\u0430\u0437\u0443\u0454 \u043B\u0438\u0448\u0435 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u0438.</p>
 </div>
 
 <div class="card">
@@ -2912,9 +2930,11 @@ async function getCard(config, id, fetchImpl = fetch) {
 }
 
 // server/pages/tender.ts
-async function tenderPage(tenderId) {
+async function tenderPage(tenderId, url) {
   const base = dataset().byTender.get(tenderId);
   if (!base) return notFound();
+  const from = url?.searchParams.get("from") ?? "";
+  const back = /^\/(?!\/)[^\s]*$/.test(from) ? from : "/";
   let entry = base;
   if (!entry.detailed) {
     const config = loadDbConfig();
@@ -2944,15 +2964,16 @@ async function tenderPage(tenderId) {
     title: `${trim(title, 60)} \xB7 ${shortMoney(entry.value_amount)}`,
     description: `${buyer ? `${buyer} \xB7 ` : ""}${money(entry.value_amount)} \xB7 ${signals[0] ?? (entry.risks.length ? `${entry.risks.length} ${plural(entry.risks.length, "\u043E\u0437\u043D\u0430\u043A\u0430", "\u043E\u0437\u043D\u0430\u043A\u0438", "\u043E\u0437\u043D\u0430\u043A")} \u0440\u0438\u0437\u0438\u043A\u0443` : "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438")} \xB7 ${entry.tender_ref || entry.tender_id}`,
     body: `
-<a class="back" href="/">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u043D\u0430\u0445\u0456\u0434\u043E\u043A</a>
+<a class="back" href="${esc(back)}">${back === "/" ? "\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C" : "\u2190 \u043D\u0430\u0437\u0430\u0434 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443"}</a>
 ${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id), { label: true })}
 <h1 class="long">${esc(title)}</h1>
 <p class="sub">${esc(readableName(entry.entity_name))} \xB7 <span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span></p>
 
 ${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
+${verdictSummary(entry, sameEntity, sameOfficer, sameWinner)}
 
 <div class="actions">
-  <a class="action primary" href="/tender/${encodeURIComponent(entry.tender_id)}/report">\u0417\u0432\u0456\u0442 \u0434\u043B\u044F \u0434\u0440\u0443\u043A\u0443 \u0442\u0430 PDF</a>
+  <a class="action primary download" href="/tender/${encodeURIComponent(entry.tender_id)}/report">\u0417\u0432\u0456\u0442 \u0434\u043B\u044F \u0434\u0440\u0443\u043A\u0443 \u0442\u0430 PDF</a>
   <a class="action" href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">\u0422\u0435\u043A\u0441\u0442\u043E\u0432\u0438\u043C \u0444\u0430\u0439\u043B\u043E\u043C</a>
   <a class="action" href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E \u0432 Prozorro</a>
 </div>
@@ -3021,7 +3042,7 @@ ${entry.risks.map((r) => riskCard(r)).join("")}
 <h2>\u041F\u0440\u0430\u0432\u043E\u0432\u0430 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F</h2>
 ${qualificationBlock(entry)}
 
-<h2>\u041D\u0430\u0448 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A</h2>
+<h2 id="conclusion">\u041D\u0430\u0448 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A</h2>
 ${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
 
 <h2>\u0426\u0435\u0439 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0437\u0430\u0433\u0430\u043B\u043E\u043C</h2>
@@ -3055,9 +3076,23 @@ function entityPage(edrpou, url) {
     officers.set(entry.officer_key, acc);
   }
   const rankedOfficers = [...officers.entries()].sort((a, b) => b[1].value - a[1].value);
+  const SHOW_OFFICERS = 8;
+  const officerRow = ([key, acc]) => `<div class="row">
+  <div class="who">
+    <div class="name"><a href="/officer/${encodeURIComponent(key)}">${esc(acc.name)}</a></div>
+    <div class="meta">${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
+</div>`;
+  const officersBlock = rankedOfficers.length === 0 ? "" : `<h2>\u0425\u0442\u043E \u0432\u0456\u0432 \u0446\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
+<div class="rows">${rankedOfficers.slice(0, SHOW_OFFICERS).map(officerRow).join("")}</div>
+${rankedOfficers.length > SHOW_OFFICERS ? `<details class="sub"><summary>\u0429\u0435 ${rankedOfficers.length - SHOW_OFFICERS} ${plural(rankedOfficers.length - SHOW_OFFICERS, "\u043E\u0441\u043E\u0431\u0430", "\u043E\u0441\u043E\u0431\u0438", "\u043E\u0441\u0456\u0431")}</summary>
+  <div class="inner"><div class="rows">${rankedOfficers.slice(SHOW_OFFICERS).map(officerRow).join("")}</div></div>
+</details>` : ""}`;
   return layout({
-    title: name,
+    title: readableName(name),
     nav: "entities",
+    description: `\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A \xB7 \u0404\u0414\u0420\u041F\u041E\u0423 ${edrpou} \xB7 ${list.length} ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u043D\u0430 ${shortMoney(value)}`,
     body: `
 <a class="back" href="/entities">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432</a>
 <h1 class="long">${esc(readableName(name))}</h1>
@@ -3071,25 +3106,15 @@ ${star("entity", edrpou, "/entity/" + encodeURIComponent(edrpou), { label: true 
   <b>${rankedOfficers.length}</b> \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0438\u0445 \u043E\u0441\u0456\u0431
 </p>
 
-${rankedOfficers.length > 0 ? `<h2>\u0425\u0442\u043E \u0432\u0456\u0432 \u0446\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
-<div class="rows">
-${rankedOfficers.map(
-      ([key, acc]) => `<div class="row">
-  <div class="who">
-    <div class="name"><a href="/officer/${encodeURIComponent(key)}">${esc(acc.name)}</a></div>
-    <div class="meta">${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438</div>
-  </div>
-  <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
-</div>`
-    ).join("")}
-</div>` : ""}
-
-<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430</h2>
-${groupedRiskCards(ranked)}
+${officersBlock}
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
 ${controlBar(dossierAction, ctrl)}
 ${listBody(shown, ctrl, dossierAction, { showEntity: false })}
+
+<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430</h2>
+<p class="hint">\u041E\u0437\u043D\u0430\u043A\u0438, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438 \u0432 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0446\u044C\u043E\u0433\u043E \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430, \u0437\u0433\u0440\u0443\u043F\u043E\u0432\u0430\u043D\u0456 \u0437\u0430 \u0437\u043C\u0456\u0441\u0442\u043E\u043C.</p>
+${groupedRiskCards(ranked)}
 `
   });
 }
@@ -3112,6 +3137,7 @@ function officerPage(key, url) {
   return layout({
     title: name,
     nav: "officers",
+    description: `\u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0430 \u043E\u0441\u043E\u0431\u0430${entity ? ` \xB7 ${readableName(entity)}` : ""} \xB7 ${list.length} ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u043D\u0430 ${shortMoney(value)}`,
     body: `
 <a class="back" href="/officers">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456\u0432</a>
 ${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
@@ -3134,13 +3160,13 @@ ${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
   <p class="faint" style="margin-top:.9rem">\u0414\u0430\u043D\u0456 \u0432\u0437\u044F\u0442\u043E \u0437 \u043A\u0430\u0440\u0442\u043E\u043A \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0443 Prozorro, \u0434\u0435 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0441\u0430\u043C \u043F\u0443\u0431\u043B\u0456\u043A\u0443\u0454 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0443 \u043E\u0441\u043E\u0431\u0443. \u041E\u0434\u043D\u0443 \u043B\u044E\u0434\u0438\u043D\u0443 \u043C\u0456\u0436 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438 \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043E \u0437\u0430 \u043F\u043E\u0448\u0442\u043E\u044E \u2014 \u0432\u043E\u043D\u0430 \u0441\u0442\u0430\u0431\u0456\u043B\u044C\u043D\u0456\u0448\u0430 \u0437\u0430 \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u043D\u044F \u0456\u043C\u0435\u043D\u0456.</p>
 </div>
 
-<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0457\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
-<p class="hint">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0437\u043D\u0430\u043A, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438. <strong>\u041D\u0435 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432\u0438\u043D\u0430.</strong></p>
-${groupedRiskCards(ranked)}
-
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
 ${controlBar(dossierAction, ctrl)}
 ${listBody(shown, ctrl, dossierAction, { showOfficer: false })}
+
+<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0457\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
+<p class="hint">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0437\u043D\u0430\u043A, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438. <strong>\u041D\u0435 \u0441\u0443\u0434\u0438\u043C\u0456\u0441\u0442\u044C \u0456 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432\u0438\u043D\u0430.</strong></p>
+${groupedRiskCards(ranked)}
 
 <p class="note">\u0426\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 \u043D\u0435 \u0454 \u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F\u043C \u043F\u0440\u043E \u043F\u0440\u0430\u0432\u043E\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0437 \u0431\u043E\u043A\u0443 \u043D\u0430\u0437\u0432\u0430\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438. \u0412\u043E\u043D\u0430 \u043F\u043E\u043A\u0430\u0437\u0443\u0454, \u0449\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0443 \u044F\u043A\u0438\u0445 \u0446\u044E \u043E\u0441\u043E\u0431\u0443 \u0432\u043A\u0430\u0437\u0430\u043D\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u043E\u044E \u043E\u0441\u043E\u0431\u043E\u044E.</p>
 `
@@ -3155,13 +3181,30 @@ function supplierPage(edrpou, url) {
   const name = list.find((c) => c.winner_name)?.winner_name ?? edrpou;
   const value = list.reduce((sum2, c) => sum2 + (c.winner_amount ?? c.value_amount ?? 0), 0);
   const ranked = rankRisks(list);
-  const buyers = new Set(list.map((c) => c.entity_edrpou).filter(Boolean));
   const solo = list.filter((c) => c.bidders === 1).length;
   const ctrl = readControls(url);
   const shown = applyControls(list, ctrl, RAILWAY_EDRPOU);
+  const buyers = /* @__PURE__ */ new Map();
+  for (const entry of list) {
+    if (!entry.entity_edrpou) continue;
+    const acc = buyers.get(entry.entity_edrpou) ?? { name: entry.entity_name ?? entry.entity_edrpou, count: 0, value: 0 };
+    acc.count++;
+    acc.value += entry.winner_amount ?? entry.value_amount ?? 0;
+    buyers.set(entry.entity_edrpou, acc);
+  }
+  const rankedBuyers = [...buyers.entries()].sort((a, b) => b[1].value - a[1].value);
+  const SHOW_BUYERS = 8;
+  const buyerRow = ([code, acc]) => `<div class="row">
+  <div class="who">
+    <div class="name"><a href="/entity/${encodeURIComponent(code)}">${esc(readableName(acc.name))}</a></div>
+    <div class="meta">${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \xB7 \u0404\u0414\u0420\u041F\u041E\u0423 ${esc(code)}</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
+</div>`;
   return layout({
-    title: name,
+    title: readableName(name),
     nav: "suppliers",
+    description: `\u041F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A \xB7 \u0404\u0414\u0420\u041F\u041E\u0423 ${edrpou} \xB7 ${list.length} ${plural(list.length, "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433")} \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u043D\u0430 ${shortMoney(value)}`,
     body: `
 <a class="back" href="/suppliers">\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456\u0432</a>
 <h1>${esc(readableName(name))}</h1>
@@ -3172,17 +3215,23 @@ ${star("supplier", edrpou, "/supplier/" + encodeURIComponent(edrpou), { label: t
   <b>${list.length}</b> \u043F\u0435\u0440\u0435\u043C\u043E\u0433 \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \xB7
   <b>${shortMoney(value)}</b> \u0441\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0456\u0432 \xB7
   <b>${solo}</b> \u0434\u0435 \u0431\u0443\u0432 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
-  <b>${buyers.size}</b> \u0440\u0456\u0437\u043D\u0438\u0445 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432
+  <b>${rankedBuyers.length}</b> \u0440\u0456\u0437\u043D\u0438\u0445 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432
 </p>
 
-<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0446\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
-${groupedRiskCards(ranked)}
+${rankedBuyers.length ? `<h2>\u041A\u043E\u043C\u0443 \u043F\u0440\u043E\u0434\u0430\u0454</h2>
+<div class="rows">${rankedBuyers.slice(0, SHOW_BUYERS).map(buyerRow).join("")}</div>
+${rankedBuyers.length > SHOW_BUYERS ? `<details class="sub"><summary>\u0429\u0435 ${rankedBuyers.length - SHOW_BUYERS} ${plural(rankedBuyers.length - SHOW_BUYERS, "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A", "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438", "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0456\u0432")}</summary>
+  <div class="inner"><div class="rows">${rankedBuyers.slice(SHOW_BUYERS).map(buyerRow).join("")}</div></div>
+</details>` : ""}` : ""}
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</h2>
 ${controlBar(dossierAction, ctrl)}
 ${listBody(shown, ctrl, dossierAction)}
 
-<p class="note">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u043E\u0445\u043E\u043F\u043B\u044E\u0454 \u043B\u0438\u0448\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0439 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456, \u044F\u043A\u0456 \u0432\u0436\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E. \u0426\u0435 \u043D\u0435 \u043F\u043E\u0432\u043D\u0430 \u0456\u0441\u0442\u043E\u0440\u0456\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457 \u043F\u043E \u0423\u043A\u0440\u0430\u0457\u043D\u0456.</p>
+<h2>\u0429\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0432 \u0446\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445</h2>
+${groupedRiskCards(ranked)}
+
+<p class="note">\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0435\u0446\u044C \u0432\u0456\u0434\u043E\u043C\u0438\u0439 \u043B\u0438\u0448\u0435 \u0442\u0430\u043C, \u0434\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E \u043F\u043E\u0432\u043D\u0443 \u043A\u0430\u0440\u0442\u043A\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u2014 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456 \u0446\u0435 ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u0457 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456, \u0440\u0435\u0448\u0442\u0430 \u043A\u0440\u0430\u0457\u043D\u0438 \u0434\u043E\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u0442\u044C\u0441\u044F. \u0426\u0435 \u043D\u0435 \u043F\u043E\u0432\u043D\u0430 \u0456\u0441\u0442\u043E\u0440\u0456\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457 \u043F\u043E \u0423\u043A\u0440\u0430\u0457\u043D\u0456.</p>
 `
   });
 }
@@ -3230,13 +3279,25 @@ function dirBar(action, c) {
     (x) => `<option value="${x.value}"${x.value === c.sort ? " selected" : ""}>${esc(x.label)}</option>`
   ).join("")}</select>
   </label>
-  ${dirty ? `<a class="reset" href="${esc(action)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438</a>` : ""}
+  ${dirty ? `<a class="reset" href="${esc(action)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0435</a>` : ""}
 </form>`;
 }
 function directoryPage(opts) {
   const c = readDirControls(opts.url);
   const rows = applyDirControls(opts.rows, c);
   const total = rows.reduce((sum2, r) => sum2 + r.value, 0);
+  const PAGE = 100;
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  const page3 = Math.min(pages, Math.max(1, Math.floor(Number(opts.url.searchParams.get("page") ?? 1) || 1)));
+  const slice = rows.slice((page3 - 1) * PAGE, page3 * PAGE);
+  const pageHref = (n) => {
+    const p = new URLSearchParams();
+    if (c.q) p.set("q", c.q);
+    if (c.sort !== "value") p.set("sort", c.sort);
+    if (n > 1) p.set("page", String(n));
+    const q = p.toString();
+    return q ? `${opts.action}?${q}` : opts.action;
+  };
   return layout({
     title: opts.title,
     nav: opts.nav,
@@ -3246,7 +3307,7 @@ function directoryPage(opts) {
 ${dirBar(opts.action, c)}
 <p class="hint">${c.q ? "\u0417\u043D\u0430\u0439\u0434\u0435\u043D\u043E" : "\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E"} <strong>${rows.length.toLocaleString("uk-UA")}</strong> ${plural(rows.length, "\u0437\u0430\u043F\u0438\u0441", "\u0437\u0430\u043F\u0438\u0441\u0438", "\u0437\u0430\u043F\u0438\u0441\u0456\u0432")} \u043D\u0430 ${shortMoney(total)}.</p>
 ${rows.length === 0 ? `<div class="empty">\u0417\u0430 \u0446\u0438\u043C \u0437\u0430\u043F\u0438\u0442\u043E\u043C \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F.<br><a href="${esc(opts.action)}">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0432\u0441\u0456\u0445</a> \xB7 <a href="/lookup${c.q ? `?edrpou=${encodeURIComponent(c.q)}` : ""}">\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423</a></div>` : `<div class="rows">
-${rows.slice(0, 150).map(
+${slice.map(
       (r) => `<div class="row">
   <div class="who">
     <div class="name">${r.kind && r.id ? star(r.kind, r.id, currentPath() || r.href) : ""}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
@@ -3256,7 +3317,11 @@ ${rows.slice(0, 150).map(
 </div>`
     ).join("")}
 </div>`}
-${rows.length > 150 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E \u043F\u0435\u0440\u0448\u0456 150 \u0456\u0437 ${rows.length.toLocaleString("uk-UA")}. \u0417\u0432\u0443\u0437\u044C\u0442\u0435 \u043F\u043E\u0448\u0443\u043A\u043E\u043C, \u0449\u043E\u0431 \u043F\u043E\u0431\u0430\u0447\u0438\u0442\u0438 \u0440\u0435\u0448\u0442\u0443.</p>` : ""}
+${pages > 1 ? `<div class="pager">
+  ${page3 > 1 ? `<a href="${esc(pageHref(1))}" aria-label="\u041F\u0435\u0440\u0448\u0430 \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430">\xAB</a><a href="${esc(pageHref(page3 - 1))}">\u2190 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456</a>` : ""}
+  <span>\u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430 ${page3} \u0437 ${pages}</span>
+  ${page3 < pages ? `<a href="${esc(pageHref(page3 + 1))}">\u043D\u0430\u0441\u0442\u0443\u043F\u043D\u0456 \u2192</a><a href="${esc(pageHref(pages))}" aria-label="\u041E\u0441\u0442\u0430\u043D\u043D\u044F \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0430">\xBB</a>` : ""}
+</div>` : ""}
 `
   });
 }
@@ -3521,7 +3586,7 @@ function articlePage(code, url) {
     nav: `article-${article.code}`,
     body: `
 <h1>\u041F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432</h1>
-<p class="sub">\u0420\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445, \u0443\u0433\u043E\u0434\u0430\u0445 \u0456 \u0437\u0432\u0456\u0442\u0430\u0445 \u2014 \u0442\u0435, \u0449\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u044E\u0442\u044C \u0437\u0430 \u0441\u0442\u0430\u0442\u0442\u0435\u044E ${esc(article.code)}.</p>
+<p class="sub">\u0420\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445, \u0443\u0433\u043E\u0434\u0430\u0445 \u0456 \u0437\u0432\u0456\u0442\u0430\u0445 \u2014 \u0442\u0435, \u0449\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u044E\u0442\u044C \u0437\u0430 \u0441\u0442\u0430\u0442\u0442\u0435\u044E ${esc(article.code)}. \u041B\u0438\u0448\u0435 ${esc(REGION)}: \u0446\u0435\u0439 \u0432\u0456\u0434\u0431\u0456\u0440 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043F\u043E\u0432\u043D\u0438\u0445 \u043A\u0430\u0440\u0442\u043E\u043A \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C, \u044F\u043A\u0456 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E \u0434\u043B\u044F \u043E\u0431\u043B\u0430\u0441\u0442\u0456 \u0442\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456.</p>
 
 <p class="statline">
   <b>${list.length.toLocaleString("uk-UA")}</b> ${plural(list.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")} \xB7
@@ -3558,14 +3623,15 @@ function articlePage(code, url) {
 
 <h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438</h2>
 <form class="filters" method="get" action="/article/${esc(article.code)}">
+  ${hiddenControls(ctrl, esc, ["at"])}
   <div class="filter-row">
     <label class="check"><input type="checkbox" name="at" value="1"${jointOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0430\u043A\u0446\u0456\u043E\u043D\u0435\u0440\u043D\u0456 \u0442\u043E\u0432\u0430\u0440\u0438\u0441\u0442\u0432\u0430 (\u0410\u0422)</label>
-    <button type="submit">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
-    ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438</a>` : ""}
+    <button type="submit">\u0417\u0430\u0441\u0442\u043E\u0441\u0443\u0432\u0430\u0442\u0438</button>
+    ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0435</a>` : ""}
   </div>
 </form>
 ${controlBar(articleAction, ctrl, {}, { extra: jointHidden })}
-${listBody(shown, ctrl, articleAction)}
+${listBody(shown, ctrl, articleAction, {}, jointOnly ? { at: "1" } : {})}
 
 <p class="note">\u041F\u0435\u0440\u0435\u043B\u0456\u043A \u0441\u0444\u043E\u0440\u043C\u043E\u0432\u0430\u043D\u043E \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E \u0437\u0430 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0412\u0456\u043D \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u0444\u0430\u043A\u0442 \u043F\u0440\u0430\u0432\u043E\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0456 \u043D\u0435 \u0454 \u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F\u043C \u0449\u043E\u0434\u043E \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u043D\u0430\u0437\u0432\u0430\u043D\u043E\u0457 \u043E\u0441\u043E\u0431\u0438 \u0447\u0438 \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457. \u041D\u0430\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u043A\u0440\u043E\u043A \u2014 \u0432\u0438\u0442\u0440\u0435\u0431\u0443\u0432\u0430\u0442\u0438 \u0441\u0430\u043C\u0456 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0439 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0457\u0445.</p>
 `
@@ -3581,10 +3647,10 @@ function updatesPage(url) {
   const c = readControls(url);
   const fresh = applyControls(freshAll, c, RAILWAY_EDRPOU);
   return layout({
-    title: "\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F",
+    title: "\u0429\u043E \u043D\u043E\u0432\u043E\u0433\u043E",
     nav: "updates",
     body: `
-<h1>\u0429\u043E \u0437\u043C\u0456\u043D\u0438\u043B\u043E\u0441\u044F</h1>
+<h1>\u0429\u043E \u043D\u043E\u0432\u043E\u0433\u043E</h1>
 <p class="sub">\u0429\u043E\u0434\u043D\u044F \u0437\u0432\u0456\u0440\u044F\u0454\u043C\u043E\u0441\u044F \u0437 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u043C \u043C\u0430\u0441\u0438\u0432\u043E\u043C \u0456 \u0434\u043E\u0434\u0430\u0454\u043C\u043E \u043D\u043E\u0432\u0435.</p>
 
 ${latest ? `<p class="statline">
@@ -3592,7 +3658,7 @@ ${latest ? `<p class="statline">
   <b>${latest.new_flags}</b> \u043D\u043E\u0432\u0438\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043D\u044C \xB7
   <b>${date(latest.started_at)}</b> \u043E\u0441\u0442\u0430\u043D\u043D\u0454 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \xB7
   <b>${runs.length}</b> ${plural(runs.length, "\u0437\u0430\u043F\u0443\u0441\u043A", "\u0437\u0430\u043F\u0443\u0441\u043A\u0438", "\u0437\u0430\u043F\u0443\u0441\u043A\u0456\u0432")}
-</p>` : '<div class="empty">\u0416\u043E\u0434\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0443 \u0449\u0435 \u043D\u0435 \u0431\u0443\u043B\u043E. \u0412\u0438\u043A\u043E\u043D\u0430\u0439\u0442\u0435 <code>npm run daily</code>.</div>'}
+</p>` : '<div class="empty">\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u044C \u0449\u0435 \u043D\u0435 \u0431\u0443\u043B\u043E \u2014 \u0431\u0430\u0437\u0430 \u043D\u0430\u043F\u043E\u0432\u043D\u0438\u0442\u044C\u0441\u044F \u043F\u0456\u0441\u043B\u044F \u043F\u0435\u0440\u0448\u043E\u0433\u043E \u0449\u043E\u0434\u0435\u043D\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0443.</div>'}
 
 ${freshAll.length > 0 ? `<h2>\u041D\u043E\u0432\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0441\u0442\u0430\u043D\u043D\u044C\u043E\u0433\u043E \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F</h2>
 ${controlBar("/updates", c)}
@@ -3612,7 +3678,7 @@ ${runs.slice(0, 30).map(
     ).join("")}
 </div>
 
-<p class="note">\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0432\u0438\u043A\u043E\u043D\u0443\u0454 \u0441\u043A\u0440\u0438\u043F\u0442 <code>npm run daily</code>. \u0412\u0456\u043D \u0431\u0435\u0437\u043F\u0435\u0447\u043D\u0438\u0439 \u0434\u043E \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0443: \u0443\u0441\u0435, \u0449\u043E \u0432\u0436\u0435 \u0454, \u043D\u0435 \u0434\u0443\u0431\u043B\u044E\u0454\u0442\u044C\u0441\u044F, \u0430 \u043F\u0435\u0440\u0435\u0440\u0432\u0430\u043D\u0438\u0439 \u0437\u0430\u043F\u0443\u0441\u043A \u0434\u043E\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u0442\u044C\u0441\u044F \u043D\u0430\u0441\u0442\u0443\u043F\u043D\u043E\u0433\u043E \u0440\u0430\u0437\u0443.</p>
+<p class="note">\u0411\u0430\u0437\u0430 \u043E\u043D\u043E\u0432\u043B\u044E\u0454\u0442\u044C\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E \u0449\u043E\u0440\u0430\u043D\u043A\u0443. \u0423\u0441\u0435, \u0449\u043E \u0432\u0436\u0435 \u0454, \u043D\u0435 \u0434\u0443\u0431\u043B\u044E\u0454\u0442\u044C\u0441\u044F, \u0430 \u043F\u0435\u0440\u0435\u0440\u0432\u0430\u043D\u0435 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u0442\u044C\u0441\u044F \u043D\u0430\u0441\u0442\u0443\u043F\u043D\u043E\u0433\u043E \u0434\u043D\u044F. \u041F\u0456\u0434\u043F\u0438\u0441\u043D\u0438\u043A\u0438 \u0431\u043E\u0442\u0430 \u043E\u0442\u0440\u0438\u043C\u0443\u044E\u0442\u044C \u043F\u0456\u0434\u0441\u0443\u043C\u043E\u043A \u043A\u043E\u0436\u043D\u043E\u0433\u043E \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F.</p>
 `
   });
 }
@@ -3690,7 +3756,7 @@ ${typed && !code ? `<div class="empty">\xAB${esc(typed)}\xBB \u043D\u0435 \u0441
 
 ${code && !found ? `<div class="empty">
   <p>\u041A\u043E\u0434 <strong>${esc(code)}</strong> \u0443 \u043D\u0430\u0448\u0456\u0439 \u0431\u0430\u0437\u0456 \u043D\u0435 \u0437\u0443\u0441\u0442\u0440\u0456\u0447\u0430\u0454\u0442\u044C\u0441\u044F.</p>
-  <p class="faint">\u041C\u0438 \u0437\u0431\u0435\u0440\u0456\u0433\u0430\u0454\u043C\u043E \u043B\u0438\u0448\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u043E\u0457 \u043E\u0431\u043B\u0430\u0441\u0442\u0456 \u0442\u0430 \u0444\u0456\u043B\u0456\u0439 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456, \u0443 \u044F\u043A\u0438\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u0439 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440. \u041F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E \u043C\u043E\u0436\u0435 \u0456\u0441\u043D\u0443\u0432\u0430\u0442\u0438 \u0439 \u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0442\u0438 \u0432 \u0456\u043D\u0448\u0438\u0445 \u0440\u0435\u0433\u0456\u043E\u043D\u0430\u0445.</p>
+  <p class="faint">\u0423 \u0431\u0430\u0437\u0456 \u2014 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432\u0441\u0456\u0454\u0457 \u0423\u043A\u0440\u0430\u0457\u043D\u0438, \u0443 \u044F\u043A\u0438\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u0439 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0440\u0438\u0437\u0438\u043A\u0443. \u042F\u043A\u0449\u043E \u043A\u043E\u0434\u0443 \u0442\u0443\u0442 \u043D\u0435\u043C\u0430\u0454, \u0437\u0430 \u0446\u0438\u043C \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E\u043C \u043F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E \u2014 \u0446\u0435 \u0434\u043E\u0431\u0440\u0438\u0439 \u0437\u043D\u0430\u043A, \u0430 \u043D\u0435 \u043F\u043E\u043C\u0438\u043B\u043A\u0430.</p>
   <p><a href="https://prozorro.gov.ua/search/tenders?edrpou=${encodeURIComponent(code)}" target="_blank" rel="noopener">\u041F\u043E\u0448\u0443\u043A \u0446\u044C\u043E\u0433\u043E \u043A\u043E\u0434\u0443 \u0432 Prozorro \u2192</a></p>
 </div>` : ""}
 
@@ -3756,7 +3822,7 @@ async function render(url, saved = []) {
         filename: `${entry.tender_ref || entry.tender_id}.txt`
       } : { status: 200, body: reportHtml(ctx) };
     }
-    return page(await tenderPage(rest));
+    return page(await tenderPage(rest, url));
   }
   if (path.startsWith("/entity/")) return page(entityPage(path.slice("/entity/".length), url));
   if (path.startsWith("/officer/")) return page(officerPage(path.slice("/officer/".length), url));
