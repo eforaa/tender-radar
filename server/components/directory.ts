@@ -68,7 +68,7 @@ export function dirBar(action: string, c: DirControls): string {
       (x) => `<option value="${x.value}"${x.value === c.sort ? " selected" : ""}>${esc(x.label)}</option>`,
     ).join("")}</select>
   </label>
-  ${dirty ? `<a class="reset" href="${esc(action)}">скинути</a>` : ""}
+  ${dirty ? `<a class="reset" href="${esc(action)}">скинути все</a>` : ""}
 </form>`;
 }
 
@@ -85,6 +85,22 @@ export function directoryPage(opts: {
   const c = readDirControls(opts.url);
   const rows = applyDirControls(opts.rows, c);
   const total = rows.reduce((sum, r) => sum + r.value, 0);
+
+  // Real pages instead of a hard cut at 150: a directory of ten thousand
+  // buyers is browsable, not just searchable.
+  const PAGE = 100;
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  const page = Math.min(pages, Math.max(1, Math.floor(Number(opts.url.searchParams.get("page") ?? 1) || 1)));
+  const slice = rows.slice((page - 1) * PAGE, page * PAGE);
+  const pageHref = (n: number) => {
+    const p = new URLSearchParams();
+    if (c.q) p.set("q", c.q);
+    if (c.sort !== "value") p.set("sort", c.sort);
+    if (n > 1) p.set("page", String(n));
+    const q = p.toString();
+    return q ? `${opts.action}?${q}` : opts.action;
+  };
+
   return layout({
     title: opts.title,
     nav: opts.nav,
@@ -97,8 +113,7 @@ ${
   rows.length === 0
     ? `<div class="empty">За цим запитом нічого не знайшлося.<br><a href="${esc(opts.action)}">Показати всіх</a> · <a href="/lookup${c.q ? `?edrpou=${encodeURIComponent(c.q)}` : ""}">Перевірити за ЄДРПОУ</a></div>`
     : `<div class="rows">
-${rows
-  .slice(0, 150)
+${slice
   .map(
     (r) => `<div class="row">
   <div class="who">
@@ -111,7 +126,15 @@ ${rows
   .join("")}
 </div>`
 }
-${rows.length > 150 ? `<p class="note">Показано перші 150 із ${rows.length.toLocaleString("uk-UA")}. Звузьте пошуком, щоб побачити решту.</p>` : ""}
+${
+  pages > 1
+    ? `<div class="pager">
+  ${page > 1 ? `<a href="${esc(pageHref(1))}" aria-label="Перша сторінка">«</a><a href="${esc(pageHref(page - 1))}">← попередні</a>` : ""}
+  <span>сторінка ${page} з ${pages}</span>
+  ${page < pages ? `<a href="${esc(pageHref(page + 1))}">наступні →</a><a href="${esc(pageHref(pages))}" aria-label="Остання сторінка">»</a>` : ""}
+</div>`
+    : ""
+}
 `,
   });
 }

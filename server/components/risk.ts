@@ -55,7 +55,7 @@ export function riskCard(riskId: string, count?: number): string {
   ${rule?.name && label ? `<p class="faint"><strong>Офіційне формулювання:</strong> ${esc(rule.name)}</p>` : ""}
   ${norm}
   ${criminal}
-  <p class="code">Індикатор ${esc(riskId)} · державна система моніторингу закупівель</p>
+  <p class="code">Індикатор ${esc(riskId)} · державна система моніторингу закупівель · <a href="/?risk=${encodeURIComponent(riskId)}">усі закупівлі з цією ознакою →</a></p>
 </div>`;
 }
 

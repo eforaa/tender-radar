@@ -36,9 +36,9 @@ async function page(path: string) {
 // "/officers" - "Відповідальні посадовці" (directoryPage heading for officersPage line 1104)
 // "/suppliers" - "Переможці закупівель" (directoryPage heading for suppliersPage line 1138)
 // "/railway" - "Залізниця Харківської області" (railwayPage line 1221)
-// "/updates" - "Що змінилося" (updatesPage line 1421)
+// "/updates" - "Що нового" (updatesPage)
 // "/prices" - "Де ціна виглядає завищеною" (pricesPage line 1491)
-// "/indicators" - "Що ми шукаємо" (indicatorsPage line 1720)
+// "/indicators" - "Що ми перевіряємо" (indicatorsPage)
 // "/about" - "Звідки дані" (aboutPage body line 1736, verified absent from server/html.ts)
 // "/starred" - "Список зберігається у вашому браузері" (starredPage body line 1649, verified absent from server/html.ts)
 // "/lookup" - "Пошук підприємства за ЄДРПОУ" (lookupPage line 1551)
@@ -48,9 +48,9 @@ const STATIC_ROUTES = [
   ["/officers", "Відповідальні посадовці"],
   ["/suppliers", "Переможці закупівель"],
   ["/railway", "Залізниця Харківської області"],
-  ["/updates", "Що змінилося"],
+  ["/updates", "Що нового"],
   ["/prices", "Де ціна виглядає завищеною"],
-  ["/indicators", "Що ми шукаємо"],
+  ["/indicators", "Що ми перевіряємо"],
   ["/about", "Звідки дані"],
   ["/starred", "Список зберігається у вашому браузері"],
   ["/lookup", "Пошук підприємства за ЄДРПОУ"],

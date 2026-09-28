@@ -69,14 +69,29 @@ ${q.criminal
   .join("")}`;
 }
 
+function levelLabel(level: string): string {
+  return level === "high" ? "Високий пріоритет" : level === "medium" ? "Середній пріоритет" : "Низький пріоритет";
+}
+
+/**
+ * The verdict in one line, for the top of the tender page: the full
+ * conclusion sits several screens down, after the legal qualification, and
+ * the priority is the first thing a reader wants to know.
+ */
+export function verdictSummary(entry: Case, sameEntity: Case[], sameOfficer: Case[], sameWinner: Case[]): string {
+  const c = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
+  return `<div class="card verdict compact ${esc(c.level)}">
+  <h3><span class="verdict-tag">${esc(levelLabel(c.level))}</span> ${esc(c.headline)} <a href="#conclusion">Чому →</a></h3>
+</div>`;
+}
+
 /** The system's own reading of one tender, rendered for the page. */
 export function conclusionBlock(entry: Case, sameEntity: Case[], sameOfficer: Case[], sameWinner: Case[]): string {
   const c = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
   // The tag states the priority; the headline says why. They must not repeat.
-  const levelLabel = c.level === "high" ? "Високий пріоритет" : c.level === "medium" ? "Середній пріоритет" : "Низький пріоритет";
 
   return `<div class="card verdict ${esc(c.level)}">
-  <h3><span class="verdict-tag">${esc(levelLabel)}</span> ${esc(c.headline)}</h3>
+  <h3><span class="verdict-tag">${esc(levelLabel(c.level))}</span> ${esc(c.headline)}</h3>
   ${
     c.observations.length > 0
       ? `<ol class="findings">${c.observations

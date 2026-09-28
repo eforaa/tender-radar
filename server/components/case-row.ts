@@ -151,11 +151,14 @@ export function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?:
   }
 
   const severity = rowSeverity(entry);
+  // The tender page's "back" link returns here — to this page of this list.
+  const here = currentPath();
+  const tenderHref = `/tender/${encodeURIComponent(entry.tender_id)}${here && !here.startsWith("/tender/") ? `?from=${encodeURIComponent(here)}` : ""}`;
 
   return `<div class="row sev-${severity}">
-  <span class="dot" title="${esc(SEVERITY_TITLE[severity])}" aria-label="${esc(SEVERITY_TITLE[severity])}"></span>
+  <span class="dot" title="${esc(SEVERITY_TITLE[severity])}" aria-hidden="true"></span><span class="sr-only">${esc(SEVERITY_TITLE[severity])}.</span>
   <div class="who">
-    <div class="name">${star("tender", entry.tender_id, currentPath() || "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
+    <div class="name">${star("tender", entry.tender_id, here || tenderHref)}<a href="${esc(tenderHref)}">${esc(title)}</a></div>
     <div class="meta">${meta.join(" · ")}</div>
     ${people.length ? `<div class="meta">${people.join(" · ")}</div>` : ""}
   </div>
@@ -169,7 +172,7 @@ export function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?:
     ${entry.risks.slice(0, MAX_ROW_FLAGS).map(riskFlag).join("")}
     ${
       entry.risks.length > MAX_ROW_FLAGS
-        ? `<a class="flag more" href="/tender/${encodeURIComponent(entry.tender_id)}">ще ${entry.risks.length - MAX_ROW_FLAGS}</a>`
+        ? `<a class="flag more" href="${esc(tenderHref)}">ще ${entry.risks.length - MAX_ROW_FLAGS}</a>`
         : ""
     }
   </div>

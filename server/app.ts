@@ -83,7 +83,7 @@ export async function render(url: URL, saved: Favourite[] = []): Promise<Rendere
           }
         : { status: 200, body: reportHtml(ctx) };
     }
-    return page(await tenderPage(rest));
+    return page(await tenderPage(rest, url));
   }
   if (path.startsWith("/entity/")) return page(entityPage(path.slice("/entity/".length), url));
   if (path.startsWith("/officer/")) return page(officerPage(path.slice("/officer/".length), url));

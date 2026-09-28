@@ -1,6 +1,6 @@
 import { RAILWAY_EDRPOU } from "../../src/config.ts";
 import { readableName } from "../../src/labels.ts";
-import { layout, esc, shortMoney } from "../html.ts";
+import { layout, esc, shortMoney, plural } from "../html.ts";
 import { readControls, applyControls } from "../controls.ts";
 import { dataset } from "../context.ts";
 import { star } from "../components/case-row.ts";
@@ -27,6 +27,7 @@ export function officerPage(key: string, url: URL): string {
   return layout({
     title: name,
     nav: "officers",
+    description: `Відповідальна особа${entity ? ` · ${readableName(entity)}` : ""} · ${list.length} ${plural(list.length, "закупівля", "закупівлі", "закупівель")} із позначками на ${shortMoney(value)}`,
     body: `
 <a class="back" href="/officers">← до переліку посадовців</a>
 ${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
@@ -49,13 +50,13 @@ ${star("officer", key, "/officer/" + encodeURIComponent(key), { label: true })}
   <p class="faint" style="margin-top:.9rem">Дані взято з карток закупівель у Prozorro, де замовник сам публікує контактну особу. Одну людину між закупівлями зіставлено за поштою — вона стабільніша за написання імені.</p>
 </div>
 
-<h2>Що держава запідозрила в її закупівлях</h2>
-<p class="hint">Перелік ознак, що спрацювали. <strong>Не судимість і не встановлена вина.</strong></p>
-${groupedRiskCards(ranked)}
-
 <h2>Закупівлі</h2>
 ${controlBar(dossierAction, ctrl)}
 ${listBody(shown, ctrl, dossierAction, { showOfficer: false })}
+
+<h2>Що держава запідозрила в її закупівлях</h2>
+<p class="hint">Перелік ознак, що спрацювали. <strong>Не судимість і не встановлена вина.</strong></p>
+${groupedRiskCards(ranked)}
 
 <p class="note">Ця сторінка не є твердженням про правопорушення з боку названої особи. Вона показує, що державна система моніторингу позначила закупівлі, у яких цю особу вказано відповідальною контактною особою.</p>
 `,

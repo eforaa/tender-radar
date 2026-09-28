@@ -3,15 +3,21 @@ import { layout, esc, money, unitMoney, shortMoney, date, plural, trim } from ".
 import { dataset } from "../context.ts";
 import { star, alarms, auditSection } from "../components/case-row.ts";
 import { riskCard } from "../components/risk.ts";
-import { qualificationBlock, conclusionBlock } from "../components/verdict.ts";
+import { qualificationBlock, conclusionBlock, verdictSummary } from "../components/verdict.ts";
 import { notFound } from "./static.ts";
 import { loadDbConfig } from "../../src/store/db.ts";
 import { getCard } from "../../src/store/cards.ts";
 import { mergeCardDetail } from "../data.ts";
 
-export async function tenderPage(tenderId: string): Promise<string> {
+export async function tenderPage(tenderId: string, url?: URL): Promise<string> {
   const base = dataset().byTender.get(tenderId);
   if (!base) return notFound();
+
+  // Where the reader came from, so "back" returns to the filtered page, the
+  // dossier or the section they were reading — not always to the bare feed.
+  // Same-site paths only: an absolute URL here would be an open redirect.
+  const from = url?.searchParams.get("from") ?? "";
+  const back = /^\/(?!\/)[^\s]*$/.test(from) ? from : "/";
 
   // Every flagged tender has an entry, but most lack detail (officer, bidders,
   // winner) — those cards were never fetched into the committed dataset. Pull
@@ -52,15 +58,16 @@ export async function tenderPage(tenderId: string): Promise<string> {
       signals[0] ?? (entry.risks.length ? `${entry.risks.length} ${plural(entry.risks.length, "ознака", "ознаки", "ознак")} ризику` : "закупівля з позначками")
     } · ${entry.tender_ref || entry.tender_id}`,
     body: `
-<a class="back" href="/">← до переліку знахідок</a>
+<a class="back" href="${esc(back)}">${back === "/" ? "← до переліку закупівель" : "← назад до переліку"}</a>
 ${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id), { label: true })}
 <h1 class="long">${esc(title)}</h1>
 <p class="sub">${esc(readableName(entry.entity_name))} · <span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span></p>
 
 ${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
+${verdictSummary(entry, sameEntity, sameOfficer, sameWinner)}
 
 <div class="actions">
-  <a class="action primary" href="/tender/${encodeURIComponent(entry.tender_id)}/report">Звіт для друку та PDF</a>
+  <a class="action primary download" href="/tender/${encodeURIComponent(entry.tender_id)}/report">Звіт для друку та PDF</a>
   <a class="action" href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">Текстовим файлом</a>
   <a class="action" href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">Першоджерело в Prozorro</a>
 </div>
@@ -151,7 +158,7 @@ ${entry.risks.map((r) => riskCard(r)).join("")}
 <h2>Правова кваліфікація</h2>
 ${qualificationBlock(entry)}
 
-<h2>Наш висновок</h2>
+<h2 id="conclusion">Наш висновок</h2>
 ${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
 
 <h2>Цей замовник загалом</h2>

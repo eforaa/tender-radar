@@ -287,7 +287,9 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 .action:hover{border-color:var(--accent);background:var(--accent-bg)}
 .action.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
 .action.primary:hover{filter:brightness(1.08);background:var(--accent)}
-.action.primary::before{content:"⤓";font-size:1.05rem}
+/* The download glyph belongs to the report link only, not to every primary
+   action — a 404 page's "all tenders" button is not a download. */
+.action.download::before{content:"⤓";font-size:1.05rem}
 .block-head{font-family:var(--f-display);font-weight:700;font-size:1.1rem;margin:var(--s5) 0 var(--s2)}
 .badge{background:var(--accent);color:#fff;font-size:.75rem;font-weight:600;min-width:1.3rem;height:1.3rem;border-radius:1rem;display:inline-flex;align-items:center;justify-content:center;padding:0 var(--s2)}
 /* star toggle — a form so the site still needs no scripts */
@@ -380,6 +382,10 @@ a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .card p{margin:0 0 var(--s3);color:var(--ink-soft);max-width:68ch}
 .card p:last-child{margin-bottom:0}
 .card p.lead{color:var(--ink);font-size:1.02rem}
+/* The one-line verdict at the top of a tender page. */
+.verdict.compact{padding:var(--s3) var(--s4);margin-bottom:var(--s5)}
+.verdict.compact h3{margin:0;font-size:1rem;font-weight:500;line-height:1.5}
+.verdict.compact h3 a{white-space:nowrap;margin-left:var(--s2)}
 .legal{border-left:3px solid var(--accent);background:var(--accent-bg);padding:var(--s3) var(--s4);font-size:.94rem;color:var(--ink);max-width:none;border-radius:0 var(--radius) var(--radius) 0}
 .legal.reading{border-left-color:var(--warn);background:var(--warn-bg)}
 details.sub{margin:var(--s4) 0 var(--s1);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}

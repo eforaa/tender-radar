@@ -297,7 +297,13 @@ export function listBody(
   c: Controls,
   action: string,
   rowOpts: { showOfficer?: boolean; showEntity?: boolean } = {},
+  /** Page-specific parameters the pager must carry too (the article page's `at`). */
+  extra: Record<string, string> = {},
 ): string {
+  const link = (over: Record<string, string>) => keepControls(action, c, { ...extra, ...over });
+  const extraHidden = Object.entries(extra)
+    .map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`)
+    .join("");
   if (list.length === 0) {
     // A dead end with a way out: one link that clears everything, and, when
     // the search text is the likely culprit, one that drops only it.
@@ -327,9 +333,9 @@ export function listBody(
 ${
   pages > 1
     ? `<div class="pager">
-  ${page > 1 ? `<a href="${keepControls(action, c)}" title="Перша сторінка" aria-label="Перша сторінка">«</a><a href="${keepControls(action, c, { page: String(page - 1) })}">← попередні</a>` : ""}
-  <form class="jump" method="get" action="${esc(action)}">${hiddenControls(c, esc)}<label>сторінка <input type="number" name="page" value="${page}" min="1" max="${pages}" aria-label="Номер сторінки"> з ${pages.toLocaleString("uk-UA")}</label><button type="submit">Перейти</button></form>
-  ${page < pages ? `<a href="${keepControls(action, c, { page: String(page + 1) })}">наступні →</a><a href="${keepControls(action, c, { page: String(pages) })}" title="Остання сторінка" aria-label="Остання сторінка">»</a>` : ""}
+  ${page > 1 ? `<a href="${link({})}" title="Перша сторінка" aria-label="Перша сторінка">«</a><a href="${link({ page: String(page - 1) })}">← попередні</a>` : ""}
+  <form class="jump" method="get" action="${esc(action)}">${hiddenControls(c, esc)}${extraHidden}<label>сторінка <input type="number" name="page" value="${page}" min="1" max="${pages}" aria-label="Номер сторінки"> з ${pages.toLocaleString("uk-UA")}</label><button type="submit">Перейти</button></form>
+  ${page < pages ? `<a href="${link({ page: String(page + 1) })}">наступні →</a><a href="${link({ page: String(pages) })}" title="Остання сторінка" aria-label="Остання сторінка">»</a>` : ""}
 </div>`
     : ""
 }`;

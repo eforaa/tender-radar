@@ -30,9 +30,33 @@ export function entityPage(edrpou: string, url: URL): string {
   }
   const rankedOfficers = [...officers.entries()].sort((a, b) => b[1].value - a[1].value);
 
+  // Long officer lists pushed the tenders many screens down; the first few
+  // carry most of the money, the rest fold away.
+  const SHOW_OFFICERS = 8;
+  const officerRow = ([key, acc]: [string, { name: string; count: number; value: number }]) => `<div class="row">
+  <div class="who">
+    <div class="name"><a href="/officer/${encodeURIComponent(key)}">${esc(acc.name)}</a></div>
+    <div class="meta">${acc.count} ${plural(acc.count, "закупівля", "закупівлі", "закупівель")} із позначками</div>
+  </div>
+  <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
+</div>`;
+  const officersBlock =
+    rankedOfficers.length === 0
+      ? ""
+      : `<h2>Хто вів ці закупівлі</h2>
+<div class="rows">${rankedOfficers.slice(0, SHOW_OFFICERS).map(officerRow).join("")}</div>
+${
+  rankedOfficers.length > SHOW_OFFICERS
+    ? `<details class="sub"><summary>Ще ${rankedOfficers.length - SHOW_OFFICERS} ${plural(rankedOfficers.length - SHOW_OFFICERS, "особа", "особи", "осіб")}</summary>
+  <div class="inner"><div class="rows">${rankedOfficers.slice(SHOW_OFFICERS).map(officerRow).join("")}</div></div>
+</details>`
+    : ""
+}`;
+
   return layout({
-    title: name,
+    title: readableName(name),
     nav: "entities",
+    description: `Замовник · ЄДРПОУ ${edrpou} · ${list.length} ${plural(list.length, "закупівля", "закупівлі", "закупівель")} із позначками на ${shortMoney(value)}`,
     body: `
 <a class="back" href="/entities">← до переліку замовників</a>
 <h1 class="long">${esc(readableName(name))}</h1>
@@ -46,31 +70,15 @@ ${star("entity", edrpou, "/entity/" + encodeURIComponent(edrpou), { label: true 
   <b>${rankedOfficers.length}</b> відповідальних осіб
 </p>
 
-${
-  rankedOfficers.length > 0
-    ? `<h2>Хто вів ці закупівлі</h2>
-<div class="rows">
-${rankedOfficers
-  .map(
-    ([key, acc]) => `<div class="row">
-  <div class="who">
-    <div class="name"><a href="/officer/${encodeURIComponent(key)}">${esc(acc.name)}</a></div>
-    <div class="meta">${acc.count} ${plural(acc.count, "закупівля", "закупівлі", "закупівель")} із позначками</div>
-  </div>
-  <div class="amount"><span class="big">${shortMoney(acc.value)}</span></div>
-</div>`,
-  )
-  .join("")}
-</div>`
-    : ""
-}
-
-<h2>Що держава запідозрила</h2>
-${groupedRiskCards(ranked)}
+${officersBlock}
 
 <h2>Закупівлі</h2>
 ${controlBar(dossierAction, ctrl)}
 ${listBody(shown, ctrl, dossierAction, { showEntity: false })}
+
+<h2>Що держава запідозрила</h2>
+<p class="hint">Ознаки, що спрацювали в закупівлях цього замовника, згруповані за змістом.</p>
+${groupedRiskCards(ranked)}
 `,
   });
 }

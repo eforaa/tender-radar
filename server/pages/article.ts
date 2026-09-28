@@ -3,7 +3,7 @@ import { RISK_LABELS } from "../../src/labels.ts";
 import { layout, esc, plural, shortMoney } from "../html.ts";
 import { ARTICLES, isJointStock } from "../../src/legal.ts";
 import { type Case } from "../data.ts";
-import { readControls, applyControls } from "../controls.ts";
+import { readControls, applyControls, hiddenControls } from "../controls.ts";
 import { dataset } from "../context.ts";
 import { controlBar, listBody } from "../components/filters.ts";
 import { notFound } from "./static.ts";
@@ -49,7 +49,7 @@ export function articlePage(code: string, url: URL): string {
     nav: `article-${article.code}`,
     body: `
 <h1>Підроблення документів</h1>
-<p class="sub">Розбіжності в договорах, угодах і звітах — те, що перевіряють за статтею ${esc(article.code)}.</p>
+<p class="sub">Розбіжності в договорах, угодах і звітах — те, що перевіряють за статтею ${esc(article.code)}. Лише ${esc(REGION)}: цей відбір потребує повних карток закупівель, які завантажено для області та залізниці.</p>
 
 <p class="statline">
   <b>${list.length.toLocaleString("uk-UA")}</b> ${plural(list.length, "закупівля", "закупівлі", "закупівель")} ·
@@ -88,14 +88,15 @@ export function articlePage(code: string, url: URL): string {
 
 <h2>Закупівлі для перевірки</h2>
 <form class="filters" method="get" action="/article/${esc(article.code)}">
+  ${hiddenControls(ctrl, esc, ["at"])}
   <div class="filter-row">
     <label class="check"><input type="checkbox" name="at" value="1"${jointOnly ? " checked" : ""}> лише акціонерні товариства (АТ)</label>
-    <button type="submit">Показати</button>
-    ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">скинути</a>` : ""}
+    <button type="submit">Застосувати</button>
+    ${jointOnly ? `<a class="reset" href="/article/${esc(article.code)}">скинути все</a>` : ""}
   </div>
 </form>
 ${controlBar(articleAction, ctrl, {}, { extra: jointHidden })}
-${listBody(shown, ctrl, articleAction)}
+${listBody(shown, ctrl, articleAction, {}, jointOnly ? { at: "1" } : {})}
 
 <p class="note">Перелік сформовано автоматично за індикаторами державної системи моніторингу закупівель. Він не встановлює факт правопорушення і не є твердженням щодо будь-якої названої особи чи компанії. Наступний крок — витребувати самі документи й перевірити їх.</p>
 `,
