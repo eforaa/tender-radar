@@ -2147,8 +2147,8 @@ function keepControls(action, c, over = {}) {
   if (c.group) p.set("group", c.group);
   if (c.then) p.set("then", c.then);
   for (const [k, v] of Object.entries(over)) p.set(k, v);
-  const query = p.toString();
-  return query ? `${action}?${query}` : action;
+  const query2 = p.toString();
+  return query2 ? `${action}?${query2}` : action;
 }
 
 // server/components/risk.ts
@@ -2784,36 +2784,67 @@ function notFound() {
   });
 }
 
-// src/store/supabase-cards.ts
-function loadSupabaseConfig(env = process.env) {
-  const url = env.SUPABASE_URL;
-  const serviceKey = env.SUPABASE_SERVICE_KEY;
-  return url && serviceKey ? { url, serviceKey } : null;
+// src/store/db.ts
+function loadDbConfig(env = process.env) {
+  const url = env.TURSO_DATABASE_URL;
+  const token = env.TURSO_AUTH_TOKEN;
+  return url && token ? { url, token } : null;
 }
-function headers(config, extra = {}) {
-  return {
-    apikey: config.serviceKey,
-    Authorization: `Bearer ${config.serviceKey}`,
-    "content-type": "application/json",
-    ...extra
-  };
+function pipelineEndpoint(url) {
+  return url.replace(/^libsql:\/\//, "https://").replace(/\/$/, "") + "/v2/pipeline";
 }
-async function getCard(config, id, fetchImpl = fetch) {
-  const base = `${config.url.replace(/\/$/, "")}/rest/v1`;
-  async function rows(path) {
-    const res = await fetchImpl(`${base}/${path}`, { method: "GET", headers: headers(config) });
-    if (!res.ok) throw new Error(`Supabase read returned ${res.status}`);
-    return await res.json();
+function encode(value) {
+  if (value === null) return { type: "null" };
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? { type: "integer", value: String(value) } : { type: "float", value };
   }
-  const enc = encodeURIComponent(id);
-  const [tender] = await rows(`tenders?id=eq.${enc}`);
-  if (!tender) return null;
-  const [items, bids, awards] = await Promise.all([
-    rows(`tender_items?tender_id=eq.${enc}`),
-    rows(`bids?tender_id=eq.${enc}`),
-    rows(`awards?tender_id=eq.${enc}`)
-  ]);
-  return { tender, items, bids, awards };
+  return { type: "text", value };
+}
+function decode(cell) {
+  switch (cell.type) {
+    case "null":
+      return null;
+    case "integer":
+      return Number(cell.value);
+    case "float":
+      return cell.value;
+    case "text":
+      return cell.value;
+    case "blob":
+      return cell.base64;
+  }
+}
+async function query(config, statements, fetchImpl = fetch) {
+  const res = await fetchImpl(pipelineEndpoint(config.url), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${config.token}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      requests: [
+        ...statements.map((s) => ({ type: "execute", stmt: { sql: s.sql, args: (s.args ?? []).map(encode) } })),
+        { type: "close" }
+      ]
+    })
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Database returned ${res.status}${detail ? ` \u2014 ${detail.slice(0, 300)}` : ""}`);
+  }
+  const { results } = await res.json();
+  return statements.map((s, i) => {
+    const r = results[i];
+    if (!r) throw new Error(`Database returned no result for statement ${i + 1}`);
+    if (r.type === "error") throw new Error(`Database error: ${r.error.message} \u2014 in: ${s.sql.slice(0, 80)}`);
+    if (r.response.type !== "execute") return [];
+    const { cols, rows } = r.response.result;
+    return rows.map((row) => Object.fromEntries(cols.map((c, j) => [c.name, decode(row[j])])));
+  });
+}
+
+// src/store/cards.ts
+async function getCard(config, id, fetchImpl = fetch) {
+  const [rows] = await query(config, [{ sql: "SELECT card FROM cards WHERE id = ?", args: [id] }], fetchImpl);
+  const row = rows[0];
+  return row ? JSON.parse(String(row.card)) : null;
 }
 
 // server/pages/tender.ts
@@ -2822,13 +2853,13 @@ async function tenderPage(tenderId) {
   if (!base) return notFound();
   let entry = base;
   if (!entry.detailed) {
-    const config = loadSupabaseConfig();
+    const config = loadDbConfig();
     if (config) {
       try {
         const card = await getCard(config, tenderId);
         if (card) entry = mergeCardDetail(base, card);
       } catch (err) {
-        console.error(`supabase card fetch failed for ${tenderId} \u2014 ${err.message}`);
+        console.error(`card fetch failed for ${tenderId} \u2014 ${err.message}`);
       }
     }
   }
@@ -3831,50 +3862,31 @@ function parseCommand(payload) {
 
 // src/store/subscribers.ts
 function loadSubscriberConfig(env = process.env) {
-  const url = env.SUPABASE_URL;
-  const serviceKey = env.SUPABASE_SERVICE_KEY;
-  return url && serviceKey ? { url, serviceKey } : null;
+  return loadDbConfig(env);
 }
 function createSubscriberStore(config, fetchImpl = fetch) {
-  const endpoint = `${config.url.replace(/\/$/, "")}/rest/v1/tg_subscribers`;
-  const headers2 = {
-    apikey: config.serviceKey,
-    Authorization: `Bearer ${config.serviceKey}`,
-    "content-type": "application/json"
-  };
-  async function call(url, init) {
-    const res = await fetchImpl(url, init);
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(`Supabase returned ${res.status}${detail ? ` \u2014 ${detail}` : ""}`);
-    }
-    return res;
-  }
   return {
-    // merge-duplicates makes a repeat /start idempotent, and resetting
-    // unsubscribed_at is what lets someone come back after /stop.
+    // Upsert makes a repeat /start idempotent, and clearing unsubscribed_at
+    // is what lets someone come back after /stop.
     async add(chatId) {
-      await call(endpoint, {
-        method: "POST",
-        headers: { ...headers2, Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify({ chat_id: chatId, unsubscribed_at: null })
-      });
+      await query(config, [{
+        sql: `INSERT INTO tg_subscribers (chat_id, subscribed_at, unsubscribed_at) VALUES (?, ?, NULL)
+              ON CONFLICT(chat_id) DO UPDATE SET unsubscribed_at = NULL`,
+        args: [chatId, (/* @__PURE__ */ new Date()).toISOString()]
+      }], fetchImpl);
     },
     // Soft delete: the row stays so the history of who left survives.
     async remove(chatId) {
-      await call(`${endpoint}?chat_id=eq.${chatId}`, {
-        method: "PATCH",
-        headers: { ...headers2, Prefer: "return=minimal" },
-        body: JSON.stringify({ unsubscribed_at: (/* @__PURE__ */ new Date()).toISOString() })
-      });
+      await query(config, [{
+        sql: "UPDATE tg_subscribers SET unsubscribed_at = ? WHERE chat_id = ?",
+        args: [(/* @__PURE__ */ new Date()).toISOString(), chatId]
+      }], fetchImpl);
     },
     async listActive() {
-      const res = await call(`${endpoint}?select=chat_id&unsubscribed_at=is.null`, {
-        method: "GET",
-        headers: headers2
-      });
-      const rows = await res.json();
-      return rows.map((row) => row.chat_id);
+      const [rows] = await query(config, [{
+        sql: "SELECT chat_id FROM tg_subscribers WHERE unsubscribed_at IS NULL ORDER BY chat_id"
+      }], fetchImpl);
+      return rows.map((row) => Number(row.chat_id));
     }
   };
 }
@@ -3909,13 +3921,13 @@ async function sendTelegramTo(config, chatId, text) {
 }
 
 // server/router.ts
-function page(status, body, headers2 = {}) {
-  return { status, body, headers: { "content-type": "text/html; charset=utf-8", ...headers2 } };
+function page(status, body, headers = {}) {
+  return { status, body, headers: { "content-type": "text/html; charset=utf-8", ...headers } };
 }
 function redirect(location, setCookie) {
-  const headers2 = { location };
-  if (setCookie) headers2["set-cookie"] = setCookie;
-  return { status: 302, body: "", headers: headers2 };
+  const headers = { location };
+  if (setCookie) headers["set-cookie"] = setCookie;
+  return { status: 302, body: "", headers };
 }
 function safeBack(value) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/starred";
@@ -4033,7 +4045,7 @@ async function handler(req, res) {
   if (req.method === "POST") {
     for await (const chunk of req) payload += chunk;
   }
-  const { status, body, headers: headers2 } = await handle({
+  const { status, body, headers } = await handle({
     url,
     cookieHeader: req.headers.cookie ?? null,
     method: req.method,
@@ -4041,7 +4053,7 @@ async function handler(req, res) {
     headers: req.headers
   });
   res.statusCode = status;
-  for (const [key, value] of Object.entries(headers2)) res.setHeader(key, value);
+  for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
   res.setHeader("cache-control", "private, no-store");
   res.setHeader("vary", "Cookie");
   res.end(body);
