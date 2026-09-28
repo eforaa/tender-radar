@@ -5,7 +5,8 @@ import { star, alarms, auditSection } from "../components/case-row.ts";
 import { riskCard } from "../components/risk.ts";
 import { qualificationBlock, conclusionBlock } from "../components/verdict.ts";
 import { notFound } from "./static.ts";
-import { loadSupabaseConfig, getCard } from "../../src/store/supabase-cards.ts";
+import { loadDbConfig } from "../../src/store/db.ts";
+import { getCard } from "../../src/store/cards.ts";
 import { mergeCardDetail } from "../data.ts";
 
 export async function tenderPage(tenderId: string): Promise<string> {
@@ -14,17 +15,17 @@ export async function tenderPage(tenderId: string): Promise<string> {
 
   // Every flagged tender has an entry, but most lack detail (officer, bidders,
   // winner) — those cards were never fetched into the committed dataset. Pull
-  // the card live from Supabase and merge it in. A miss or an outage leaves
-  // the entry as-is, which renders the existing "not loaded" state.
+  // the card live from the database and merge it in. A miss or an outage
+  // leaves the entry as-is, which renders the existing "not loaded" state.
   let entry = base;
   if (!entry.detailed) {
-    const config = loadSupabaseConfig();
+    const config = loadDbConfig();
     if (config) {
       try {
         const card = await getCard(config, tenderId);
         if (card) entry = mergeCardDetail(base, card);
       } catch (err) {
-        console.error(`supabase card fetch failed for ${tenderId} — ${(err as Error).message}`);
+        console.error(`card fetch failed for ${tenderId} — ${(err as Error).message}`);
       }
     }
   }

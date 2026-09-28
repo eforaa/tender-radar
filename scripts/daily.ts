@@ -16,6 +16,7 @@ import { pricePoints, priceGroups, detectPeerPrice, detectOwnPriceGrowth } from 
 import { join } from "node:path";
 import { loadTelegramConfig, buildMessage, sendTelegram, sendTelegramTo, postMessage, pickHighlights } from "../src/notify/telegram.ts";
 import { loadSubscriberConfig, createSubscriberStore } from "../src/store/subscribers.ts";
+import { ensureSchema } from "../src/store/db.ts";
 import { broadcast } from "../src/notify/broadcast.ts";
 import { openStore, REGION, RAILWAY_EDRPOU } from "../src/config.ts";
 import type { RiskFlagRow, TenderRow, TenderItemRow, BidRow, AwardRow, RunRow, FindingRow } from "../src/store/types.ts";
@@ -241,18 +242,19 @@ try {
       siteUrl: process.env.SITE_URL ?? "https://tender-radar-five.vercel.app",
     });
 
-    const supabase = loadSubscriberConfig();
-    if (!supabase) {
+    const db = loadSubscriberConfig();
+    if (!db) {
       // No subscriber store configured: behave exactly as before.
       const result = await sendTelegram(telegram, text);
       log(result.sent ? "telegram notification sent" : `telegram notification failed — ${result.reason}`);
     } else {
       // Its own try/catch, mirroring ingest-monitorings and build-web-data
       // above: everything the ingest already did (tenders, flags, web-data
-      // export) is committed by this point, so a Supabase hiccup here must
+      // export) is committed by this point, so a database hiccup here must
       // not flip step 4's "ok" run record to "failed" via the outer catch.
       try {
-        const subscribers = createSubscriberStore(supabase);
+        await ensureSchema(db);
+        const subscribers = createSubscriberStore(db);
         const chatIds = await subscribers.listActive();
         const outcome = await broadcast(chatIds, text, {
           send: (chatId, body) => postMessage(telegram, chatId, body),

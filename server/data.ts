@@ -3,7 +3,7 @@ import { openStore } from "../src/config.ts";
 import { officerKey } from "../src/normalize/tender.ts";
 import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow, BidRow, RunRow, FindingRow } from "../src/store/types.ts";
 import { violationEstablished, conclusionText, conclusionPublished } from "../src/normalize/monitoring.ts";
-import type { Card } from "../src/store/supabase-cards.ts";
+import type { Card } from "../src/store/cards.ts";
 
 /** One entry per tender: the flags that fired plus whatever the card added. */
 /**

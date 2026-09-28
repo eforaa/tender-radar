@@ -12,6 +12,8 @@
     "daily": "node scripts/daily.ts",
     "ingest:details": "node scripts/ingest-details.ts",
     "backfill:cards": "node scripts/backfill-cards.ts",
+    "db:init": "node scripts/db-init.ts",
+    "migrate:supabase": "node scripts/migrate-supabase-to-db.ts",
     "ingest:monitorings": "node scripts/ingest-monitorings.ts",
     "ingest:market": "node scripts/ingest-market.ts",
     "analyze": "node scripts/analyze.ts",
