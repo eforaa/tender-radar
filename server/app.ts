@@ -2,7 +2,7 @@
 import { normaliseEdrpou, type Favourite } from "./favourites.ts";
 import { reportText, reportHtml, type ReportContext } from "./report.ts";
 import { buildConclusion } from "./conclusion.ts";
-import { dataset, reloadDataset, setStarred } from "./context.ts";
+import { dataset, reloadDataset, setStarred, setCurrentPath } from "./context.ts";
 import { feedPage } from "./pages/feed.ts";
 import { tenderPage } from "./pages/tender.ts";
 import { entityPage } from "./pages/entity.ts";
@@ -33,6 +33,7 @@ export async function render(url: URL, saved: Favourite[] = []): Promise<Rendere
   // caseRow is called from a dozen places; threading the list through every
   // one of them would add a parameter to each. Set it once per request.
   setStarred(saved);
+  setCurrentPath(url.pathname + url.search);
 
   const path = decodeURIComponent(url.pathname);
 
@@ -53,7 +54,7 @@ export async function render(url: URL, saved: Favourite[] = []): Promise<Rendere
   if (path === "/prices") return { status: 200, body: pricesPage(url) };
   if (path === "/indicators") return { status: 200, body: indicatorsPage() };
   if (path === "/about") return { status: 200, body: aboutPage() };
-  if (path.startsWith("/article/")) return { status: 200, body: articlePage(path.slice("/article/".length), url) };
+  if (path.startsWith("/article/")) return page(articlePage(path.slice("/article/".length), url));
   if (path.startsWith("/tender/")) {
     const rest = path.slice("/tender/".length);
     if (rest.endsWith("/report") || rest.endsWith("/report.txt")) {
@@ -82,11 +83,20 @@ export async function render(url: URL, saved: Favourite[] = []): Promise<Rendere
           }
         : { status: 200, body: reportHtml(ctx) };
     }
-    return { status: 200, body: await tenderPage(rest) };
+    return page(await tenderPage(rest));
   }
-  if (path.startsWith("/entity/")) return { status: 200, body: entityPage(path.slice("/entity/".length), url) };
-  if (path.startsWith("/officer/")) return { status: 200, body: officerPage(path.slice("/officer/".length), url) };
-  if (path.startsWith("/supplier/")) return { status: 200, body: supplierPage(path.slice("/supplier/".length), url) };
+  if (path.startsWith("/entity/")) return page(entityPage(path.slice("/entity/".length), url));
+  if (path.startsWith("/officer/")) return page(officerPage(path.slice("/officer/".length), url));
+  if (path.startsWith("/supplier/")) return page(supplierPage(path.slice("/supplier/".length), url));
 
   return { status: 404, body: notFound() };
+}
+
+/**
+ * Dossier pages answer an unknown id with the not-found page; that must go
+ * out as a real 404, or search engines index every dead link as a page.
+ * notFound() is deterministic, so comparing the body is exact and cheap.
+ */
+function page(body: string): Rendered {
+  return { status: body === notFound() ? 404 : 200, body };
 }

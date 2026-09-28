@@ -44,7 +44,8 @@ export function readControls(url: URL): Controls {
     max: Number(url.searchParams.get("max") ?? "") || 0,
     group: isDimension(rawGroup) ? rawGroup : "",
     then: isDimension(rawThen) ? rawThen : "",
-    page: Math.max(1, Number(url.searchParams.get("page") ?? 1)),
+    // `|| 1`, not just Math.max: `?page=abc` is NaN, and NaN survives max().
+    page: Math.max(1, Math.floor(Number(url.searchParams.get("page") ?? 1) || 1)),
   };
 }
 
@@ -68,7 +69,8 @@ export function activeCount(c: Controls): number {
 
 export function isFiltered(c: Controls): boolean {
   return Boolean(
-    c.q || c.risk || c.region || c.railOnly || c.soloOnly || c.priceOnly || c.dateFrom || c.dateTo || c.min > 0 || c.max > 0,
+    c.q || c.risk || c.region || c.railOnly || c.soloOnly || c.priceOnly || c.audit ||
+      c.dateFrom || c.dateTo || c.min > 0 || c.max > 0,
   );
 }
 
@@ -126,8 +128,8 @@ export function applyControls(cases: Case[], c: Controls, railwayCodes: Set<stri
   );
 }
 
-/** Rebuilds the query string, so paging and links keep every control. */
-export function keepControls(action: string, c: Controls, over: Record<string, string> = {}): string {
+/** Every control that is set, as query parameters. The page is left out on purpose. */
+export function controlParams(c: Controls): URLSearchParams {
   const p = new URLSearchParams();
   if (c.q) p.set("q", c.q);
   if (c.risk) p.set("risk", c.risk);
@@ -143,7 +145,24 @@ export function keepControls(action: string, c: Controls, over: Record<string, s
   if (c.max > 0) p.set("max", String(c.max));
   if (c.group) p.set("group", c.group);
   if (c.then) p.set("then", c.then);
-  for (const [k, v] of Object.entries(over)) p.set(k, v);
+  return p;
+}
+
+/** Rebuilds the query string, so paging and links keep every control. */
+export function keepControls(action: string, c: Controls, over: Record<string, string> = {}): string {
+  const p = controlParams(c);
+  for (const [k, v] of Object.entries(over)) {
+    if (v) p.set(k, v);
+    else p.delete(k);
+  }
   const query = p.toString();
   return query ? `${action}?${query}` : action;
+}
+
+/** The same controls as hidden inputs, so a small GET form keeps them too. */
+export function hiddenControls(c: Controls, esc: (v: unknown) => string, skip: string[] = []): string {
+  return [...controlParams(c).entries()]
+    .filter(([k]) => !skip.includes(k))
+    .map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`)
+    .join("");
 }

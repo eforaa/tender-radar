@@ -13,9 +13,23 @@ console.log(
     `(${db.cases.filter((c) => c.detailed).length} with full cards)`,
 );
 let starred: Favourite[] = [];
+let current = "";
 
 export function dataset(): Dataset {
   return db;
+}
+
+/**
+ * The path and query being rendered. The star toggle posts it as `back`, so
+ * starring a row on page 7 of a filtered feed returns to page 7 of that feed
+ * — not to the tender page, which is what a per-row fallback did.
+ */
+export function setCurrentPath(path: string): void {
+  current = path;
+}
+
+export function currentPath(): string {
+  return current;
 }
 
 /** Re-reads the store. The local server calls this when the data files change. */

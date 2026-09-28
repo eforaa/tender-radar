@@ -1,5 +1,5 @@
 import { procedureLabel, readableName } from "../../src/labels.ts";
-import { layout, esc, money, unitMoney, shortMoney, date, plural } from "../html.ts";
+import { layout, esc, money, unitMoney, shortMoney, date, plural, trim } from "../html.ts";
 import { dataset } from "../context.ts";
 import { star, alarms, auditSection } from "../components/case-row.ts";
 import { riskCard } from "../components/risk.ts";
@@ -32,15 +32,25 @@ export async function tenderPage(tenderId: string): Promise<string> {
 
   const sameEntity = dataset().cases.filter((c) => c.entity_edrpou && c.entity_edrpou === entry.entity_edrpou);
   const sameOfficer = entry.officer_key ? dataset().cases.filter((c) => c.officer_key === entry.officer_key) : [];
-  const officerValue = sameOfficer.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
   const sameWinner = entry.winner_edrpou ? dataset().cases.filter((c) => c.winner_edrpou === entry.winner_edrpou) : [];
-  const winnerValue = sameWinner.reduce((sum, c) => sum + (c.winner_amount ?? c.value_amount ?? 0), 0);
+  // "In N other tenders": the lists include this one, so the count is minus it.
+  const others = (list: typeof sameOfficer) => list.filter((c) => c.tender_id !== entry.tender_id);
+  const otherOfficer = others(sameOfficer);
+  const otherWinner = others(sameWinner);
+  const officerValue = otherOfficer.reduce((sum, c) => sum + (c.value_amount ?? 0), 0);
+  const winnerValue = otherWinner.reduce((sum, c) => sum + (c.winner_amount ?? c.value_amount ?? 0), 0);
 
   const title = entry.title || readableName(entry.entity_name) || "Закупівля";
   const signals = alarms(entry);
+  const prozorro = `https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}`;
+  const buyer = readableName(entry.entity_name);
 
   return layout({
-    title: entry.tender_ref || entry.tender_id,
+    // The tab and any link preview name the thing, not just its number.
+    title: `${trim(title, 60)} · ${shortMoney(entry.value_amount)}`,
+    description: `${buyer ? `${buyer} · ` : ""}${money(entry.value_amount)} · ${
+      signals[0] ?? (entry.risks.length ? `${entry.risks.length} ${plural(entry.risks.length, "ознака", "ознаки", "ознак")} ризику` : "закупівля з позначками")
+    } · ${entry.tender_ref || entry.tender_id}`,
     body: `
 <a class="back" href="/">← до переліку знахідок</a>
 ${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id), { label: true })}
@@ -59,7 +69,7 @@ ${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.m
   <dl class="facts">
     <dt>Сума</dt><dd><strong>${money(entry.value_amount)}</strong> <span class="faint">(${shortMoney(entry.value_amount)})</span></dd>
     <dt>Замовник</dt><dd><a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">${esc(readableName(entry.entity_name))}</a><br><span class="faint">ЄДРПОУ ${esc(entry.entity_edrpou ?? "—")}</span></dd>
-    <dt>Регіон</dt><dd>${esc(entry.region ?? "—")}</dd>
+    <dt>Регіон</dt><dd>${entry.region ? `<a href="/?region=${encodeURIComponent(entry.region)}">${esc(entry.region)}</a>` : "—"}</dd>
     ${entry.method ? `<dt>Процедура</dt><dd>${esc(procedureLabel(entry.method) ?? "—")}</dd>` : ""}
     ${entry.detailed ? `<dt>Учасників</dt><dd>${entry.bidders === 1 ? "<strong>один</strong> — конкуренції не було" : entry.bidders || "—"}</dd>` : ""}
     <dt>Дата закупівлі</dt><dd>${date(entry.tender_date)}</dd>
@@ -73,14 +83,18 @@ ${
   entry.officer_name
     ? `<div class="card">
   <h3><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a></h3>
-  <p class="lead">Ця особа вказана відповідальною ще у <strong>${sameOfficer.length}</strong> закупівлях із позначками, разом на <strong>${shortMoney(officerValue)}</strong>.</p>
+  <p class="lead">${
+    otherOfficer.length
+      ? `Ця особа вказана відповідальною ще у <strong>${otherOfficer.length}</strong> ${plural(otherOfficer.length, "закупівлі", "закупівлях", "закупівлях")} із позначками, разом на <strong>${shortMoney(officerValue)}</strong>.`
+      : "Інших закупівель із позначками за цією особою в базі немає."
+  }</p>
   <dl class="facts">
     <dt>Пошта</dt><dd>${esc(entry.officer_email ?? "—")}</dd>
     <dt>Телефон</dt><dd>${esc(entry.officer_phone ?? "—")}</dd>
   </dl>
   <p style="margin-top:.9rem"><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">Відкрити досьє посадовця →</a></p>
 </div>`
-    : `<div class="card"><p>Картку цієї закупівлі ще не завантажено, тому відповідальна особа невідома.</p></div>`
+    : `<div class="card"><p>Картку цієї закупівлі ще не завантажено, тому відповідальна особа невідома.</p><p><a href="${prozorro}" target="_blank" rel="noopener">Подивитися відповідальну особу в Prozorro →</a></p></div>`
 }
 
 <h2>Хто виграв</h2>
@@ -88,13 +102,17 @@ ${
   entry.winner_name
     ? `<div class="card">
   <h3><a href="/supplier/${encodeURIComponent(entry.winner_edrpou ?? "")}">${esc(readableName(entry.winner_name))}</a></h3>
-  <p class="lead">Ця компанія перемогла ще у <strong>${sameWinner.length}</strong> закупівлях із позначками, разом на <strong>${shortMoney(winnerValue)}</strong>.</p>
+  <p class="lead">${
+    otherWinner.length
+      ? `Ця компанія перемогла ще у <strong>${otherWinner.length}</strong> ${plural(otherWinner.length, "закупівлі", "закупівлях", "закупівлях")} із позначками, разом на <strong>${shortMoney(winnerValue)}</strong>.`
+      : "Інших закупівель із позначками за цією компанією в базі немає."
+  }</p>
   <dl class="facts">
     <dt>ЄДРПОУ</dt><dd>${esc(entry.winner_edrpou ?? "—")}</dd>
     <dt>Сума договору</dt><dd>${money(entry.winner_amount)}</dd>
   </dl>
 </div>`
-    : `<div class="card"><p>Переможця не визначено або картку ще не завантажено.</p></div>`
+    : `<div class="card"><p>Переможця не визначено або картку ще не завантажено.</p><p><a href="${prozorro}" target="_blank" rel="noopener">Подивитися переможця в Prozorro →</a></p></div>`
 }
 
 ${
@@ -127,7 +145,7 @@ ${entry.findings
 
 ${auditSection(entry)}
 <h2>Що тут не так</h2>
-<p class="hint">Спрацювало ${entry.risks.length} ${plural(entry.risks.length, "індикатор", "індикатори", "індикаторів")} із чотирнадцяти чинних.</p>
+<p class="hint">Спрацювало ${entry.risks.length} ${plural(entry.risks.length, "індикатор", "індикатори", "індикаторів")} із ${dataset().rules.length} чинних. <a href="/indicators">Що означає кожен →</a></p>
 ${entry.risks.map((r) => riskCard(r)).join("")}
 
 <h2>Правова кваліфікація</h2>

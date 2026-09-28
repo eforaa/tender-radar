@@ -2,7 +2,7 @@ import { MONITORING_REASONS, VIOLATION_TYPES, readableName } from "../../src/lab
 import { esc, date, trim, shortMoney, plural } from "../html.ts";
 import { type Case } from "../data.ts";
 import { isStarred, type FavKind } from "../favourites.ts";
-import { starredList } from "../context.ts";
+import { starredList, currentPath } from "../context.ts";
 import { riskFlag, shortRisk, rankRisks } from "./risk.ts";
 
 /** Chips beyond this crowd the row; the rest are one click away. */
@@ -155,7 +155,7 @@ export function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?:
   return `<div class="row sev-${severity}">
   <span class="dot" title="${esc(SEVERITY_TITLE[severity])}" aria-label="${esc(SEVERITY_TITLE[severity])}"></span>
   <div class="who">
-    <div class="name">${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
+    <div class="name">${star("tender", entry.tender_id, currentPath() || "/tender/" + encodeURIComponent(entry.tender_id))}<a href="/tender/${encodeURIComponent(entry.tender_id)}">${esc(title)}</a></div>
     <div class="meta">${meta.join(" · ")}</div>
     ${people.length ? `<div class="meta">${people.join(" · ")}</div>` : ""}
   </div>

@@ -179,8 +179,16 @@ export function aboutPage(): string {
 }
 
 export function notFound(): string {
+  // The links sit outside .sub, which the phone hides — a 404 with no way
+  // out is the one page that must not lose its links.
   return layout({
     title: "Не знайдено",
-    body: `<h1>Не знайдено</h1><p class="sub">Такої сторінки немає. <a href="/">До переліку знахідок →</a></p>`,
+    body: `<h1>Не знайдено</h1>
+<p class="sub">Такої сторінки немає — можливо, посилання застаріло або закупівлю ще не завантажено.</p>
+<div class="actions">
+  <a class="action primary" href="/">Усі закупівлі</a>
+  <a class="action" href="/lookup">Перевірити за ЄДРПОУ</a>
+  <a class="action" href="/updates">Що нового в базі</a>
+</div>`,
   });
 }

@@ -1,6 +1,7 @@
-import { layout, esc, shortMoney } from "../html.ts";
+import { layout, esc, shortMoney, plural } from "../html.ts";
 import { type FavKind } from "../favourites.ts";
 import { star } from "./case-row.ts";
+import { currentPath } from "../context.ts";
 
 /**
  * Search and sorting for the three directory pages. They hold aggregates,
@@ -91,17 +92,17 @@ export function directoryPage(opts: {
 <h1>${esc(opts.heading)}</h1>
 <p class="sub">${opts.intro}</p>
 ${dirBar(opts.action, c)}
-<p class="hint">${c.q ? "Знайдено" : "Показано"} <strong>${rows.length.toLocaleString("uk-UA")}</strong> на ${shortMoney(total)}.</p>
+<p class="hint">${c.q ? "Знайдено" : "Показано"} <strong>${rows.length.toLocaleString("uk-UA")}</strong> ${plural(rows.length, "запис", "записи", "записів")} на ${shortMoney(total)}.</p>
 ${
   rows.length === 0
-    ? '<div class="empty">За цим запитом нічого не знайшлося.</div>'
+    ? `<div class="empty">За цим запитом нічого не знайшлося.<br><a href="${esc(opts.action)}">Показати всіх</a> · <a href="/lookup${c.q ? `?edrpou=${encodeURIComponent(c.q)}` : ""}">Перевірити за ЄДРПОУ</a></div>`
     : `<div class="rows">
 ${rows
   .slice(0, 150)
   .map(
     (r) => `<div class="row">
   <div class="who">
-    <div class="name">${r.kind && r.id ? star(r.kind, r.id, r.href) : ""}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
+    <div class="name">${r.kind && r.id ? star(r.kind, r.id, currentPath() || r.href) : ""}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
     <div class="meta">${r.meta}</div>
   </div>
   <div class="amount"><span class="big">${shortMoney(r.value)}</span></div>

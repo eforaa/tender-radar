@@ -158,8 +158,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
 .scrim{position:fixed;inset:0;background:rgba(10,18,24,.42);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease;z-index:40;cursor:pointer}
 #menu-toggle:checked ~ .scrim{opacity:1;visibility:visible}
 
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(20rem,86vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
-#menu-toggle:checked ~ .drawer{transform:translateX(0)}
+/* visibility, not just transform: an off-screen drawer that is still
+   "visible" keeps its dozen links in the tab order ahead of the content. */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(20rem,86vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;transition:transform .28s cubic-bezier(.32,.72,.32,1),visibility .28s;overflow-y:auto}
+#menu-toggle:checked ~ .drawer{transform:translateX(0);visibility:visible}
+/* Skip link: the first tab stop, visible only while focused. */
+.skip{position:absolute;left:-999px;top:var(--s2);z-index:100;background:var(--accent);color:#fff;padding:var(--s2) var(--s4);border-radius:var(--radius);text-decoration:none;font-weight:500}
+.skip:focus{left:var(--s4)}
 
 .drawer-head{display:flex;align-items:center;justify-content:space-between;padding:var(--s4) var(--s4);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
 .drawer-head strong{font-family:var(--f-display);font-size:1.02rem;font-weight:700}
@@ -258,7 +263,7 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
    that only exists for the cramped case. */
 .filters-trigger{display:none}
 .filters-scrim{display:none}
-.filters-drawer{position:static;transform:none;width:auto;box-shadow:none;border:0;background:transparent;overflow:visible}
+.filters-drawer{position:static;transform:none;visibility:visible;width:auto;box-shadow:none;border:0;background:transparent;overflow:visible}
 .filters-drawer .drawer-head{display:none}
 .filters-drawer-body{padding:0}
 
@@ -353,6 +358,10 @@ select:disabled{opacity:.5;cursor:not-allowed}
 /* The compact signal replaces the chip list on the phone; desktop keeps chips. */
 .signal{display:none}
 
+/* Base chip. Every coloured variant below builds on this; without it the
+   risk chips and "ще N" links rendered as bare text. */
+.flags{display:flex;flex-wrap:wrap;gap:var(--s1)}
+.flag{display:inline-flex;align-items:center;font-size:.8rem;line-height:1.3;padding:var(--s1) var(--s2);border:1px solid var(--line);border-radius:999px;color:var(--ink-soft);text-decoration:none;white-space:nowrap}
 a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .flag.alarm{border-color:var(--alarm);background:var(--alarm-bg);color:var(--alarm);font-weight:500}
 .flag.warn{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
@@ -394,10 +403,14 @@ dl.facts dd{margin:0;font-size:1rem}
 dl.facts dd strong{font-weight:600}
 
 /* ---------- misc ---------- */
-.pager{display:flex;gap:var(--s3);align-items:center;margin-top:var(--s5);font-size:.94rem}
-.pager a{padding:var(--s2) var(--s4);border:1px solid var(--line);background:var(--surface);text-decoration:none}
+.pager{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;margin-top:var(--s5);font-size:.94rem}
+.pager a{padding:var(--s2) var(--s3);border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);text-decoration:none;min-height:2.4rem;display:inline-flex;align-items:center}
 .pager a:hover{border-color:var(--accent)}
 .pager span{color:var(--ink-faint)}
+.pager .jump{display:inline-flex;align-items:center;gap:var(--s2);color:var(--ink-faint);margin:0 auto}
+.pager .jump input{width:4.5rem;padding:var(--s1) var(--s2);border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font:inherit;text-align:center}
+.pager .jump button{padding:var(--s1) var(--s3);border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);color:var(--accent);font:inherit;cursor:pointer}
+.pager .jump button:hover{border-color:var(--accent)}
 .empty{background:var(--surface);border:1px dashed var(--line);padding:var(--s7) var(--s5);text-align:center;color:var(--ink-soft)}
 .card ul{margin:var(--s1) 0 var(--s4);padding-left:var(--s4);color:var(--ink-soft);max-width:68ch}
 .card li{margin-bottom:var(--s2)}
@@ -435,10 +448,13 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
 @media (max-width:44rem){
   body{font-size:16px}
 
-  /* The phone job is scanning the feed, so the first screen must be tenders,
-     not onboarding. The explainer strip and the stat block are things a
-     returning reader has already read; the /about link keeps them a tap away. */
-  .sub,.primer,details.help{display:none}
+  /* The phone job is scanning the feed, so on the LIST pages the first screen
+     must be tenders, not onboarding: the explainer strip and the help fold
+     go. Everywhere else the subtitle carries facts — a ЄДРПОУ, an
+     institution, the latest run — so it stays. */
+  .primer{display:none}
+  body[data-nav="feed"] .sub,body[data-nav="railway"] .sub,body[data-nav="prices"] .sub,body[data-nav="starred"] .sub,
+  body[data-nav="feed"] details.help,body[data-nav="railway"] details.help,body[data-nav="prices"] details.help{display:none}
   h1{font-size:1.3rem}
   .statline{font-size:.8rem;color:var(--ink-faint)}
 
@@ -461,7 +477,6 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   h1{font-size:1.25rem;max-width:none;margin-bottom:var(--s1)}
   h2{font-size:1.15rem;margin-top:var(--s5)}
   .sub{font-size:.88rem;margin-bottom:var(--s2)}
-  .statline{display:none}
   .presets{margin-bottom:var(--s2)}
   .sortbar{margin-bottom:var(--s2)}
   .sub,.hint,.card p,.card ul,.note,details.sub p{max-width:none}
@@ -490,8 +505,9 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   .filters-trigger{display:flex;align-items:center;justify-content:center;gap:var(--s2);width:100%;min-height:2.75rem;margin:0 0 var(--s3);padding:var(--s2) var(--s4);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--accent);font-size:.95rem;font-weight:500;cursor:pointer}
   .filters-scrim{display:block}
   #filters-toggle:checked ~ .filters-scrim{opacity:1;visibility:visible}
-  .filters-drawer{position:fixed;top:0;right:0;bottom:0;left:auto;width:min(22rem,88vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.32,.72,.32,1);overflow-y:auto}
-  #filters-toggle:checked ~ .filters-drawer{transform:translateX(0)}
+  .filters-drawer{position:fixed;top:0;right:0;bottom:0;left:auto;width:min(22rem,88vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 40px -24px rgba(10,18,24,.55);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;transition:transform .28s cubic-bezier(.32,.72,.32,1),visibility .28s;overflow-y:auto}
+  #filters-toggle:checked ~ .filters-drawer{transform:translateX(0);visibility:visible}
+  #filters-toggle:focus-visible ~ .filters-trigger{outline:2px solid var(--accent);outline-offset:2px}
   .filters-drawer .drawer-head{display:flex}
   .filters-drawer-body{padding:var(--s4)}
 
@@ -612,7 +628,8 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
      so a light-theme reader never sees a dark flash. Everything else is CSS. -->
 <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
-<body>
+<body data-nav="${esc(opts.nav ?? "")}">
+<a class="skip" href="#main">До вмісту</a>
 <input type="checkbox" id="menu-toggle" class="sr-only" aria-label="Показати всі розділи">
 <header class="top"><div class="inner">
   <a class="brand" href="/"><img class="brand-mark" src="/icon-192.png" alt="" width="28" height="28" decoding="async">Tender<span>&nbsp;Radar</span></a>
@@ -647,7 +664,7 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
   </details>`;
   }).join("")}
 </nav>
-<main class="wrap">
+<main class="wrap" id="main">
 ${opts.body}
 </main>
 </body>

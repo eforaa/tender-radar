@@ -3,7 +3,7 @@ import { esc, shortMoney, plural } from "../html.ts";
 import { type Case } from "../data.ts";
 import { DIMENSIONS, buildGroups, type Dimension, type Group } from "../grouping.ts";
 import {
-  activeCount, isFiltered, keepControls,
+  activeCount, isFiltered, keepControls, hiddenControls,
   type Controls, type ControlOptions,
 } from "../controls.ts";
 import { dataset } from "../context.ts";
@@ -36,22 +36,25 @@ export function presetsFor(action: string): Preset[] {
   return action === "/prices" ? base.filter((p) => p.query !== "price=1") : base;
 }
 
-/** Marks the preset that matches the current query, so the state is visible. */
+/**
+ * Marks the preset that matches the current query, so the state is visible.
+ *
+ * A preset only owns the four controls the presets are made of; the search
+ * text, region, sort and the rest carry over, so switching preset does not
+ * throw away what the reader typed. A chip is "on" only when the whole query
+ * equals what that chip would produce — with an extra filter set, no chip is
+ * on, which is the truth.
+ */
 export function presetBar(action: string, url: URL, c: Controls): string {
-  const current = new URLSearchParams();
-  if (c.audit) current.set("audit", c.audit);
-  if (c.priceOnly) current.set("price", "1");
-  if (c.soloOnly) current.set("solo", "1");
-  if (c.min > 0) current.set("min", String(c.min));
-  if (c.sort !== "value") current.set("sort", c.sort);
-  const currentKey = current.toString();
+  const cleared: Controls = { ...c, audit: "", priceOnly: false, soloOnly: false, min: 0, page: 1 };
+  const current = keepControls(action, { ...c, page: 1 });
 
   return `<div class="presets">
   ${presetsFor(action)
     .map((p) => {
-      const active = p.query === currentKey;
-      const href = p.query ? `${action}?${p.query}` : action;
-      return `<a class="preset${active ? " on" : ""}" href="${esc(href)}" title="${esc(p.hint)}">${esc(p.label)}</a>`;
+      const href = keepControls(action, cleared, Object.fromEntries(new URLSearchParams(p.query)));
+      const active = href === current;
+      return `<a class="preset${active ? " on" : ""}" href="${esc(href)}" title="${esc(p.hint)}"${active ? ' aria-current="true"' : ""}>${esc(p.label)}</a>`;
     })
     .join("")}
 </div>`;
@@ -129,6 +132,43 @@ export function groupBlock(group: Group, depth: number): string {
 }
 
 /**
+ * The date span, the region list and the amount range of the whole dataset.
+ * Computed once per dataset load, not per request: every list page used to
+ * sort 36k dates and spread 36k amounts into Math.min on each render.
+ */
+let bounds: { of: unknown; earliest: string; latest: string; regions: string[]; rangeHint: string } | null = null;
+function datasetBounds() {
+  const ds = dataset();
+  if (bounds && bounds.of === ds) return bounds;
+  let earliest = "";
+  let latest = "";
+  let lo = Infinity;
+  let hi = 0;
+  const regionSet = new Set<string>();
+  for (const x of ds.cases) {
+    const d = x.tender_date ?? "";
+    if (d) {
+      if (!earliest || d < earliest) earliest = d;
+      if (d > latest) latest = d;
+    }
+    if (x.region) regionSet.add(x.region);
+    const n = x.value_amount ?? 0;
+    if (n > 0) {
+      if (n < lo) lo = n;
+      if (n > hi) hi = n;
+    }
+  }
+  bounds = {
+    of: ds,
+    earliest,
+    latest,
+    regions: [...regionSet].sort(),
+    rangeHint: hi > 0 ? `у базі від ${shortMoney(lo)} до ${shortMoney(hi)}` : "",
+  };
+  return bounds;
+}
+
+/**
  * The filter panel. Identical on every page that shows tenders; `action` is
  * where it submits, so each tab filters its own scope.
  */
@@ -138,23 +178,19 @@ export function filterPanel(action: string, c: Controls, opts: ControlOptions = 
       .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
       .join("");
 
-  const stamps = dataset().cases.map((x) => x.tender_date ?? "").filter(Boolean).sort();
-  const earliest = stamps[0] ?? "";
-  const latest = stamps[stamps.length - 1] ?? "";
-  const regions = [...new Set(dataset().cases.map((x) => x.region ?? "").filter(Boolean))].sort();
-  const amounts = dataset().cases.map((x) => x.value_amount ?? 0).filter((n) => n > 0);
-  const rangeHint = amounts.length
-    ? `у базі від ${shortMoney(Math.min(...amounts))} до ${shortMoney(Math.max(...amounts))}`
-    : "";
+  const { earliest, latest, regions, rangeHint } = datasetBounds();
 
   const active = activeCount(c);
-  const anything = isFiltered(c) || Boolean(c.group);
+  // The panel opens when a filter is on; the reset link also shows for a
+  // non-default sort, which is otherwise the one state with no way back.
+  const open = isFiltered(c) || Boolean(c.group);
+  const showReset = open || c.sort !== "value";
 
   return `<form class="filters" method="get" action="${esc(action)}">
   <input type="hidden" name="q" value="${esc(c.q)}">
   ${extra}
-  <details class="filters-more"${anything ? " open" : ""}>
-    <summary>Більше фільтрів${active > 0 ? ` <span class="badge">${active}</span>` : ""}${anything ? ` <a class="reset" href="${esc(action)}">скинути все</a>` : ""}</summary>
+  <details class="filters-more"${open ? " open" : ""}>
+    <summary>Більше фільтрів${active > 0 ? ` <span class="badge">${active}</span>` : ""}${showReset ? ` <a class="reset" href="${esc(action)}">скинути все</a>` : ""}</summary>
     <div class="inner">
       <div class="filter-row">
         <select name="risk" aria-label="Ознака">
@@ -201,7 +237,7 @@ export function filterPanel(action: string, c: Controls, opts: ControlOptions = 
         ${opts.hideRail ? "" : `<label class="check"><input type="checkbox" name="rail" value="1"${c.railOnly ? " checked" : ""}> лише залізниця</label>`}
         <label class="check"><input type="checkbox" name="solo" value="1"${c.soloOnly ? " checked" : ""}> лише без конкурентів</label>
         ${opts.hidePrice ? "" : `<label class="check"><input type="checkbox" name="price" value="1"${c.priceOnly ? " checked" : ""}> лише де ціна завищена</label>`}
-        <button type="submit">Показати</button>
+        <button type="submit">Застосувати фільтри</button>
       </div>
     </div>
   </details>
@@ -263,7 +299,12 @@ export function listBody(
   rowOpts: { showOfficer?: boolean; showEntity?: boolean } = {},
 ): string {
   if (list.length === 0) {
-    return '<div class="empty">За цими умовами нічого не знайшлося. Спробуйте прибрати частину фільтрів.</div>';
+    // A dead end with a way out: one link that clears everything, and, when
+    // the search text is the likely culprit, one that drops only it.
+    const dropSearch = c.q
+      ? ` <a href="${esc(keepControls(action, c, { q: "" }))}">Прибрати пошук «${esc(c.q)}»</a> ·`
+      : "";
+    return `<div class="empty">За цими умовами нічого не знайшлося.<br>${dropSearch} <a href="${esc(action)}">Скинути всі фільтри</a></div>`;
   }
 
   if (c.group) {
@@ -286,9 +327,9 @@ export function listBody(
 ${
   pages > 1
     ? `<div class="pager">
-  ${page > 1 ? `<a href="${keepControls(action, c, { page: String(page - 1) })}">← попередні</a>` : ""}
-  <span>сторінка ${page} з ${pages}</span>
-  ${page < pages ? `<a href="${keepControls(action, c, { page: String(page + 1) })}">наступні →</a>` : ""}
+  ${page > 1 ? `<a href="${keepControls(action, c)}" title="Перша сторінка" aria-label="Перша сторінка">«</a><a href="${keepControls(action, c, { page: String(page - 1) })}">← попередні</a>` : ""}
+  <form class="jump" method="get" action="${esc(action)}">${hiddenControls(c, esc)}<label>сторінка <input type="number" name="page" value="${page}" min="1" max="${pages}" aria-label="Номер сторінки"> з ${pages.toLocaleString("uk-UA")}</label><button type="submit">Перейти</button></form>
+  ${page < pages ? `<a href="${keepControls(action, c, { page: String(page + 1) })}">наступні →</a><a href="${keepControls(action, c, { page: String(pages) })}" title="Остання сторінка" aria-label="Остання сторінка">»</a>` : ""}
 </div>`
     : ""
 }`;
