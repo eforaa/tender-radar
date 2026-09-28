@@ -1061,6 +1061,20 @@ var MENU = [
   { href: "/about", nav: "about", label: "\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443", hint: "\u0437\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456 \u0456 \u0447\u043E\u0433\u043E \u0432\u043E\u043D\u0430 \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C" }
 ];
 var SITE_DESCRIPTION = "\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0423\u043A\u0440\u0430\u0457\u043D\u0438 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443: \u0432\u0438\u0441\u043D\u043E\u0432\u043A\u0438 \u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0438, \u0432\u043B\u0430\u0441\u043D\u0438\u0439 \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0446\u0456\u043D \u0456 \u043F\u0440\u0430\u0432\u043E\u0432\u0430 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F \u043F\u043E \u043A\u043E\u0436\u043D\u0456\u0439 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456.";
+function siteOrigin() {
+  return (process.env.SITE_URL ?? "").replace(/\/$/, "");
+}
+var renderPath = "";
+function setRenderPath(path) {
+  renderPath = path;
+}
+function canonicalPath() {
+  const [pathname, query2 = ""] = renderPath.split("?");
+  const p = new URLSearchParams(query2);
+  p.delete("from");
+  const q = p.toString();
+  return (pathname || "/") + (q ? `?${q}` : "");
+}
 function layout(opts) {
   return `<!doctype html>
 <html lang="uk">
@@ -1077,7 +1091,9 @@ function layout(opts) {
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-180.png">
-<meta property="og:image" content="/icon-512.png">
+${siteOrigin() ? `<link rel="canonical" href="${esc(siteOrigin() + canonicalPath())}">
+<meta property="og:url" content="${esc(siteOrigin() + canonicalPath())}">` : ""}
+<meta property="og:image" content="${esc(siteOrigin())}/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -2014,6 +2030,11 @@ function setCurrentPath(path) {
 function currentPath() {
   return current;
 }
+var memo = /* @__PURE__ */ new Map();
+function perDataset(key, build) {
+  if (!memo.has(key)) memo.set(key, build());
+  return memo.get(key);
+}
 function setStarred(list) {
   starred = list;
 }
@@ -2735,7 +2756,7 @@ function starredPage(saved, url) {
       value: list.reduce((sum2, c2) => sum2 + (c2.value_amount ?? 0), 0)
     };
   });
-  const officerRows = saved.filter((f) => f.kind === "officer").map((f) => {
+  const officerRows2 = saved.filter((f) => f.kind === "officer").map((f) => {
     const list = dataset().cases.filter((c2) => c2.officer_key === f.id);
     return {
       fav: f,
@@ -2785,8 +2806,8 @@ ${section(
 
 ${section(
       "\u041F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
-      officerRows.length,
-      `<div class="rows">${officerRows.map(
+      officerRows2.length,
+      `<div class="rows">${officerRows2.map(
         (r) => `<div class="row">
   <div class="who">
     <div class="name">${star("officer", r.fav.id, "/starred")}<a href="${esc(r.href)}">${esc(r.name)}</a></div>
@@ -3327,7 +3348,7 @@ ${pages > 1 ? `<div class="pager">
 }
 
 // server/pages/entities.ts
-function entitiesPage(url) {
+function entityRows() {
   const byEntity = /* @__PURE__ */ new Map();
   for (const entry of dataset().cases) {
     const key = entry.entity_edrpou ?? "";
@@ -3337,6 +3358,17 @@ function entitiesPage(url) {
     acc.value += entry.value_amount ?? 0;
     byEntity.set(key, acc);
   }
+  return [...byEntity.entries()].map(([edrpou, acc]) => ({
+    kind: "entity",
+    id: edrpou,
+    href: `/entity/${encodeURIComponent(edrpou)}`,
+    name: readableName(acc.name),
+    meta: `\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}${RAILWAY_EDRPOU.has(edrpou) ? " \xB7 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F" : ""}`,
+    value: acc.value,
+    count: acc.count
+  }));
+}
+function entitiesPage(url) {
   return directoryPage({
     title: "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438",
     nav: "entities",
@@ -3344,20 +3376,12 @@ function entitiesPage(url) {
     intro: "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438, \u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \u044F\u043A\u0438\u0445 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u0456 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438.",
     action: "/entities",
     url,
-    rows: [...byEntity.entries()].map(([edrpou, acc]) => ({
-      kind: "entity",
-      id: edrpou,
-      href: `/entity/${encodeURIComponent(edrpou)}`,
-      name: readableName(acc.name),
-      meta: `\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}${RAILWAY_EDRPOU.has(edrpou) ? " \xB7 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F" : ""}`,
-      value: acc.value,
-      count: acc.count
-    }))
+    rows: perDataset("entities", entityRows)
   });
 }
 
 // server/pages/officers.ts
-function officersPage(url) {
+function officerRows() {
   const byOfficer = /* @__PURE__ */ new Map();
   for (const entry of dataset().cases) {
     if (!entry.officer_key) continue;
@@ -3371,6 +3395,17 @@ function officersPage(url) {
     acc.value += entry.value_amount ?? 0;
     byOfficer.set(entry.officer_key, acc);
   }
+  return [...byOfficer.entries()].map(([key, acc]) => ({
+    kind: "officer",
+    id: key,
+    href: `/officer/${encodeURIComponent(key)}`,
+    name: acc.name,
+    meta: `${esc(readableName(acc.entity))} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}`,
+    value: acc.value,
+    count: acc.count
+  }));
+}
+function officersPage(url) {
   return directoryPage({
     title: "\u041F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
     nav: "officers",
@@ -3378,20 +3413,12 @@ function officersPage(url) {
     intro: "\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0456 \u043E\u0441\u043E\u0431\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438. \u041D\u0435 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u043F\u0456\u0434\u043E\u0437\u0440\u044E\u0432\u0430\u043D\u0438\u0445 \u2014 \u043F\u0435\u0440\u0435\u043B\u0456\u043A \u0442\u043E\u0433\u043E, \u0449\u043E \u0432\u0430\u0440\u0442\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438.",
     action: "/officers",
     url,
-    rows: [...byOfficer.entries()].map(([key, acc]) => ({
-      kind: "officer",
-      id: key,
-      href: `/officer/${encodeURIComponent(key)}`,
-      name: acc.name,
-      meta: `${esc(readableName(acc.entity))} \xB7 ${acc.count} ${plural(acc.count, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C")}`,
-      value: acc.value,
-      count: acc.count
-    }))
+    rows: perDataset("officers", officerRows)
   });
 }
 
 // server/pages/suppliers.ts
-function suppliersPage(url) {
+function supplierRows() {
   const bySupplier = /* @__PURE__ */ new Map();
   for (const entry of dataset().cases) {
     const key = entry.winner_edrpou ?? "";
@@ -3402,6 +3429,17 @@ function suppliersPage(url) {
     if (entry.bidders === 1) acc.solo++;
     bySupplier.set(key, acc);
   }
+  return [...bySupplier.entries()].map(([edrpou, acc]) => ({
+    kind: "supplier",
+    id: edrpou,
+    href: `/supplier/${encodeURIComponent(edrpou)}`,
+    name: readableName(acc.name),
+    meta: `\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433")}${acc.solo ? ` \xB7 ${acc.solo} \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432` : ""}`,
+    value: acc.value,
+    count: acc.count
+  }));
+}
+function suppliersPage(url) {
   return directoryPage({
     title: "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456",
     nav: "suppliers",
@@ -3409,15 +3447,7 @@ function suppliersPage(url) {
     intro: "\u041A\u043E\u043C\u043F\u0430\u043D\u0456\u0457, \u044F\u043A\u0456 \u0432\u0438\u0433\u0440\u0430\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438.",
     action: "/suppliers",
     url,
-    rows: [...bySupplier.entries()].map(([edrpou, acc]) => ({
-      kind: "supplier",
-      id: edrpou,
-      href: `/supplier/${encodeURIComponent(edrpou)}`,
-      name: readableName(acc.name),
-      meta: `\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(edrpou)} \xB7 ${acc.count} ${plural(acc.count, "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0430", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433\u0438", "\u043F\u0435\u0440\u0435\u043C\u043E\u0433")}${acc.solo ? ` \xB7 ${acc.solo} \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432` : ""}`,
-      value: acc.value,
-      count: acc.count
-    }))
+    rows: perDataset("suppliers", supplierRows)
   });
 }
 
@@ -3779,6 +3809,7 @@ ${found && profile ? `${star("entity", code, "/lookup?edrpou=" + encodeURICompon
 async function render(url, saved = []) {
   setStarred(saved);
   setCurrentPath(url.pathname + url.search);
+  setRenderPath(url.pathname + url.search);
   const path = decodeURIComponent(url.pathname);
   if (path === "/lookup") {
     const code = normaliseEdrpou(url.searchParams.get("edrpou") ?? "");
