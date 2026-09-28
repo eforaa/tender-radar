@@ -1,10 +1,10 @@
 import { readableName } from "../../src/labels.ts";
 import { esc, plural } from "../html.ts";
 import { type FavKind } from "../favourites.ts";
-import { dataset } from "../context.ts";
-import { directoryPage } from "../components/directory.ts";
+import { dataset, perDataset } from "../context.ts";
+import { directoryPage, type DirRow } from "../components/directory.ts";
 
-export function suppliersPage(url: URL): string {
+function supplierRows(): DirRow[] {
   const bySupplier = new Map<string, { name: string; count: number; value: number; solo: number }>();
   for (const entry of dataset().cases) {
     const key = entry.winner_edrpou ?? "";
@@ -15,7 +15,18 @@ export function suppliersPage(url: URL): string {
     if (entry.bidders === 1) acc.solo++;
     bySupplier.set(key, acc);
   }
+  return [...bySupplier.entries()].map(([edrpou, acc]) => ({
+    kind: "supplier" as FavKind,
+    id: edrpou,
+    href: `/supplier/${encodeURIComponent(edrpou)}`,
+    name: readableName(acc.name),
+    meta: `ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "перемога", "перемоги", "перемог")}${acc.solo ? ` · ${acc.solo} без конкурентів` : ""}`,
+    value: acc.value,
+    count: acc.count,
+  }));
+}
 
+export function suppliersPage(url: URL): string {
   return directoryPage({
     title: "Переможці",
     nav: "suppliers",
@@ -23,14 +34,6 @@ export function suppliersPage(url: URL): string {
     intro: "Компанії, які виграли закупівлі з позначками.",
     action: "/suppliers",
     url,
-    rows: [...bySupplier.entries()].map(([edrpou, acc]) => ({
-      kind: "supplier" as FavKind,
-      id: edrpou,
-      href: `/supplier/${encodeURIComponent(edrpou)}`,
-      name: readableName(acc.name),
-      meta: `ЄДРПОУ ${esc(edrpou)} · ${acc.count} ${plural(acc.count, "перемога", "перемоги", "перемог")}${acc.solo ? ` · ${acc.solo} без конкурентів` : ""}`,
-      value: acc.value,
-      count: acc.count,
-    })),
+    rows: perDataset("suppliers", supplierRows),
   });
 }

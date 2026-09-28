@@ -609,6 +609,31 @@ const SITE_DESCRIPTION =
   "Публічні закупівлі України з позначками державної системи моніторингу: " +
   "висновки Держаудитслужби, власний розрахунок цін і правова кваліфікація по кожній закупівлі.";
 
+/**
+ * The public origin, for canonical and preview URLs. Set as SITE_URL on the
+ * host; without it these tags are left out rather than guessed, and the
+ * preview image stays a relative path.
+ */
+function siteOrigin(): string {
+  return (process.env.SITE_URL ?? "").replace(/\/$/, "");
+}
+
+// Set per request by the router. Kept here rather than imported from
+// context.ts so this module stays free of the dataset load.
+let renderPath = "";
+export function setRenderPath(path: string): void {
+  renderPath = path;
+}
+
+/** The path being rendered, minus the tracking-ish `from` parameter. */
+function canonicalPath(): string {
+  const [pathname, query = ""] = renderPath.split("?");
+  const p = new URLSearchParams(query);
+  p.delete("from");
+  const q = p.toString();
+  return (pathname || "/") + (q ? `?${q}` : "");
+}
+
 export function layout(opts: { title: string; nav?: string; body: string; description?: string }): string {
   return `<!doctype html>
 <html lang="uk">
@@ -625,7 +650,9 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-180.png">
-<meta property="og:image" content="/icon-512.png">
+${siteOrigin() ? `<link rel="canonical" href="${esc(siteOrigin() + canonicalPath())}">
+<meta property="og:url" content="${esc(siteOrigin() + canonicalPath())}">` : ""}
+<meta property="og:image" content="${esc(siteOrigin())}/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">

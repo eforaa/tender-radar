@@ -3,6 +3,7 @@ import { normaliseEdrpou, type Favourite } from "./favourites.ts";
 import { reportText, reportHtml, type ReportContext } from "./report.ts";
 import { buildConclusion } from "./conclusion.ts";
 import { dataset, reloadDataset, setStarred, setCurrentPath } from "./context.ts";
+import { setRenderPath } from "./html.ts";
 import { feedPage } from "./pages/feed.ts";
 import { tenderPage } from "./pages/tender.ts";
 import { entityPage } from "./pages/entity.ts";
@@ -34,6 +35,7 @@ export async function render(url: URL, saved: Favourite[] = []): Promise<Rendere
   // one of them would add a parameter to each. Set it once per request.
   setStarred(saved);
   setCurrentPath(url.pathname + url.search);
+  setRenderPath(url.pathname + url.search);
 
   const path = decodeURIComponent(url.pathname);
 
