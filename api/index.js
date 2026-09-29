@@ -606,6 +606,18 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
 .nav a{text-decoration:none;color:var(--ink-soft);font-size:.94rem;padding:var(--s1) var(--s3);border-radius:2px}
 .nav a:hover{color:var(--accent);background:var(--surface-2)}
 .nav a[aria-current]{color:var(--accent);background:var(--accent-bg);font-weight:500}
+/* Bottom tab bar \u2014 the phone's primary navigation. Desktop has the header
+   links and the drawer, so it stays hidden there. */
+.tabbar{display:none}
+/* A heavy section folded by default: the legal qualification runs to many
+   screens, and most readers want the verdict, not the statute text. */
+details.fold{margin:var(--s3) 0 var(--s5)}
+details.fold>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:var(--s2);padding:var(--s3) var(--s4);border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--accent);font-weight:500}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:"";width:.5rem;height:.5rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin-left:auto;transition:transform .2s}
+details.fold[open]>summary::after{transform:rotate(225deg)}
+details.fold[open]>summary{border-radius:var(--radius) var(--radius) 0 0}
+details.fold>.fold-body{padding-top:var(--s3)}
 
 /* Slide-in drawer. CSS only \u2014 a checkbox drives it, because <details>
    cannot animate between display:none and shown. The checkbox is hidden
@@ -1033,6 +1045,55 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
 
   details.help summary,details.sub summary{padding:var(--s4) var(--s4)}
   .legal{padding:var(--s3) var(--s4)}
+
+  /* ---------- app shell ----------
+     The phone gets a bottom tab bar with the four places people actually go;
+     the header keeps only the mark and the theme switch. Everything the tab
+     bar replaces (burger, star button) leaves the header. */
+  .top .inner{min-height:3.25rem;padding-top:var(--s1);padding-bottom:var(--s1)}
+  .burger,.starred-btn{display:none}
+  .theme-btn{margin-left:auto;width:2.5rem;height:2.5rem}
+  .wrap{padding-bottom:calc(4.5rem + env(safe-area-inset-bottom))}
+  .tabbar{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  .tabbar a,.tabbar label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:3.5rem;padding:var(--s1) 0;color:var(--ink-faint);text-decoration:none;font-size:.68rem;font-weight:500;letter-spacing:.01em;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .tabbar svg{width:1.4rem;height:1.4rem;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .tabbar a[aria-current]{color:var(--accent)}
+  .tabbar a:active,.tabbar label:active{background:var(--surface-2)}
+  #menu-toggle:checked ~ .tabbar .tab-menu{color:var(--accent)}
+
+  /* "back" as a pill at the top of inner pages: a thumb target, not a
+     text link at the very top edge. */
+  .back{display:inline-flex;align-items:center;min-height:2.4rem;padding:0 var(--s3);border:1px solid var(--line);border-radius:999px;background:var(--surface);text-decoration:none;font-size:.9rem;margin-bottom:var(--s3)}
+
+  /* ---------- lists ----------
+     The whole row is the tap target: the title link stretches over the row,
+     while the star and the inline links stay above it. */
+  .row .name a::after{content:"";position:absolute;inset:0}
+  .row .star-form,.row .meta a{position:relative;z-index:1}
+  .row:active{background:var(--surface-2)}
+  .row{padding-top:var(--s4);padding-bottom:var(--s4)}
+  .row .amount .big{font-size:1.1rem}
+
+  /* filters + presets as one horizontally scrolling strip above the list:
+     the trigger first, then the chips, no wrapping */
+  .filter-sheet{display:flex;align-items:center;gap:var(--s2);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 calc(-1 * var(--s4)) var(--s3);padding:0 var(--s4)}
+  .filter-sheet::-webkit-scrollbar{display:none}
+  .filters-trigger{flex:none;width:auto;margin:0;min-height:2.5rem;padding:0 var(--s3);border-radius:999px;font-size:.88rem}
+  .presets{display:flex;flex-wrap:nowrap;gap:var(--s2);margin:0}
+  .preset{min-height:2.5rem;padding:0 var(--s3);font-size:.86rem;white-space:nowrap}
+
+  /* pager: two big buttons, the jump form beneath */
+  .pager{display:grid;grid-template-columns:1fr 1fr;gap:var(--s2);margin-top:var(--s5)}
+  .pager a{justify-content:center;min-height:2.75rem;border-radius:var(--radius)}
+  .pager a[aria-label]{display:none}
+  .pager .jump{grid-column:1 / -1;justify-content:center;margin:var(--s1) 0 0}
+  .pager .jump input,.pager .jump button{min-height:2.5rem}
+
+  /* cards: full-bleed, one column of facts */
+  .card{border-left:0;border-right:0;border-radius:0;margin-inline:calc(-1 * var(--s4));padding:var(--s4)}
+  .verdict.compact{margin-inline:0;border-left:1px solid var(--line);border-right:1px solid var(--line);border-radius:var(--radius)}
+  .actions .action.primary{flex:1 1 100%}
+  .actions .action:not(.primary){flex:1 1 calc(50% - var(--s1))}
 }
 
 @media (max-width:22rem){
@@ -1136,6 +1197,12 @@ ${siteOrigin() ? `<link rel="canonical" href="${esc(siteOrigin() + canonicalPath
 <main class="wrap" id="main">
 ${opts.body}
 </main>
+<nav class="tabbar" aria-label="\u0413\u043E\u043B\u043E\u0432\u043D\u0435">
+  <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>\u0421\u0442\u0440\u0456\u0447\u043A\u0430</a>
+  <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 21l1.5-3M15 21l-1.5-3"/><circle cx="9" cy="14" r=".6"/><circle cx="15" cy="14" r=".6"/></svg>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</a>
+  <a href="/starred"${opts.nav === "starred" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9L3.5 9.7l5.9-.8z"/></svg>\u041E\u0431\u0440\u0430\u043D\u0435</a>
+  <label class="tab-menu" for="menu-toggle" role="button" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>\u0420\u043E\u0437\u0434\u0456\u043B\u0438</label>
+</nav>
 </body>
 </html>`;
 }
@@ -2569,13 +2636,13 @@ function controlBar(action, c, opts = {}, params = {}) {
   <input type="checkbox" id="filters-toggle" class="sr-only" aria-label="\u0424\u0456\u043B\u044C\u0442\u0440\u0438">
   <label class="filters-trigger" for="filters-toggle">\u0424\u0456\u043B\u044C\u0442\u0440\u0438${active > 0 ? ` <span class="badge">${active}</span>` : ""}</label>
   <label class="scrim filters-scrim" for="filters-toggle" aria-hidden="true"></label>
+  ${presets}
   <div class="drawer filters-drawer" aria-label="\u0424\u0456\u043B\u044C\u0442\u0440\u0438">
     <div class="drawer-head">
       <strong>\u0424\u0456\u043B\u044C\u0442\u0440\u0438</strong>
       <label class="drawer-close" for="filters-toggle" role="button" aria-label="\u0417\u0430\u043A\u0440\u0438\u0442\u0438">&times;</label>
     </div>
     <div class="filters-drawer-body">
-      ${presets}
       ${sortBar(action, c, extra)}
       ${filterPanel(action, c, opts, extra)}
     </div>
@@ -3061,7 +3128,10 @@ ${auditSection(entry)}
 ${entry.risks.map((r) => riskCard(r)).join("")}
 
 <h2>\u041F\u0440\u0430\u0432\u043E\u0432\u0430 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F</h2>
-${qualificationBlock(entry)}
+<details class="fold">
+  <summary>\u041D\u043E\u0440\u043C\u0438, \u043D\u0430\u0441\u043B\u0456\u0434\u043A\u0438, \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0456\u0441\u0442\u044C \u2014 \u0440\u043E\u0437\u0433\u043E\u0440\u043D\u0443\u0442\u0438</summary>
+  <div class="fold-body">${qualificationBlock(entry)}</div>
+</details>
 
 <h2 id="conclusion">\u041D\u0430\u0448 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A</h2>
 ${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
