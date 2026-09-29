@@ -268,13 +268,13 @@ export function controlBar(
   <input type="checkbox" id="filters-toggle" class="sr-only" aria-label="Фільтри">
   <label class="filters-trigger" for="filters-toggle">Фільтри${active > 0 ? ` <span class="badge">${active}</span>` : ""}</label>
   <label class="scrim filters-scrim" for="filters-toggle" aria-hidden="true"></label>
+  ${presets}
   <div class="drawer filters-drawer" aria-label="Фільтри">
     <div class="drawer-head">
       <strong>Фільтри</strong>
       <label class="drawer-close" for="filters-toggle" role="button" aria-label="Закрити">&times;</label>
     </div>
     <div class="filters-drawer-body">
-      ${presets}
       ${sortBar(action, c, extra)}
       ${filterPanel(action, c, opts, extra)}
     </div>

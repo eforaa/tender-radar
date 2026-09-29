@@ -156,7 +156,10 @@ ${auditSection(entry)}
 ${entry.risks.map((r) => riskCard(r)).join("")}
 
 <h2>Правова кваліфікація</h2>
-${qualificationBlock(entry)}
+<details class="fold">
+  <summary>Норми, наслідки, відповідальність — розгорнути</summary>
+  <div class="fold-body">${qualificationBlock(entry)}</div>
+</details>
 
 <h2 id="conclusion">Наш висновок</h2>
 ${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
