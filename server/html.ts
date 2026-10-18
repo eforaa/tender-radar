@@ -1,3 +1,4 @@
+import { REVIEW_SCRIPT } from "./review-client.ts";
 import { STUDIO_STYLES } from "./studio-styles.ts";
 import { FAVOURITE_SCRIPT } from "./favourite-interaction.ts";
 /** Layout, styles and small rendering helpers. No template engine, no deps. */
@@ -733,6 +734,7 @@ ${opts.body}
 </nav>
 ${NAVIGATION_SCRIPT}
 ${FAVOURITE_SCRIPT}
+${REVIEW_SCRIPT}
 </body>
 </html>`;
 }

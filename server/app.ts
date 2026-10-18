@@ -1,3 +1,4 @@
+import { reviewPage } from "./pages/review.ts";
 // Server-rendered site over the local store. Zero dependencies.
 import { normaliseEdrpou, type Favourite } from "./favourites.ts";
 import { reportText, reportHtml, type ReportContext } from "./report.ts";
@@ -45,6 +46,7 @@ export async function render(url: URL, saved: Favourite[] = []): Promise<Rendere
     if (!code) return { status: 200, body: lookupPage(null, url.searchParams.get("edrpou") ?? "") };
     return { status: 200, body: lookupPage(code, code) };
   }
+  if (path === "/review") return { status: 200, body: reviewPage() };
   if (path === "/starred") return { status: 200, body: starredPage(saved, url) };
 
   if (path === "/") return { status: 200, body: feedPage(url) };

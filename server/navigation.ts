@@ -5,6 +5,7 @@ const groups = [
   {href:"/railway", nav:"railway", label:"Залізниця", hint:"Закупівлі залізничних організацій", icon:"↔"},
   {href:"/starred", nav:"starred", label:"Обране", hint:"Закупівлі й компанії, які ви зберегли", icon:"☆"}]},
  {title:"Перевірити", items:[
+  {href:"/review", nav:"review", label:"Моя перевірка", hint:"Особиста черга, статуси та нотатки", icon:"✓"},
   {href:"/lookup", nav:"lookup", label:"Знайти компанію", hint:"Введіть її код ЄДРПОУ", icon:"⌕"},
   {href:"/prices", nav:"prices", label:"Цінові сигнали", hint:"Порівняння цін, які потребують перевірки", icon:"₴"},
   {href:"/article/366", nav:"article-366", label:"Розбіжності в документах", hint:"Сигнали та пояснення для перевірки", icon:"≡"}]},

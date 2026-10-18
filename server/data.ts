@@ -1,5 +1,8 @@
 // Loads the store once and joins it into the shapes the pages need.
-import { openStore } from "../src/config.ts";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import type { DocumentResult } from "../src/documents/types.ts";
+import { dataDir, openStore } from "../src/config.ts";
 import { officerKey } from "../src/normalize/tender.ts";
 import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow, BidRow, RunRow, FindingRow } from "../src/store/types.ts";
 import { violationEstablished, conclusionText, conclusionPublished } from "../src/normalize/monitoring.ts";
@@ -57,6 +60,7 @@ export type Case = {
 };
 
 export type Dataset = {
+  documents?: DocumentResult[];
   ingestion?: IngestState | null;
   cases: Case[];
   byTender: Map<string, Case>;
@@ -246,7 +250,11 @@ export async function loadDataset(): Promise<Dataset> {
   }
 
   const cases = [...byTender.values()];
+  let documents: DocumentResult[] = [];
+  try { documents = JSON.parse(await readFile(join(dataDir(), "document-extractions.json"), "utf8")); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   return {
+    documents,
     ingestion,
     cases,
     byTender,

@@ -1,3 +1,5 @@
+import { reviewEditor } from "./review.ts";
+import { documentSection } from "../components/documents.ts";
 import { buildConclusion } from "../conclusion.ts";
 import { procedureLabel, readableName } from "../../src/labels.ts";
 import { layout, esc, money, unitMoney, shortMoney, date, plural, trim } from "../html.ts";
@@ -65,6 +67,8 @@ export async function tenderPage(tenderId: string, url?: URL): Promise<string> {
 <header class="detail-heading"><p class="detail-ref">${esc(entry.tender_ref || entry.tender_id)}</p><h1>${esc(title)}</h1><p class="detail-buyer">${esc(buyer)}</p></header>
 <section class="detail-overview" id="facts" aria-label="Основні дані"><div><span>Сума закупівлі</span><strong>${shortMoney(entry.value_amount)}</strong></div><div><span>Учасників</span><strong>${entry.detailed ? entry.bidders ?? 'Немає даних' : 'Немає даних'}</strong></div><div><span>Дата закупівлі</span><strong>${date(entry.tender_date)}</strong></div></section>
 <div class="detail-source"><a href="${prozorro}" target="_blank" rel="noopener">Відкрити в Prozorro <span aria-hidden="true">↗</span></a><span>Документи та першоджерело</span></div>
+${reviewEditor({ id: entry.tender_id, title, ref: entry.tender_ref })}
+${documentSection((dataset().documents ?? []).filter(d => d.tender_id === entry.tender_id))}
 <div class="detail-columns"><section class="detail-signals" id="signals"><h2>Що потребує уваги <span>${entry.risks.length + entry.findings.length}</span></h2><p class="detail-caution">Сигнал не доводить порушення.</p>
 ${entry.bidders === 1 ? '<p class="detail-competition">Один учасник — немає іншої пропозиції для порівняння.</p>' : ''}
 ${entry.risks.map(r => `<details class="detail-fold signal-fold"><summary><span><small>Державний індикатор</small><strong>${esc(shortRisk(r))}</strong></span></summary><div class="detail-fold-body"><p>${esc(dataset().ruleById.get(r)?.name ?? r)}</p><p class="detail-caution">Це автоматична ознака. Перевірте договір та зміни до нього в першоджерелі.</p><a href="${prozorro}" target="_blank" rel="noopener">Перевірити документи ↗</a><p class="detail-ref">Індикатор ${esc(r)} · <a href="/?risk=${encodeURIComponent(r)}">Інші закупівлі з цією ознакою</a></p></div></details>`).join('')}

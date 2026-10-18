@@ -1,0 +1,10 @@
+import { layout, esc } from "../html.ts";
+import { REVIEW_STYLES } from "../review-client.ts";
+
+const options = '<option value="to_review">Потрібно перевірити</option><option value="in_progress">У роботі</option><option value="needs_documents">Потрібні документи</option><option value="explained">Є пояснення</option>';
+export function reviewEditor(meta: { id: string; title: string; ref: string }): string {
+  return `${REVIEW_STYLES}<details class="detail-fold"><summary><strong>Моя перевірка</strong></summary><form class="review-editor" data-review-editor="${esc(JSON.stringify(meta))}"><p class="hint">Особисті нотатки зберігаються лише у цьому браузері. Не синхронізуються між пристроями.</p><label>Статус<select name="status">${options}</select></label><label>Нотатка<textarea name="note" maxlength="10000" placeholder="Що перевірити, які документи потрібні…"></textarea></label><div class="review-actions"><button type="submit">Зберегти в чергу</button><a href="/review">Відкрити мою чергу →</a></div></form></details><p id="review-message" role="status" aria-live="polite"></p><noscript>Для особистої черги увімкніть JavaScript.</noscript>`;
+}
+export function reviewPage(): string {
+  return layout({ title: "Моя перевірка", nav: "review", body: `${REVIEW_STYLES}<header class="compact-intro"><h1>Моя перевірка</h1><p>Закупівлі, які ви перевіряєте, та ваші нотатки.</p></header><p class="hint">Зберігається лише у цьому браузері. Експортуйте копію перед очищенням даних браузера.</p><div class="review-tools"><label>Пошук<input type="search" id="review-search" placeholder="Назва, номер або нотатка"></label><label>Статус<select id="review-filter"><option value="">Усі статуси</option>${options}</select></label></div><p id="review-count"></p><div id="review-list"></div><p id="review-message" role="status" aria-live="polite"></p><div class="review-actions"><a href="/">Знайти закупівлю →</a><button type="button" id="review-export">Експортувати копію</button><label>Відновити копію <input type="file" id="review-import" accept="application/json,.json"></label></div><noscript>Для особистої черги увімкніть JavaScript.</noscript>` });
+}
