@@ -14,7 +14,7 @@ const logDir = join(root, "logs"); await mkdir(logDir, { recursive: true });
 const logPath = join(logDir, `daily-${new Date().toISOString().replace(/[:.]/g, "-")}.log`);
 const results: { step: string; code: number | null }[] = [];
 try {
-  for (const script of ["ingest-tenders.ts", "ingest-market.ts", "analyze.ts", "ai-batch.ts", "analyze-documents.ts", "build-web-data.ts"]) {
+  for (const script of ["ingest-tenders.ts", "ingest-market.ts", "analyze.ts", "ai-batch.ts", "ingest-contract-documents.ts", "analyze-documents.ts", "ingest-document-market.ts", "analyze-document-prices.ts", "build-web-data.ts"]) {
     await appendFile(logPath, `\n${new Date().toISOString()} ${script}\n`);
     const code = await new Promise<number | null>((resolveCode) => {
       const child = spawn(process.execPath, [join(root, "scripts", script)], { cwd: root, windowsHide: true,

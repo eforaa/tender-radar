@@ -28,7 +28,7 @@ export function sourceDocuments(raw: unknown): SourceDocument[] {
 }
 
 export function allowedDocumentUrl(value: string): boolean {
-  try { const url = new URL(value); return url.protocol === "https:" && ["public-docs.prozorro.gov.ua", "swift-prod.prozorro.gov.ua"].includes(url.hostname) &&
+  try { const url = new URL(value); return url.protocol === "https:" && (["public-docs.prozorro.gov.ua", "swift-prod.prozorro.gov.ua"].includes(url.hostname) || (url.hostname === "public-api.prozorro.gov.ua" && /^\/api\/2\.5\/contracts\/[a-f0-9]{32}\/documents\/[a-f0-9]{32}$/.test(url.pathname))) &&
     !url.username && !url.password && (!url.port || url.port === "443"); } catch { return false; }
 }
 

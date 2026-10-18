@@ -9,6 +9,8 @@
   "scripts": {
     "test": "node --test \"tests/**/*.test.ts\"",
     "ingest:tenders": "node scripts/ingest-tenders.ts",
+    "ingest:contracts": "node scripts/ingest-contract-documents.ts",
+    "analyze:document-prices": "node scripts/analyze-document-prices.ts",
     "analyze:documents": "node scripts/analyze-documents.ts",
     "ai:extract": "node scripts/ai-extract.ts",
     "ai:batch": "node scripts/ai-batch.ts",

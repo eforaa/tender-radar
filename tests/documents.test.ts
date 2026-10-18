@@ -10,6 +10,8 @@ import { documentSection } from "../server/components/documents.ts";
 
 test("document allowlist rejects private hosts, credentials and misleading suffixes", () => {
   assert.ok(allowedDocumentUrl("https://public-docs.prozorro.gov.ua/get/123?Signature=abc"));
+  assert.ok(allowedDocumentUrl(`https://public-api.prozorro.gov.ua/api/2.5/contracts/${"a".repeat(32)}/documents/${"b".repeat(32)}`));
+  assert.equal(allowedDocumentUrl("https://public-api.prozorro.gov.ua/api/2.5/tenders"), false);
   for (const url of ["http://public-docs.prozorro.gov.ua/x", "https://127.0.0.1/x", "https://public-docs.prozorro.gov.ua.evil.test/x", "https://x@public-docs.prozorro.gov.ua/x", "https://public-docs.prozorro.gov.ua:8080/x", "file:///etc/passwd"])
     assert.equal(allowedDocumentUrl(url), false);
 });

@@ -1,3 +1,4 @@
+import type { DocumentPriceCheck } from "../src/analysis/document-price.ts";
 // Loads the store once and joins it into the shapes the pages need.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -61,6 +62,7 @@ export type Case = {
 
 export type Dataset = {
   documents?: DocumentResult[];
+  documentPrices?: DocumentPriceCheck[];
   ingestion?: IngestState | null;
   cases: Case[];
   byTender: Map<string, Case>;
@@ -141,7 +143,7 @@ export async function loadDataset(): Promise<Dataset> {
   // Monitoring conclusions have their own audit field. They are not price
   // anomalies and must not enter the price counter, preset or severity.
   const findings: FindingRow[] = (await store.allFindings()).filter(
-    (row) => ["peer_price", "own_price_growth", "market_price"].includes(row.detector_key),
+    (row) => ["peer_price", "own_price_growth", "market_price", "document_market_price"].includes(row.detector_key),
   );
   const monitorings = await store.allMonitorings();
 
@@ -253,7 +255,11 @@ export async function loadDataset(): Promise<Dataset> {
   let documents: DocumentResult[] = [];
   try { documents = JSON.parse(await readFile(join(dataDir(), "document-extractions.json"), "utf8")); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  let documentPrices: DocumentPriceCheck[] = [];
+  try { documentPrices = JSON.parse(await readFile(join(dataDir(), "document-price-checks.json"), "utf8")); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   return {
+    documentPrices,
     documents,
     ingestion,
     cases,

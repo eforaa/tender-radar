@@ -1,3 +1,4 @@
+import { documentPriceSection } from "../components/document-prices.ts";
 import { reviewEditor } from "./review.ts";
 import { documentSection } from "../components/documents.ts";
 import { buildConclusion } from "../conclusion.ts";
@@ -68,6 +69,7 @@ export async function tenderPage(tenderId: string, url?: URL): Promise<string> {
 <section class="detail-overview" id="facts" aria-label="Основні дані"><div><span>Сума закупівлі</span><strong>${shortMoney(entry.value_amount)}</strong></div><div><span>Учасників</span><strong>${entry.detailed ? entry.bidders ?? 'Немає даних' : 'Немає даних'}</strong></div><div><span>Дата закупівлі</span><strong>${date(entry.tender_date)}</strong></div></section>
 <div class="detail-source"><a href="${prozorro}" target="_blank" rel="noopener">Відкрити в Prozorro <span aria-hidden="true">↗</span></a><span>Документи та першоджерело</span></div>
 ${reviewEditor({ id: entry.tender_id, title, ref: entry.tender_ref })}
+${documentPriceSection((dataset().documentPrices ?? []).filter(d => d.tender_id === entry.tender_id))}
 ${documentSection((dataset().documents ?? []).filter(d => d.tender_id === entry.tender_id))}
 <div class="detail-columns"><section class="detail-signals" id="signals"><h2>Що потребує уваги <span>${entry.risks.length + entry.findings.length}</span></h2><p class="detail-caution">Сигнал не доводить порушення.</p>
 ${entry.bidders === 1 ? '<p class="detail-competition">Один учасник — немає іншої пропозиції для порівняння.</p>' : ''}
@@ -81,6 +83,8 @@ ${entry.findings
     const e = f.evidence as Record<string, number | string | null>;
     const rows = Object.entries({
       "Ціна за одиницю": typeof e.unit_price === "number" ? `${unitMoney(e.unit_price)}` : null,
+      "Медіана Prozorro Market": typeof e.market_median === "number" ? money(e.market_median) : null,
+      "Різниця з орієнтиром (не збиток)": typeof e.comparison_difference === "number" ? money(e.comparison_difference) : null,
       "Типова ціна (медіана)": typeof e.peer_median === "number" ? `${unitMoney(e.peer_median)}` : null,
       "Середня половина цін": typeof e.peer_p25 === "number" && typeof e.peer_p75 === "number" ? `${unitMoney(e.peer_p25)} — ${unitMoney(e.peer_p75)}` : null,
       "Порівняно із закупівлями": typeof e.peer_count === "number" ? String(e.peer_count) : null,

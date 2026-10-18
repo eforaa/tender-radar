@@ -11,14 +11,14 @@ export function pricesPage(url: URL): string {
   const withFindings = dataset().cases.filter((c) => c.findings.length > 0);
   const gapOf = (c: Case) =>
     c.findings.reduce((total, f) => {
-      const e = f.evidence as { overpayment?: number; extra_cost?: number };
-      return Math.max(total, e.overpayment ?? e.extra_cost ?? 0);
+      const e = f.evidence as { overpayment?: number; extra_cost?: number; comparison_difference?: number };
+      return Math.max(total, e.overpayment ?? e.extra_cost ?? e.comparison_difference ?? 0);
     }, 0);
 
   const totalGap = withFindings.reduce((t, c) => t + gapOf(c), 0);
   const peer = withFindings.filter((c) => c.findings.some((f) => f.detector_key === "peer_price")).length;
   const growth = withFindings.filter((c) => c.findings.some((f) => f.detector_key === "own_price_growth")).length;
-  const market = withFindings.filter(c => c.findings.some(f => f.detector_key === "market_price")).length;
+  const market = withFindings.filter(c => c.findings.some(f => ["market_price", "document_market_price"].includes(f.detector_key))).length;
 
   // Every tender here already has a price finding, so that checkbox is moot.
   const c = readControls(url);
@@ -33,7 +33,7 @@ export function pricesPage(url: URL): string {
 
 <p class="statline">
   <b>${withFindings.length}</b> закупівель для перевірки ·
-  <b>${shortMoney(totalGap)}</b> різниця з іншими закупівлями ·
+  <b>${shortMoney(totalGap)}</b> сума найбільших розбіжностей по закупівлях ·
   <b>${peer}</b> дорожче, ніж в інших ·
   <b>${growth}</b> дорожче за попередню закупівлю ·
   <b>${market}</b> сигнали каталогу
@@ -42,7 +42,8 @@ export function pricesPage(url: URL): string {
 <details class="help">
   <summary>Як ми це рахуємо</summary>
   <div class="inner">
-    <p>Рахуємо ціну одиниці лише для закупівлі з однією позицією та одним активним рішенням про переможця. Очікуваний бюджет не використовуємо.</p>
+    <p>Для документів беремо лише явно вказану ціну одиниці з цитатою, зіставляємо кількість, одиницю, валюту та ПДВ. Сигнал виникає від 50% понад верхній квартиль актуального каталогу. Різниця рахується від медіани. Це поточний орієнтир, не ціна на дату договору і не збиток.</p>
+    <p>Для даних API рахуємо ціну одиниці лише для закупівлі з однією позицією та одним активним рішенням про переможця. Очікуваний бюджет не використовуємо.</p>
     <p>Далі шукаємо, за скільки те саме купували інші, і беремо середину. Якщо ціна помітно вища за середину — показуємо.</p>
     <p>Для попередніх закупівель перевіряємо дату, однаковий опис, одиницю, валюту та ПДВ. Для каталогу потрібна однозначна відповідність назви та ціна не пізніше закупівлі, давністю до 30 днів, із вибірки щонайменше 5 спостережень. Доставка, комплектація й умови оплати потребують окремої перевірки.</p>
     <p><strong>Ми мовчимо, коли порівняти чесно не можна.</strong> Ремонти й послуги не порівнюємо — кожен об'єкт свій. Не порівнюємо й товари всередині надто широкого коду: під одним кодом можуть бути і прокладка за 400 грн, і редуктор за мільйон.</p>

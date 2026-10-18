@@ -2319,7 +2319,7 @@ async function loadDataset() {
   const bids = await store.allBids();
   const runs = await store.allRuns();
   const findings = (await store.allFindings()).filter(
-    (row) => ["peer_price", "own_price_growth", "market_price"].includes(row.detector_key)
+    (row) => ["peer_price", "own_price_growth", "market_price", "document_market_price"].includes(row.detector_key)
   );
   const monitorings = await store.allMonitorings();
   const monitoringsByTender = /* @__PURE__ */ new Map();
@@ -2427,7 +2427,14 @@ async function loadDataset() {
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
+  let documentPrices = [];
+  try {
+    documentPrices = JSON.parse(await readFile2(join3(dataDir(), "document-price-checks.json"), "utf8"));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   return {
+    documentPrices,
     documents,
     ingestion,
     cases,
@@ -3032,10 +3039,23 @@ ${listBody(list, c, "/")}
 function allowedDocumentUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && ["public-docs.prozorro.gov.ua", "swift-prod.prozorro.gov.ua"].includes(url.hostname) && !url.username && !url.password && (!url.port || url.port === "443");
+    return url.protocol === "https:" && (["public-docs.prozorro.gov.ua", "swift-prod.prozorro.gov.ua"].includes(url.hostname) || url.hostname === "public-api.prozorro.gov.ua" && /^\/api\/2\.5\/contracts\/[a-f0-9]{32}\/documents\/[a-f0-9]{32}$/.test(url.pathname)) && !url.username && !url.password && (!url.port || url.port === "443");
   } catch {
     return false;
   }
+}
+
+// server/components/document-prices.ts
+function documentPriceSection(checks) {
+  if (!checks.length) return "";
+  const link = (url) => {
+    try {
+      return new URL(url).origin === "https://market-api.prozorro.gov.ua";
+    } catch {
+      return false;
+    }
+  };
+  return `<section class="document-results"><h2>\u0426\u0456\u043D\u0438 \u0437 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432</h2><p class="hint">\u041F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 \u043E\u0440\u0456\u0454\u043D\u0442\u0438\u0440 Prozorro Market. \u0420\u0456\u0437\u043D\u0438\u0446\u044F \u043D\u0435 \u0454 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u043C \u0437\u0431\u0438\u0442\u043A\u043E\u043C.</p>${checks.map((r) => `<details class="detail-fold"><summary><span><small>${r.status === "signal" ? "\u041C\u043E\u0436\u043B\u0438\u0432\u0435 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u043D\u044F" : r.status === "limited" ? "\u041C\u0430\u043B\u0430 \u0432\u0438\u0431\u0456\u0440\u043A\u0430 \xB7 \u043B\u0438\u0448\u0435 \u0434\u043E\u0432\u0456\u0434\u043A\u043E\u0432\u0438\u0439 \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A" : r.status === "compared" ? "\u041F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043E \xB7 \u043F\u043E\u0440\u0456\u0433 \u0441\u0438\u0433\u043D\u0430\u043B\u0443 \u043D\u0435 \u043F\u0435\u0440\u0435\u0432\u0438\u0449\u0435\u043D\u043E" : "\u041D\u0435\u0434\u043E\u0441\u0442\u0430\u0442\u043D\u044C\u043E \u0434\u0430\u043D\u0438\u0445 \u0434\u043B\u044F \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F"}</small><strong>${esc(r.description)}</strong></span></summary><div class="detail-fold-body">${r.reference ? `<dl class="facts"><dt>\u0426\u0456\u043D\u0430 \u0434\u043B\u044F \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F</dt><dd>${money(r.unit_price ?? null)} / ${esc(r.unit ?? "")}</dd><dt>\u041C\u0435\u0434\u0456\u0430\u043D\u0430 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0443</dt><dd>${money(r.reference.median)}</dd><dt>\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C</dt><dd>${r.quantity}</dd><dt>\u0420\u0456\u0437\u043D\u0438\u0446\u044F \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E</dt><dd>${money(r.difference_per_unit ?? null)}</dd><dt>\u0420\u0456\u0437\u043D\u0438\u0446\u044F \xD7 \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C</dt><dd>${money(r.comparison_difference ?? null)} (${r.difference_percent}%)</dd><dt>\u041F\u0414\u0412</dt><dd>${r.vat ? "\u0412\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u0432 \u043E\u0431\u0438\u0434\u0432\u0456 \u0446\u0456\u043D\u0438" : "\u041E\u0431\u0438\u0434\u0432\u0456 \u0446\u0456\u043D\u0438 \u0431\u0435\u0437 \u041F\u0414\u0412"}</dd><dt>\u041E\u0440\u0456\u0454\u043D\u0442\u0438\u0440 \u0432\u0456\u0434</dt><dd>${esc(r.reference.date.slice(0, 10))} \xB7 ${r.reference.sample_size} \u0441\u043F\u043E\u0441\u0442\u0435\u0440\u0435\u0436\u0435\u043D\u044C</dd></dl><p>${link(r.reference.source_url) ? `<a href="${esc(r.reference.source_url)}" target="_blank" rel="noopener">\u0414\u0436\u0435\u0440\u0435\u043B\u043E \u0446\u0456\u043D\u0438 \u2197</a>` : ""} \xB7 ${link(r.reference.product_url) ? `<a href="${esc(r.reference.product_url)}" target="_blank" rel="noopener">\u0425\u0430\u0440\u0430\u043A\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043A\u0438 \u0442\u043E\u0432\u0430\u0440\u0443 \u2197</a>` : ""}</p>` : ""}${r.normalization ? `<p>\u0423 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456: ${r.document_unit_price} \u20B4/\u043E\u0434. \u0414\u043B\u044F \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F: ${r.unit_price} \u20B4/\u043E\u0434.</p>` : ""}${r.contract_url && /^https:\/\/public-api\.prozorro\.gov\.ua\/api\/2\.5\/contracts\/[a-f0-9]{32}$/.test(r.contract_url) ? `<p><a href="${esc(r.contract_url)}" target="_blank" rel="noopener">\u0414\u0430\u043D\u0456 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443: \u0442\u043E\u0432\u0430\u0440, \u0432\u0430\u043B\u044E\u0442\u0430 \u0442\u0430 \u041F\u0414\u0412 \u2197</a></p>` : ""}${r.reasons.map((s) => `<p>${esc(s)}</p>`).join("")}${allowedDocumentUrl(r.document_url) ? `<p><a href="${esc(r.document_url)}" target="_blank" rel="noopener">${esc(r.document_title)} \u2197</a></p>` : ""}<details><summary>\u0426\u0438\u0442\u0430\u0442\u0438 \u0434\u043B\u044F \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043A\u0443</summary>${r.quotes.filter((c) => ["unit_price", "quantity", "unit", "currency", "vat"].includes(c.field)).map((c) => `<blockquote>${esc(c.quote)}<br><small>${r.locator_kind === "fragment" ? "\u0424\u0440\u0430\u0433\u043C\u0435\u043D\u0442" : "\u0421\u0442\u043E\u0440."} ${c.page}${c.method === "ocr" ? " \xB7 OCR" : ""}</small></blockquote>`).join("")}</details></div></details>`).join("")}</section>`;
 }
 
 // server/components/documents.ts
@@ -3355,6 +3375,7 @@ async function tenderPage(tenderId, url) {
 <section class="detail-overview" id="facts" aria-label="\u041E\u0441\u043D\u043E\u0432\u043D\u0456 \u0434\u0430\u043D\u0456"><div><span>\u0421\u0443\u043C\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</span><strong>${shortMoney(entry.value_amount)}</strong></div><div><span>\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432</span><strong>${entry.detailed ? entry.bidders ?? "\u041D\u0435\u043C\u0430\u0454 \u0434\u0430\u043D\u0438\u0445" : "\u041D\u0435\u043C\u0430\u0454 \u0434\u0430\u043D\u0438\u0445"}</strong></div><div><span>\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</span><strong>${date(entry.tender_date)}</strong></div></section>
 <div class="detail-source"><a href="${prozorro}" target="_blank" rel="noopener">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0432 Prozorro <span aria-hidden="true">\u2197</span></a><span>\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0442\u0430 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E</span></div>
 ${reviewEditor({ id: entry.tender_id, title, ref: entry.tender_ref })}
+${documentPriceSection((dataset().documentPrices ?? []).filter((d) => d.tender_id === entry.tender_id))}
 ${documentSection((dataset().documents ?? []).filter((d) => d.tender_id === entry.tender_id))}
 <div class="detail-columns"><section class="detail-signals" id="signals"><h2>\u0429\u043E \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u0443\u0432\u0430\u0433\u0438 <span>${entry.risks.length + entry.findings.length}</span></h2><p class="detail-caution">\u0421\u0438\u0433\u043D\u0430\u043B \u043D\u0435 \u0434\u043E\u0432\u043E\u0434\u0438\u0442\u044C \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
 ${entry.bidders === 1 ? '<p class="detail-competition">\u041E\u0434\u0438\u043D \u0443\u0447\u0430\u0441\u043D\u0438\u043A \u2014 \u043D\u0435\u043C\u0430\u0454 \u0456\u043D\u0448\u043E\u0457 \u043F\u0440\u043E\u043F\u043E\u0437\u0438\u0446\u0456\u0457 \u0434\u043B\u044F \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F.</p>' : ""}
@@ -3365,6 +3386,8 @@ ${entry.findings.map((f) => {
       const e = f.evidence;
       const rows = Object.entries({
         "\u0426\u0456\u043D\u0430 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E": typeof e.unit_price === "number" ? `${unitMoney(e.unit_price)}` : null,
+        "\u041C\u0435\u0434\u0456\u0430\u043D\u0430 Prozorro Market": typeof e.market_median === "number" ? money(e.market_median) : null,
+        "\u0420\u0456\u0437\u043D\u0438\u0446\u044F \u0437 \u043E\u0440\u0456\u0454\u043D\u0442\u0438\u0440\u043E\u043C (\u043D\u0435 \u0437\u0431\u0438\u0442\u043E\u043A)": typeof e.comparison_difference === "number" ? money(e.comparison_difference) : null,
         "\u0422\u0438\u043F\u043E\u0432\u0430 \u0446\u0456\u043D\u0430 (\u043C\u0435\u0434\u0456\u0430\u043D\u0430)": typeof e.peer_median === "number" ? `${unitMoney(e.peer_median)}` : null,
         "\u0421\u0435\u0440\u0435\u0434\u043D\u044F \u043F\u043E\u043B\u043E\u0432\u0438\u043D\u0430 \u0446\u0456\u043D": typeof e.peer_p25 === "number" && typeof e.peer_p75 === "number" ? `${unitMoney(e.peer_p25)} \u2014 ${unitMoney(e.peer_p75)}` : null,
         "\u041F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043E \u0456\u0437 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438": typeof e.peer_count === "number" ? String(e.peer_count) : null,
@@ -4051,12 +4074,12 @@ function pricesPage(url) {
   const withFindings = dataset().cases.filter((c2) => c2.findings.length > 0);
   const gapOf = (c2) => c2.findings.reduce((total, f) => {
     const e = f.evidence;
-    return Math.max(total, e.overpayment ?? e.extra_cost ?? 0);
+    return Math.max(total, e.overpayment ?? e.extra_cost ?? e.comparison_difference ?? 0);
   }, 0);
   const totalGap = withFindings.reduce((t, c2) => t + gapOf(c2), 0);
   const peer = withFindings.filter((c2) => c2.findings.some((f) => f.detector_key === "peer_price")).length;
   const growth = withFindings.filter((c2) => c2.findings.some((f) => f.detector_key === "own_price_growth")).length;
-  const market = withFindings.filter((c2) => c2.findings.some((f) => f.detector_key === "market_price")).length;
+  const market = withFindings.filter((c2) => c2.findings.some((f) => ["market_price", "document_market_price"].includes(f.detector_key))).length;
   const c = readControls(url);
   const list = applyControls(withFindings, c, RAILWAY_EDRPOU, { hidePrice: true });
   return layout({
@@ -4068,7 +4091,7 @@ function pricesPage(url) {
 
 <p class="statline">
   <b>${withFindings.length}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \xB7
-  <b>${shortMoney(totalGap)}</b> \u0440\u0456\u0437\u043D\u0438\u0446\u044F \u0437 \u0456\u043D\u0448\u0438\u043C\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438 \xB7
+  <b>${shortMoney(totalGap)}</b> \u0441\u0443\u043C\u0430 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0438\u0445 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0435\u0439 \u043F\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445 \xB7
   <b>${peer}</b> \u0434\u043E\u0440\u043E\u0436\u0447\u0435, \u043D\u0456\u0436 \u0432 \u0456\u043D\u0448\u0438\u0445 \xB7
   <b>${growth}</b> \u0434\u043E\u0440\u043E\u0436\u0447\u0435 \u0437\u0430 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \xB7
   <b>${market}</b> \u0441\u0438\u0433\u043D\u0430\u043B\u0438 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0443
@@ -4077,7 +4100,8 @@ function pricesPage(url) {
 <details class="help">
   <summary>\u042F\u043A \u043C\u0438 \u0446\u0435 \u0440\u0430\u0445\u0443\u0454\u043C\u043E</summary>
   <div class="inner">
-    <p>\u0420\u0430\u0445\u0443\u0454\u043C\u043E \u0446\u0456\u043D\u0443 \u043E\u0434\u0438\u043D\u0438\u0446\u0456 \u043B\u0438\u0448\u0435 \u0434\u043B\u044F \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0434\u043D\u0456\u0454\u044E \u043F\u043E\u0437\u0438\u0446\u0456\u0454\u044E \u0442\u0430 \u043E\u0434\u043D\u0438\u043C \u0430\u043A\u0442\u0438\u0432\u043D\u0438\u043C \u0440\u0456\u0448\u0435\u043D\u043D\u044F\u043C \u043F\u0440\u043E \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F. \u041E\u0447\u0456\u043A\u0443\u0432\u0430\u043D\u0438\u0439 \u0431\u044E\u0434\u0436\u0435\u0442 \u043D\u0435 \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u043C\u043E.</p>
+    <p>\u0414\u043B\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432 \u0431\u0435\u0440\u0435\u043C\u043E \u043B\u0438\u0448\u0435 \u044F\u0432\u043D\u043E \u0432\u043A\u0430\u0437\u0430\u043D\u0443 \u0446\u0456\u043D\u0443 \u043E\u0434\u0438\u043D\u0438\u0446\u0456 \u0437 \u0446\u0438\u0442\u0430\u0442\u043E\u044E, \u0437\u0456\u0441\u0442\u0430\u0432\u043B\u044F\u0454\u043C\u043E \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C, \u043E\u0434\u0438\u043D\u0438\u0446\u044E, \u0432\u0430\u043B\u044E\u0442\u0443 \u0442\u0430 \u041F\u0414\u0412. \u0421\u0438\u0433\u043D\u0430\u043B \u0432\u0438\u043D\u0438\u043A\u0430\u0454 \u0432\u0456\u0434 50% \u043F\u043E\u043D\u0430\u0434 \u0432\u0435\u0440\u0445\u043D\u0456\u0439 \u043A\u0432\u0430\u0440\u0442\u0438\u043B\u044C \u0430\u043A\u0442\u0443\u0430\u043B\u044C\u043D\u043E\u0433\u043E \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0443. \u0420\u0456\u0437\u043D\u0438\u0446\u044F \u0440\u0430\u0445\u0443\u0454\u0442\u044C\u0441\u044F \u0432\u0456\u0434 \u043C\u0435\u0434\u0456\u0430\u043D\u0438. \u0426\u0435 \u043F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 \u043E\u0440\u0456\u0454\u043D\u0442\u0438\u0440, \u043D\u0435 \u0446\u0456\u043D\u0430 \u043D\u0430 \u0434\u0430\u0442\u0443 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443 \u0456 \u043D\u0435 \u0437\u0431\u0438\u0442\u043E\u043A.</p>
+    <p>\u0414\u043B\u044F \u0434\u0430\u043D\u0438\u0445 API \u0440\u0430\u0445\u0443\u0454\u043C\u043E \u0446\u0456\u043D\u0443 \u043E\u0434\u0438\u043D\u0438\u0446\u0456 \u043B\u0438\u0448\u0435 \u0434\u043B\u044F \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0434\u043D\u0456\u0454\u044E \u043F\u043E\u0437\u0438\u0446\u0456\u0454\u044E \u0442\u0430 \u043E\u0434\u043D\u0438\u043C \u0430\u043A\u0442\u0438\u0432\u043D\u0438\u043C \u0440\u0456\u0448\u0435\u043D\u043D\u044F\u043C \u043F\u0440\u043E \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F. \u041E\u0447\u0456\u043A\u0443\u0432\u0430\u043D\u0438\u0439 \u0431\u044E\u0434\u0436\u0435\u0442 \u043D\u0435 \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u043C\u043E.</p>
     <p>\u0414\u0430\u043B\u0456 \u0448\u0443\u043A\u0430\u0454\u043C\u043E, \u0437\u0430 \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0442\u0435 \u0441\u0430\u043C\u0435 \u043A\u0443\u043F\u0443\u0432\u0430\u043B\u0438 \u0456\u043D\u0448\u0456, \u0456 \u0431\u0435\u0440\u0435\u043C\u043E \u0441\u0435\u0440\u0435\u0434\u0438\u043D\u0443. \u042F\u043A\u0449\u043E \u0446\u0456\u043D\u0430 \u043F\u043E\u043C\u0456\u0442\u043D\u043E \u0432\u0438\u0449\u0430 \u0437\u0430 \u0441\u0435\u0440\u0435\u0434\u0438\u043D\u0443 \u2014 \u043F\u043E\u043A\u0430\u0437\u0443\u0454\u043C\u043E.</p>
     <p>\u0414\u043B\u044F \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E \u0434\u0430\u0442\u0443, \u043E\u0434\u043D\u0430\u043A\u043E\u0432\u0438\u0439 \u043E\u043F\u0438\u0441, \u043E\u0434\u0438\u043D\u0438\u0446\u044E, \u0432\u0430\u043B\u044E\u0442\u0443 \u0442\u0430 \u041F\u0414\u0412. \u0414\u043B\u044F \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0443 \u043F\u043E\u0442\u0440\u0456\u0431\u043D\u0430 \u043E\u0434\u043D\u043E\u0437\u043D\u0430\u0447\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u043D\u0456\u0441\u0442\u044C \u043D\u0430\u0437\u0432\u0438 \u0442\u0430 \u0446\u0456\u043D\u0430 \u043D\u0435 \u043F\u0456\u0437\u043D\u0456\u0448\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0434\u0430\u0432\u043D\u0456\u0441\u0442\u044E \u0434\u043E 30 \u0434\u043D\u0456\u0432, \u0456\u0437 \u0432\u0438\u0431\u0456\u0440\u043A\u0438 \u0449\u043E\u043D\u0430\u0439\u043C\u0435\u043D\u0448\u0435 5 \u0441\u043F\u043E\u0441\u0442\u0435\u0440\u0435\u0436\u0435\u043D\u044C. \u0414\u043E\u0441\u0442\u0430\u0432\u043A\u0430, \u043A\u043E\u043C\u043F\u043B\u0435\u043A\u0442\u0430\u0446\u0456\u044F \u0439 \u0443\u043C\u043E\u0432\u0438 \u043E\u043F\u043B\u0430\u0442\u0438 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u044E\u0442\u044C \u043E\u043A\u0440\u0435\u043C\u043E\u0457 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438.</p>
     <p><strong>\u041C\u0438 \u043C\u043E\u0432\u0447\u0438\u043C\u043E, \u043A\u043E\u043B\u0438 \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u0442\u0438 \u0447\u0435\u0441\u043D\u043E \u043D\u0435 \u043C\u043E\u0436\u043D\u0430.</strong> \u0420\u0435\u043C\u043E\u043D\u0442\u0438 \u0439 \u043F\u043E\u0441\u043B\u0443\u0433\u0438 \u043D\u0435 \u043F\u043E\u0440\u0456\u0432\u043D\u044E\u0454\u043C\u043E \u2014 \u043A\u043E\u0436\u0435\u043D \u043E\u0431'\u0454\u043A\u0442 \u0441\u0432\u0456\u0439. \u041D\u0435 \u043F\u043E\u0440\u0456\u0432\u043D\u044E\u0454\u043C\u043E \u0439 \u0442\u043E\u0432\u0430\u0440\u0438 \u0432\u0441\u0435\u0440\u0435\u0434\u0438\u043D\u0456 \u043D\u0430\u0434\u0442\u043E \u0448\u0438\u0440\u043E\u043A\u043E\u0433\u043E \u043A\u043E\u0434\u0443: \u043F\u0456\u0434 \u043E\u0434\u043D\u0438\u043C \u043A\u043E\u0434\u043E\u043C \u043C\u043E\u0436\u0443\u0442\u044C \u0431\u0443\u0442\u0438 \u0456 \u043F\u0440\u043E\u043A\u043B\u0430\u0434\u043A\u0430 \u0437\u0430 400 \u0433\u0440\u043D, \u0456 \u0440\u0435\u0434\u0443\u043A\u0442\u043E\u0440 \u0437\u0430 \u043C\u0456\u043B\u044C\u0439\u043E\u043D.</p>

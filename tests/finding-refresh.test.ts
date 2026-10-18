@@ -20,17 +20,17 @@ test("audit monitoring conclusions never appear in the price-only results", asyn
   process.env.TR_DATA_DIR = dir;
   try {
   const store = new JsonStore(dir);
-  await store.replaceTenderCards(["priced", "audit"].map(id => normalizeTender({ id, tenderID: `UA-2026-01-01-${id}`, title: id })));
-  await store.upsertFindings([finding("priced"), finding("audit", "monitoring")]);
+  await store.replaceTenderCards(["priced", "audit", "document-priced"].map(id => normalizeTender({ id, tenderID: `UA-2026-01-01-${id}`, title: id })));
+  await store.upsertFindings([finding("priced"), finding("audit", "monitoring"), finding("document-priced", "document_market_price")]);
   await store.upsertMonitorings([{ monitoring_id: "m", tender_id: "audit", status: "completed", decision_text: "test",
     reasons: [], conclusion: { violationOccurred: true, description: "test", date: "2026-01-01" }, date_created: "2026-01-01", date_modified: "2026-01-01" }]);
   const ds = await loadDataset();
-  assert.equal(ds.cases.length, 2, "unflagged tenders appear without synthetic risk flags");
+  assert.equal(ds.cases.length, 3, "unflagged tenders appear without synthetic risk flags");
   assert.ok(ds.cases.some((entry) => entry.audit), "fixture includes audit conclusions");
   const priced = applyControls(ds.cases, readControls(new URL("http://localhost/?price=1")), new Set());
-  assert.ok(priced.length > 0, "fixture includes price signals");
+  assert.equal(priced.length, 2, "both document and structured price signals survive the price filter");
   for (const entry of priced) {
-    assert.ok(entry.findings.every((row) => ["peer_price", "own_price_growth"].includes(row.detector_key)));
+    assert.ok(entry.findings.every((row) => ["peer_price", "own_price_growth", "document_market_price"].includes(row.detector_key)));
   }
   assert.equal(ds.findingCount, ds.cases.reduce((n, entry) => n + entry.findings.length, 0));
   } finally {

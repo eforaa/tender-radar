@@ -19,8 +19,11 @@ try {
     .sort((a, b) => (b.source_modified ?? "").localeCompare(a.source_modified ?? ""));
   if (process.argv[2] && !tenders.length) throw new Error("Tender raw data not found");
   let used = 0; let failed = 0;
-  const candidates = tenders.flatMap(tender => sourceDocuments(tender.raw)
-    .sort((a, b) => Number(/догов|специф|додатк/i.test(b.title)) - Number(/догов|специф|додатк/i.test(a.title)))
+  let contracts: { tender_id: string; contract: Record<string, unknown> }[] = [];
+  try { contracts = JSON.parse(await readFile(join(directory, "contract-documents.json"), "utf8")); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  const candidates = tenders.flatMap(tender => [...sourceDocuments({ contracts: contracts.filter(c => c.tender_id === tender.id && c.contract.status === "active").map(c => c.contract) }), ...sourceDocuments(tender.raw)]
+    .sort((a, b) => Number(b.kind === "Договір та додатки") - Number(a.kind === "Договір та додатки") || Number(/догов|специф|додатк/i.test(b.title)) - Number(/догов|специф|додатк/i.test(a.title)))
     .map(document => ({ tender, document, key: createHash("sha256").update(`${tender.id}|${document.id}|${document.url}|${document.modified}`).digest("hex") })));
   // Broken sources must not consume every daily slot and starve documents not yet tried.
   candidates.sort((a, b) => Number(rows.get(a.key)?.status === "error") - Number(rows.get(b.key)?.status === "error"));
@@ -29,9 +32,9 @@ try {
       if (process.env.TR_DOCUMENT_ID && document.id !== process.env.TR_DOCUMENT_ID) continue;
       const format = documentFormat(document);
       const old = rows.get(key);
-      if (old?.analyzer_version === 3 && old.status !== "error") continue;
-      if (process.env.TR_DOCUMENT_RETRY !== "1" && old?.analyzer_version === 3 && old.status === "error" && Date.now() - Date.parse(old.updated_at) < 60 * 60 * 1000) continue;
-      const row: DocumentResult = { analyzer_version: 3, key, tender_id: tender.id, document, status: "error", updated_at: new Date().toISOString(),
+      if (old?.analyzer_version === 4 && old.status !== "error") continue;
+      if (process.env.TR_DOCUMENT_RETRY !== "1" && old?.analyzer_version === 4 && old.status === "error" && Date.now() - Date.parse(old.updated_at) < 60 * 60 * 1000) continue;
+      const row: DocumentResult = { analyzer_version: 4, key, tender_id: tender.id, document, status: "error", updated_at: new Date().toISOString(),
         page_count: 0, processed_pages: 0, ocr_pages: [], claims: [], rejected_count: 0, message: "", attempts: (old?.attempts ?? 0) + 1 };
       if (!format) {
         row.status = "unsupported"; row.message = "Цей формат ще не обробляється. Відкрийте оригінал.";
