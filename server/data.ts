@@ -4,6 +4,7 @@ import { officerKey } from "../src/normalize/tender.ts";
 import type { RiskFlagRow, RiskRuleRow, TenderRow, AwardRow, BidRow, RunRow, FindingRow } from "../src/store/types.ts";
 import { violationEstablished, conclusionText, conclusionPublished } from "../src/normalize/monitoring.ts";
 import type { Card } from "../src/store/cards.ts";
+import { INGEST_KEY, type IngestState } from "../src/ingest/tenders.ts";
 
 /** One entry per tender: the flags that fired plus whatever the card added. */
 /**
@@ -28,6 +29,7 @@ export type AuditVerdict = {
 };
 
 export type Case = {
+  scope_reasons?: string[];
   tender_id: string;
   tender_ref: string;
   /** The date the tender was published, taken from its own number. */
@@ -55,6 +57,7 @@ export type Case = {
 };
 
 export type Dataset = {
+  ingestion?: IngestState | null;
   cases: Case[];
   byTender: Map<string, Case>;
   rules: RiskRuleRow[];
@@ -97,10 +100,11 @@ export function mergeCardDetail(entry: Case, card: Card): Case {
     method: detail.method ?? null,
     // The flag already carries these; only fall back to the card when the
     // flag itself did not have them, matching the original priority.
-    entity_edrpou: entry.entity_edrpou ?? detail.entity_edrpou ?? null,
-    entity_name: entry.entity_name ?? detail.entity_name ?? null,
-    region: entry.region ?? detail.region ?? null,
-    value_amount: entry.value_amount ?? detail.value_amount ?? null,
+    entity_edrpou: detail.entity_edrpou ?? entry.entity_edrpou ?? null,
+    entity_name: detail.entity_name ?? entry.entity_name ?? null,
+    region: detail.region ?? entry.region ?? null,
+    value_amount: detail.value_amount ?? entry.value_amount ?? null,
+    scope_reasons: detail.scope_reasons,
     officer_name: detail.officer_name ?? null,
     officer_email: detail.officer_email ?? null,
     officer_phone: detail.officer_phone ?? null,
@@ -122,6 +126,8 @@ function violationTypes(row: { conclusion: unknown }): string[] {
 
 export async function loadDataset(): Promise<Dataset> {
   const store = openStore();
+  const checkpoint = await store.getCursor(INGEST_KEY);
+  const ingestion: IngestState | null = checkpoint ? JSON.parse(checkpoint) : null;
   const flags: RiskFlagRow[] = await store.allRiskFlags();
   const rules: RiskRuleRow[] = await store.allRiskRules();
   const tenders: TenderRow[] = await store.allTenders();
@@ -184,7 +190,13 @@ export async function loadDataset(): Promise<Dataset> {
   }
 
   const byTender = new Map<string, Case>();
-  for (const flag of flags) {
+  // Unflagged tenders are first-class records. Never manufacture a state risk for them.
+  const flaggedIds = new Set(flags.map(f => f.tender_id));
+  const unflagged = tenders.filter(t => !flaggedIds.has(t.id)).map(t => ({
+    tender_id: t.id, tender_ref: t.tender_id, risk_id: "", date_assessed: null,
+    region: t.region, entity_edrpou: t.entity_edrpou, entity_name: t.entity_name, value_amount: t.value_amount,
+  }));
+  for (const flag of [...flags, ...unflagged]) {
     let entry = byTender.get(flag.tender_id);
     if (!entry) {
       const detail = tenderById.get(flag.tender_id);
@@ -230,11 +242,12 @@ export async function loadDataset(): Promise<Dataset> {
       entry.tender_date = tenderDateOf(flag.tender_ref);
     }
     if (entry.value_amount === null) entry.value_amount = flag.value_amount;
-    if (!entry.risks.includes(flag.risk_id)) entry.risks.push(flag.risk_id);
+    if (flag.risk_id && !entry.risks.includes(flag.risk_id)) entry.risks.push(flag.risk_id);
   }
 
   const cases = [...byTender.values()];
   return {
+    ingestion,
     cases,
     byTender,
     rules,

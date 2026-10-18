@@ -11,6 +11,7 @@ export const SOUTHERN_RAILWAY_EDRPOU = "40081216";
 
 /** Branches of AT "Ukrainian Railways" tracked regardless of their region. */
 export const RAILWAY_EDRPOU = new Set([
+  "40075815", // АТ «Укрзалізниця»
   SOUTHERN_RAILWAY_EDRPOU, // РФ "Південна залізниця" — the Kharkiv branch
   "40081347", // Філія "Центр забезпечення виробництва"
   "41022900", // Філія "Пасажирська компанія"
@@ -43,6 +44,7 @@ export function railwayScope(entity: {
   const edrpou = entity.entity_edrpou ?? "";
   if (edrpou === SOUTHERN_RAILWAY_EDRPOU) return "southern";
   if (RAILWAY_EDRPOU.has(edrpou)) return "branch";
+  if (/укрзалізниц|українська\s+залізниця|украинская\s+железная\s+дорога/i.test(entity.entity_name ?? "")) return "branch";
   if (entity.region === REGION && RAILWAY_NAME.test(entity.entity_name ?? "")) return "local";
   return null;
 }

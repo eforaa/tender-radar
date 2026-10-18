@@ -13,13 +13,13 @@ const CONCURRENCY = Number(process.env.TR_CONCURRENCY ?? 6);
 const store = openStore();
 
 const flags = await store.allRiskFlags();
-const ours = new Set(flags.map((f) => f.tender_id));
+const ours = new Set([...flags.map((f) => f.tender_id), ...(await store.allTenders()).map(t => t.id)]);
 console.log(`tenders we track: ${ours.size}`);
 
 const stored = await store.allMonitorings();
 // Status can change after we first see it — an active monitoring becomes
 // addressed — so the status is part of what makes a stored copy current.
-const seen = new Map(stored.map((m) => [m.monitoring_id, m.status]));
+const seen = new Map(stored.map((m) => [m.monitoring_id, `${m.status}|${m.date_modified}`]));
 
 const wanted: string[] = [];
 let scanned = 0;
@@ -35,7 +35,7 @@ while (uri) {
   for (const entry of page.data) {
     if (!entry.tender_id || !ours.has(entry.tender_id)) continue;
     if (!entry.status || !CONCLUDED_STATUSES.has(entry.status)) continue;
-    if (seen.get(entry.id) === entry.status) continue;
+    if (seen.get(entry.id) === `${entry.status}|${entry.dateModified}`) continue;
     wanted.push(entry.id);
   }
 

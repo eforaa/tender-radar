@@ -21,6 +21,8 @@ export type PricePoint = {
   basis: "award" | "expected";
   entity_edrpou: string | null;
   date: string | null;
+  currency?: string;
+  vat_included?: boolean;
 };
 
 export type PriceGroup = {
@@ -110,8 +112,17 @@ export function pricePoints(
   const points: PricePoint[] = [];
   for (const tender of tenders) {
     const items = itemsByTender.get(tender.id) ?? [];
-    const priced = unitPrice({ tender, items, awards: awardsByTender.get(tender.id) ?? [] });
+    const awards = (awardsByTender.get(tender.id) ?? []).filter(a => a.status === "active");
+    // No pending award, expected budget, ambiguous multiple awards or unknown tax basis.
+    if (awards.length !== 1 || !Number.isFinite(Date.parse(awards[0].date ?? ""))) continue;
+    const raw = tender.raw as { awards?: { id?: string; value?: { currency?: string; valueAddedTaxIncluded?: boolean } }[] } | null;
+    const value = raw?.awards?.find(a => a.id === awards[0].award_id)?.value ?? {
+      currency: awards[0].currency, valueAddedTaxIncluded: awards[0].vat_included,
+    };
+    if (value?.currency !== "UAH" || typeof value.valueAddedTaxIncluded !== "boolean") continue;
+    const priced = unitPrice({ tender, items, awards });
     if (!priced.computable) continue;
+    if (priced.basis !== "award") continue;
 
     const item = priced.item;
     if (!item.cpv_code || !isComparableUnit(item.unit_code)) continue;
@@ -127,7 +138,9 @@ export function pricePoints(
       quantity: priced.quantity,
       basis: priced.basis,
       entity_edrpou: tender.entity_edrpou,
-      date: tender.date,
+      date: awards[0].date,
+      currency: value.currency,
+      vat_included: value.valueAddedTaxIncluded,
     });
   }
   return points;
@@ -175,6 +188,18 @@ function fmt(n: number): string {
   return new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 2 }).format(n);
 }
 
+/** Conservative candidate screen, not proof of identical commercial terms. */
+export function comparableHistorical(point: PricePoint, peer: PricePoint): boolean {
+  const age = Date.parse(point.date ?? "") - Date.parse(peer.date ?? "");
+  const normalize = (s: string | null) => (s ?? "").toLocaleLowerCase("uk-UA").replace(/\s+/g, " ").trim();
+  return point.basis === "award" && peer.basis === "award"
+    && point.currency === "UAH" && peer.currency === point.currency
+    && typeof point.vat_included === "boolean" && peer.vat_included === point.vat_included
+    && point.cpv_code === peer.cpv_code && point.unit_code === peer.unit_code
+    && Number.isFinite(age) && age >= 0 && age <= 180 * 86400000
+    && !!normalize(point.description) && normalize(point.description) === normalize(peer.description);
+}
+
 /**
  * Compares one tender against every other tender that bought the same thing.
  * The tender itself is excluded from its own benchmark.
@@ -183,7 +208,7 @@ export function detectPeerPrice(point: PricePoint, group: PriceGroup, now: strin
   // A code whose own prices are all over the place is not one product.
   if (!group.homogeneous) return null;
 
-  const peers = group.points.filter((p) => p.tender_id !== point.tender_id);
+  const peers = [...new Map(group.points.filter((p) => p.tender_id !== point.tender_id && comparableHistorical(point, p)).map(p => [p.tender_id, p])).values()];
   if (peers.length < MIN_PEERS) return null;
 
   const sorted = peers.map((p) => p.price).sort((a, b) => a - b);
@@ -204,17 +229,22 @@ export function detectPeerPrice(point: PricePoint, group: PriceGroup, now: strin
     title: `Ціна за одиницю у ${ratio.toFixed(1)} раза вища за типову`,
     explanation:
       `Ціна — ${fmt(point.price)} ₴ за ${unit}. ` +
-      `Інші ${peers.length} закупівель того самого предмета (код ${point.cpv_code}) мають медіану ${fmt(median)} ₴, ` +
+      `Інші ${peers.length} закупівель з однаковим описом, одиницею та ПДВ за попередні 180 днів мають медіану ${fmt(median)} ₴, ` +
       `середню половину — від ${fmt(quantile(sorted, 0.25))} до ${fmt(quantile(sorted, 0.75))} ₴. ` +
       `Кількість — ${fmt(point.quantity)} ${unit}, тож різниця на всю закупівлю — ${fmt(overpayment)} ₴. ` +
-      `Розрахунок від ${point.basis === "award" ? "суми договору" : "очікуваної вартості"}. ` +
-      `Це ознака ризику, що потребує перевірки.`,
+      `Розрахунок від суми активного рішення про переможця. ` +
+      `Умови поставки, комплектацію та оплату ще треба зіставити. Це різниця з вибіркою, не встановлена переплата чи збиток.`,
     evidence: {
       unit_price: point.price,
       peer_median: median,
       peer_p25: quantile(sorted, 0.25),
       peer_p75: quantile(sorted, 0.75),
       peer_count: peers.length,
+      peer_tender_ids: peers.map(p => p.tender_id),
+      comparison_version: 2,
+      requires_review: true,
+      currency: point.currency,
+      vat_included: point.vat_included,
       ratio,
       quantity: point.quantity,
       overpayment,
@@ -240,6 +270,7 @@ export function detectOwnPriceGrowth(point: PricePoint, group: PriceGroup, now: 
         p.entity_edrpou === point.entity_edrpou &&
         p.tender_id !== point.tender_id &&
         p.date !== null &&
+        comparableHistorical(point, p) &&
         p.date < point.date!,
     )
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -263,18 +294,20 @@ export function detectOwnPriceGrowth(point: PricePoint, group: PriceGroup, now: 
     detector_key: "own_price_growth",
     tier: "own_analysis",
     severity: growth >= 2 ? "high" : growth >= 1 ? "medium" : "low",
-    title: `Той самий замовник підняв ціну на ${Math.round(growth * 100)}%`,
+    title: `Ціна вища за попередню закупівлю на ${Math.round(growth * 100)}%`,
     explanation:
       `Цей замовник раніше купував те саме (код ${point.cpv_code}) по ${fmt(previous.price)} ₴ за ${unit}, ` +
       `тепер — по ${fmt(point.price)} ₴. Зростання на ${Math.round(growth * 100)}%. ` +
       `На обсяг ${fmt(point.quantity)} ${unit} це ${fmt(extra)} ₴ різниці. ` +
-      `Порівняння всередині одного замовника, тож місцеві умови однакові. ` +
-      `Це ознака ризику, що потребує перевірки.`,
+      `Опис, одиниця, валюта та ознака ПДВ збігаються; інші умови потребують перевірки. ` +
+      `Це різниця з попередньою закупівлею, не встановлений збиток.`,
     evidence: {
       unit_price: point.price,
       previous_price: previous.price,
       previous_tender_id: previous.tender_id,
       previous_date: previous.date,
+      comparison_version: 2,
+      requires_review: true,
       previous_description: previous.description,
       description_overlap: describesSameThing(previous.description, point.description),
       growth,

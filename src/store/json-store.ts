@@ -1,4 +1,5 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type {
   Store, TenderRow, TenderItemRow, BidRow, AwardRow, RiskFlagRow,
@@ -24,7 +25,20 @@ export class JsonStore implements Store {
 
   async #write<T>(table: string, rows: T[]): Promise<void> {
     await mkdir(this.#dir, { recursive: true });
-    await writeFile(join(this.#dir, `${table}.json`), JSON.stringify(rows), "utf8");
+    const target = join(this.#dir, `${table}.json`);
+    const temporary = `${target}.${randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(rows), "utf8");
+    await rename(temporary, target);
+  }
+
+  async replaceTenderCards(cards: { tender: TenderRow; items: TenderItemRow[]; bids: BidRow[]; awards: AwardRow[] }[]): Promise<void> {
+    if (!cards.length) return;
+    const ids = new Set(cards.map(c => c.tender.id));
+    // Cursor is committed only after every table succeeds. A failed page is replayed.
+    await this.#write("tender_items", [...(await this.allTenderItems()).filter(r => !ids.has(r.tender_id)), ...cards.flatMap(c => c.items)]);
+    await this.#write("bids", [...(await this.allBids()).filter(r => !ids.has(r.tender_id)), ...cards.flatMap(c => c.bids)]);
+    await this.#write("awards", [...(await this.allAwards()).filter(r => !ids.has(r.tender_id)), ...cards.flatMap(c => c.awards)]);
+    await this.upsertTenders(cards.map(c => c.tender));
   }
 
   async #upsert<T>(table: string, rows: T[], key: (row: T) => string): Promise<void> {

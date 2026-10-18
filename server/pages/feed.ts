@@ -27,12 +27,13 @@ export function feedPage(url: URL): string {
 <div class="results-heading"><h2 id="results-heading">Знайдіть закупівлю</h2><span>Від пошуку до першоджерела</span></div>
 <nav class="scope-nav" aria-label="Територія моніторингу">${scopes.map((s) => `<a href="${esc(keepControls("/", c, { region: s.region, rail: s.rail, page: "1" }))}"${s.active ? ' aria-current="page"' : ""}>${s.label}</a>`).join("")}</nav>
 <div class="scope-caption"><span>${esc(scope)} · поточна вибірка</span><a href="/updates">${latest ? `Останній запуск: ${shortDate(latest.started_at)}${latest.status !== "ok" || latest.errors ? " · є помилки" : ""}` : "Історія оновлень"}</a></div>
+<p class="coverage-note">${ds.ingestion ? `Незалежний збір Prozorro: ${ds.ingestion.historyComplete ? "історичний прохід завершено" : "історія ще завантажується"}. ${ds.ingestion.liveCaughtUp ? "Потік оновлень наздогнано." : "Оновлення ще обробляються."} Переглянуто ${ds.ingestion.scanned.toLocaleString("uk-UA")} записів потоку (включно з повторними змінами).${ds.ingestion.error ? " Є помилка завантаження; повнота не гарантована." : ""}` : "Історичний збір ще не запущено; поточна база неповна."} Харківщина: замовник або місце поставки. Уся Україна — наявні записи, не повне покриття.</p>
 
 <section class="radar-results" aria-labelledby="results-heading">
 
 ${controlBar("/", c, {}, { url })}
 <details class="data-overview"><summary>Огляд даних: суми, сигнали та повнота карток</summary><section class="radar-metrics" aria-label="Показники поточної вибірки">
- <div><span>Закупівлі з ознаками ризику</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>Не всі закупівлі регіону</small></div>
+ <div><span>Закупівлі у вибірці</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>З позначками та без них</small></div>
  <div><span>Загальна сума закупівель</span><strong>${shortMoney(list.reduce((n, x) => n + (x.value_amount ?? 0), 0))}</strong><small>Обсяг закупівель, не збитки</small></div>
  <div><span>Цінові сигнали</span><strong>${signals.toLocaleString("uk-UA")}</strong><small>Потребують перевірки аналогів</small></div>
  <div><span>З деталями у списку</span><strong>${full.toLocaleString("uk-UA")} <em>/ ${list.length.toLocaleString("uk-UA")}</em></strong><small>${full === list.length ? "Деталі є для всієї вибірки" : "Решта можуть мати неповні дані"}</small></div>

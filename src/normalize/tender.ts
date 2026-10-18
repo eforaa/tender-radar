@@ -106,6 +106,8 @@ export function normalizeTender(raw: RawTender): {
       supplier_edrpou: str(supplierId.id),
       supplier_name: str(supplier.name) ?? str(supplierId.legalName),
       amount: num(awardValue.amount),
+      currency: str(awardValue.currency),
+      vat_included: typeof awardValue.valueAddedTaxIncluded === "boolean" ? awardValue.valueAddedTaxIncluded : null,
       status: str(award.status),
       date: str(award.date),
     };

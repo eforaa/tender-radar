@@ -17,6 +17,9 @@ export type TenderRow = {
   officer_email: string | null;
   officer_phone: string | null;
   raw: unknown;
+  fetched_at?: string;
+  source_modified?: string | null;
+  scope_reasons?: string[];
 };
 
 export type TenderItemRow = {
@@ -41,6 +44,8 @@ export type BidRow = {
 };
 
 export type AwardRow = {
+  currency?: string | null;
+  vat_included?: boolean | null;
   tender_id: string;
   award_id: string;
   supplier_edrpou: string | null;
@@ -125,6 +130,8 @@ export type FindingRow = {
 
 /** Narrow persistence surface. Adapters implement it; nothing else may. */
 export interface Store {
+  /** Replace all child rows for each refreshed tender, removing deleted items/bids. */
+  replaceTenderCards(cards: { tender: TenderRow; items: TenderItemRow[]; bids: BidRow[]; awards: AwardRow[] }[]): Promise<void>;
   upsertTenders(rows: TenderRow[]): Promise<void>;
   upsertTenderItems(rows: TenderItemRow[]): Promise<void>;
   upsertBids(rows: BidRow[]): Promise<void>;

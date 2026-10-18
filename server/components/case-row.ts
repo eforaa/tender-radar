@@ -159,7 +159,7 @@ export function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?:
   const tenderHref = `/tender/${encodeURIComponent(entry.tender_id)}${here && !here.startsWith("/tender/") ? `?from=${encodeURIComponent(here)}` : ""}`;
 
   return `<article class="row tender-card sev-${severity}">
-  <div class="card-topline"><span class="card-status">${esc({proven:'Висновок ДАСУ',high:'Ціновий сигнал',medium:'Потребує уваги',clear:'Перевірено ДАСУ',low:'Ознаки ризику'}[severity])}</span>${star("tender", entry.tender_id, here || tenderHref)}</div>
+  <div class="card-topline"><span class="card-status">${esc({proven:'Висновок ДАСУ',high:'Ціновий сигнал',medium:'Потребує уваги',clear:'Перевірено ДАСУ',low:entry.risks.length ? 'Ознаки ризику' : 'Без виявлених сигналів'}[severity])}</span>${star("tender", entry.tender_id, here || tenderHref)}</div>
   <div class="who"><h3 class="card-title"><a href="${esc(tenderHref)}">${esc(title)}</a></h3><div class="card-buyer">${showEntity && buyer && hasOwnTitle ? esc(buyer) : !hasOwnTitle ? 'Назва закупівлі відсутня у списку' : ''}</div></div>
   <div class="card-facts"><div><span>Сума закупівлі</span><strong>${shortMoney(entry.value_amount)}</strong></div><div><span>Оприлюднено</span><strong>${entry.tender_date ? date(entry.tender_date) : 'Немає дати'}</strong></div></div>
   ${signalLine(entry) ? `<p class="card-reason"><span>${severity === "clear" ? "Результат перевірки" : "Чому перевірити"}</span>${signalLine(entry)}</p>` : ''}

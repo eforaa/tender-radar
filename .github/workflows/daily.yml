@@ -35,6 +35,11 @@ jobs:
           npm run typecheck
           npm test
 
+      - name: Підготувати робоче сховище
+        run: |
+          mkdir -p data
+          cp web-data/*.json data/
+
       - name: Оновити дані та проаналізувати
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -46,6 +51,16 @@ jobs:
           # public API and the job has no deadline to meet.
           TR_CONCURRENCY: "4"
         run: npm run daily
+
+      # Exact public source versions are evidence, not assets for the website.
+      - name: Зберегти версії першоджерел
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prozorro-sources-${{ github.run_id }}
+          path: data/source-versions/
+          if-no-files-found: ignore
+          retention-days: 90
 
       - name: Зібрати бандл функції
         run: npm run build:api

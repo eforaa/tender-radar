@@ -1,6 +1,5 @@
-// The daily run. Refreshes every state risk indicator, picks up whatever is
-// new for Kharkiv oblast and the railway branches, fetches the full card for
-// each new tender, and records what changed.
+// The daily run. Scans the independent public feed (live + historical pages),
+// then enriches the corpus with state indicators and runs our own detectors.
 //
 // Safe to run at any hour and safe to run twice: everything is keyed, so a
 // repeat run simply finds nothing new. A crash mid-way loses no data — the
@@ -10,16 +9,16 @@
 // schedule sends every subscriber the digest twice — there is no dedupe.
 import { listRiskRuleIds, fetchRiskReportCsv, fetchRisksPage } from "../src/sources/risks.ts";
 import { normalizeRiskReport, normalizeRiskRules } from "../src/normalize/risk.ts";
-import { fetchTender } from "../src/sources/openprocurement.ts";
-import { normalizeTender } from "../src/normalize/tender.ts";
+import { ingestTenders } from "../src/ingest/tenders.ts";
+
 import { pricePoints, priceGroups, detectPeerPrice, detectOwnPriceGrowth } from "../src/analysis/peer-price.ts";
 import { join } from "node:path";
 import { loadTelegramConfig, buildMessage, sendTelegram, sendTelegramTo, postMessage, pickHighlights } from "../src/notify/telegram.ts";
 import { loadSubscriberConfig, createSubscriberStore } from "../src/store/subscribers.ts";
 import { ensureSchema } from "../src/store/db.ts";
 import { broadcast } from "../src/notify/broadcast.ts";
-import { openStore, REGION, RAILWAY_EDRPOU } from "../src/config.ts";
-import type { RiskFlagRow, TenderRow, TenderItemRow, BidRow, AwardRow, RunRow, FindingRow } from "../src/store/types.ts";
+import { openStore, dataDir } from "../src/config.ts";
+import type { RiskFlagRow, TenderItemRow, AwardRow, RunRow, FindingRow } from "../src/store/types.ts";
 
 const CONCURRENCY = Number(process.env.TR_CONCURRENCY ?? 6);
 /** How many new ids one run stores; the count itself is kept in full. */
@@ -34,28 +33,25 @@ function log(message: string): void {
   console.log(`[${new Date().toISOString().slice(11, 19)}] ${message}`);
 }
 
-/**
- * Flags are kept for the whole country — the main list shows all of Ukraine.
- * Full tender cards are a different matter: fetching one per tender for every
- * region would be tens of thousands of requests, so those stay scoped.
- */
-function wantsFullCard(row: RiskFlagRow): boolean {
-  return row.region === REGION || RAILWAY_EDRPOU.has(row.entity_edrpou ?? "");
-}
-
 let errors = 0;
 let newFlags = 0;
 let detailsFetched = 0;
 let newTenderIds: string[] = [];
 
 try {
+  // The independent public feed runs first. State indicators only enrich the corpus.
+  const ingestion = await ingestTenders(store, {
+    directory: dataDir(), maxPages: Number(process.env.TR_FEED_MAX_PAGES ?? 20),
+    concurrency: CONCURRENCY, log,
+  });
+  detailsFetched = ingestion.fetched;
+  newTenderIds = ingestion.newIds;
   /* ---- 1. state risk indicators ---- */
 
   const before = await store.allRiskFlags();
   const knownFlagKeys = new Set(before.map((f) => `${f.tender_id}|${f.risk_id}`));
-  const knownTenderIds = new Set(before.map((f) => f.tender_id));
 
-  const ruleIds = await listRiskRuleIds();
+  const ruleIds = await listRiskRuleIds().catch(err => { errors++; log(`state indicators unavailable: ${err.message}`); return []; });
   log(`active state indicators: ${ruleIds.length}`);
 
   const freshFlags: RiskFlagRow[] = [];
@@ -82,51 +78,8 @@ try {
     log(`indicator descriptions failed — ${(err as Error).message}`);
   }
 
-  newTenderIds = [...new Set(addedFlags.map((r) => r.tender_id))].filter((id) => !knownTenderIds.has(id));
+  // New tenders are counted from independent ingestion, not state flags.
   log(`new flags: ${newFlags}, on ${newTenderIds.length} tenders not seen before`);
-
-  /* ---- 2. full cards for anything still missing one ---- */
-
-  const haveCards = new Set((await store.allTenders()).map((t) => t.id));
-  const storedFlags = await store.allRiskFlags();
-  const wanted = [...new Set(storedFlags.filter(wantsFullCard).map((f) => f.tender_id))];
-  const missing = wanted.filter((id) => !haveCards.has(id));
-  log(`tender cards wanted ${wanted.length}, missing ${missing.length}`);
-
-  const tenders: TenderRow[] = [];
-  const items: TenderItemRow[] = [];
-  const bids: BidRow[] = [];
-  const awards: AwardRow[] = [];
-
-  async function flush(): Promise<void> {
-    if (tenders.length === 0) return;
-    await store.upsertTenders(tenders.splice(0));
-    await store.upsertTenderItems(items.splice(0));
-    await store.upsertBids(bids.splice(0));
-    await store.upsertAwards(awards.splice(0));
-  }
-
-  const queue = [...missing];
-  async function worker(): Promise<void> {
-    for (;;) {
-      const id = queue.pop();
-      if (!id) return;
-      try {
-        const normalized = normalizeTender(await fetchTender(id));
-        tenders.push(normalized.tender);
-        items.push(...normalized.items);
-        bids.push(...normalized.bids);
-        awards.push(...normalized.awards);
-        detailsFetched++;
-      } catch (err) {
-        errors++;
-        if (errors <= 5) log(`  ${id}: ${(err as Error).message}`);
-      }
-      if (tenders.length >= 200) await flush();
-    }
-  }
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  await flush();
 
   /* ---- 3. our own price analysis over the whole corpus ---- */
 

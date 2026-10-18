@@ -6,7 +6,8 @@
 // stays small enough to ship.
 import { readFile, writeFile, mkdir, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { dataDir } from "../src/config.ts";
+import { dataDir, openStore } from "../src/config.ts";
+import { INGEST_KEY } from "../src/ingest/tenders.ts";
 import type { TenderRow } from "../src/store/types.ts";
 
 const source = dataDir();
@@ -37,6 +38,9 @@ function mb(bytes: number): string {
 }
 
 await mkdir(target, { recursive: true });
+// Export only public coverage, never unrelated internal source cursors.
+const coverage = await openStore().getCursor(INGEST_KEY);
+await writeFile(join(target, "cursors.json"), JSON.stringify(coverage ? [{ [INGEST_KEY]: coverage }] : []));
 
 const present = new Set(await readdir(source));
 let written = 0;

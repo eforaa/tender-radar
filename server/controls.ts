@@ -97,8 +97,8 @@ export function applyControls(cases: Case[], c: Controls, railwayCodes: Set<stri
     );
   }
   if (c.risk) list = list.filter((x) => x.risks.includes(c.risk));
-  if (c.region) list = list.filter((x) => x.region === c.region);
-  if (c.railOnly && !opts.hideRail) list = list.filter((x) => railwayCodes.has(x.entity_edrpou ?? ""));
+  if (c.region) list = list.filter((x) => x.region === c.region || (c.region === "Харківська область" && x.scope_reasons?.some(r => r.startsWith("kharkiv_"))));
+  if (c.railOnly && !opts.hideRail) list = list.filter((x) => railwayCodes.has(x.entity_edrpou ?? "") || x.scope_reasons?.includes("railway"));
   if (c.soloOnly) list = list.filter((x) => x.bidders === 1);
   if (c.priceOnly && !opts.hidePrice) list = list.filter((x) => x.findings.length > 0);
   if (c.audit === "violation") list = list.filter((x) => x.audit?.violation === true);

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { unitPrice, isComparableUnit } from "../src/analysis/unit-price.ts";
 import {
   quantile, pricePoints, priceGroups, detectPeerPrice, detectOwnPriceGrowth,
-  describesSameThing, MIN_PEERS,
+  describesSameThing, MIN_PEERS, comparableHistorical,
   type PricePoint,
 } from "../src/analysis/peer-price.ts";
 import type { TenderRow, TenderItemRow, AwardRow } from "../src/store/types.ts";
@@ -15,7 +15,8 @@ function tender(id: string, amount: number | null, edrpou = "111", date = "2026-
     id, tender_id: `UA-${id}`, title: "t", description: null, status: "active", method: null,
     value_amount: amount, currency: "UAH", date, entity_edrpou: edrpou, entity_name: "КП",
     region: "Харківська область", locality: null,
-    officer_name: null, officer_email: null, officer_phone: null, raw: {},
+    officer_name: null, officer_email: null, officer_phone: null,
+    raw: { awards: [{ id: "a", value: { currency: "UAH", valueAddedTaxIncluded: true } }] },
   };
 }
 function item(tid: string, quantity: number | null, unit = "KWH", cpv: string | null = "09310000-5"): TenderItemRow {
@@ -25,7 +26,7 @@ function item(tid: string, quantity: number | null, unit = "KWH", cpv: string | 
   };
 }
 function award(tid: string, amount: number, status = "active"): AwardRow {
-  return { tender_id: tid, award_id: "a", supplier_edrpou: "9", supplier_name: "ТОВ", amount, status, date: null };
+  return { tender_id: tid, award_id: "a", supplier_edrpou: "9", supplier_name: "ТОВ", amount, status, date: "2026-01-01" };
 }
 function point(
   id: string, price: number, edrpou = "111", date = "2026-01-01",
@@ -33,7 +34,7 @@ function point(
 ): PricePoint {
   return {
     tender_id: id, cpv_code: "09310000-5", cpv_name: null, unit_code: "KWH", unit_name: "кіловат-година",
-    description, price, quantity: 100, basis: "award", entity_edrpou: edrpou, date,
+    description, price, quantity: 100, basis: "award", entity_edrpou: edrpou, date, currency: "UAH", vat_included: true,
   };
 }
 
@@ -90,7 +91,7 @@ test("price points skip tenders whose unit is not comparable", () => {
     ["a", [item("a", 100, "KWH")]],
     ["b", [item("b", 1, "E51")]],
   ]);
-  const points = pricePoints(tenders, items, new Map());
+  const points = pricePoints(tenders, items, new Map([["a", [award("a", 1000)]], ["b", [award("b", 1000)]]]));
   assert.equal(points.length, 1);
   assert.equal(points[0].tender_id, "a");
 });
@@ -146,7 +147,7 @@ test("a tender is not part of its own benchmark", () => {
 /* ---------- a buyer against itself ---------- */
 
 test("reports a buyer whose own price jumped", () => {
-  const older = point("old", 10, "555", "2025-01-01");
+  const older = point("old", 10, "555", "2025-12-01");
   const newer = point("new", 20, "555", "2026-01-01");
   const group = priceGroups([older, newer]).get("09310000-5|KWH")!;
   const finding = detectOwnPriceGrowth(newer, group, "now");
@@ -228,12 +229,29 @@ test("skips an earlier purchase that was a different product", () => {
 });
 
 test("walks back past an unrelated purchase to the matching one", () => {
-  const same = point("older", 800, "555", "2024-01-01", "Щебінь фракції 20-40");
-  const noise = point("mid", 5, "555", "2025-01-01", "Пісок будівельний річковий");
+  const same = point("older", 800, "555", "2025-11-01", "Щебінь фракції 20-40");
+  const noise = point("mid", 5, "555", "2025-12-01", "Пісок будівельний річковий");
   const mine = point("new", 1900, "555", "2026-01-01", "Щебінь фракції 20-40");
   const group = priceGroups([same, noise, mine]).get("09310000-5|KWH")!;
   const finding = detectOwnPriceGrowth(mine, group, "now");
   assert.ok(finding);
   const e = finding.evidence as Record<string, unknown>;
   assert.equal(e.previous_tender_id, "older");
+});
+
+test("historical comparability rejects future, stale, wrong VAT/currency and different specifications", () => {
+  const target = point("a", 30);
+  assert.equal(comparableHistorical(target, point("b", 10)), true);
+  for (const patch of [{ date: "2026-02-01" }, { date: "2024-01-01" }, { currency: "USD" },
+    { vat_included: false }, { vat_included: undefined }, { description: "інший товар" }, { basis: "expected" as const }]) {
+    assert.equal(comparableHistorical(target, { ...point("b", 10), ...patch }), false);
+  }
+});
+
+test("price analysis refuses budgets, pending awards and missing VAT evidence", () => {
+  const t = tender("a", 1000);
+  const items = new Map([["a", [item("a", 10)]]]);
+  assert.equal(pricePoints([t], items, new Map()).length, 0);
+  assert.equal(pricePoints([t], items, new Map([["a", [award("a", 900, "pending")]]])).length, 0);
+  assert.equal(pricePoints([{ ...t, raw: null }], items, new Map([["a", [award("a", 900)]]])).length, 0);
 });

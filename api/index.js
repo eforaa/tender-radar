@@ -2004,7 +2004,8 @@ import { existsSync } from "node:fs";
 import { join as join2 } from "node:path";
 
 // src/store/json-store.ts
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 var JsonStore = class {
   #dir;
@@ -2021,7 +2022,18 @@ var JsonStore = class {
   }
   async #write(table, rows) {
     await mkdir(this.#dir, { recursive: true });
-    await writeFile(join(this.#dir, `${table}.json`), JSON.stringify(rows), "utf8");
+    const target = join(this.#dir, `${table}.json`);
+    const temporary = `${target}.${randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(rows), "utf8");
+    await rename(temporary, target);
+  }
+  async replaceTenderCards(cards) {
+    if (!cards.length) return;
+    const ids = new Set(cards.map((c) => c.tender.id));
+    await this.#write("tender_items", [...(await this.allTenderItems()).filter((r) => !ids.has(r.tender_id)), ...cards.flatMap((c) => c.items)]);
+    await this.#write("bids", [...(await this.allBids()).filter((r) => !ids.has(r.tender_id)), ...cards.flatMap((c) => c.bids)]);
+    await this.#write("awards", [...(await this.allAwards()).filter((r) => !ids.has(r.tender_id)), ...cards.flatMap((c) => c.awards)]);
+    await this.upsertTenders(cards.map((c) => c.tender));
   }
   async #upsert(table, rows, key) {
     if (rows.length === 0) return;
@@ -2120,6 +2132,8 @@ var JsonStore = class {
 var REGION = "\u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0430 \u043E\u0431\u043B\u0430\u0441\u0442\u044C";
 var SOUTHERN_RAILWAY_EDRPOU = "40081216";
 var RAILWAY_EDRPOU = /* @__PURE__ */ new Set([
+  "40075815",
+  // АТ «Укрзалізниця»
   SOUTHERN_RAILWAY_EDRPOU,
   // РФ "Південна залізниця" — the Kharkiv branch
   "40081347",
@@ -2138,6 +2152,7 @@ function railwayScope(entity) {
   const edrpou = entity.entity_edrpou ?? "";
   if (edrpou === SOUTHERN_RAILWAY_EDRPOU) return "southern";
   if (RAILWAY_EDRPOU.has(edrpou)) return "branch";
+  if (/укрзалізниц|українська\s+залізниця|украинская\s+железная\s+дорога/i.test(entity.entity_name ?? "")) return "branch";
   if (entity.region === REGION && RAILWAY_NAME.test(entity.entity_name ?? "")) return "local";
   return null;
 }
@@ -2181,6 +2196,13 @@ function conclusionPublished(row) {
   return asString(conclusion.datePublished) ?? asString(conclusion.dateCreated) ?? row.date_modified;
 }
 
+// src/sources/openprocurement.ts
+var BASE = "https://public-api.prozorro.gov.ua/api/2.5";
+var FEED_START = `${BASE}/tenders?limit=100&descending=1&opt_fields=tenderID,procuringEntity,public_modified`;
+
+// src/ingest/tenders.ts
+var INGEST_KEY = "public-tenders-v1";
+
 // server/data.ts
 function tenderDateOf(tenderRef) {
   const m = /^UA-(\d{4}-\d{2}-\d{2})-/.exec(tenderRef);
@@ -2199,10 +2221,11 @@ function mergeCardDetail(entry, card) {
     method: detail.method ?? null,
     // The flag already carries these; only fall back to the card when the
     // flag itself did not have them, matching the original priority.
-    entity_edrpou: entry.entity_edrpou ?? detail.entity_edrpou ?? null,
-    entity_name: entry.entity_name ?? detail.entity_name ?? null,
-    region: entry.region ?? detail.region ?? null,
-    value_amount: entry.value_amount ?? detail.value_amount ?? null,
+    entity_edrpou: detail.entity_edrpou ?? entry.entity_edrpou ?? null,
+    entity_name: detail.entity_name ?? entry.entity_name ?? null,
+    region: detail.region ?? entry.region ?? null,
+    value_amount: detail.value_amount ?? entry.value_amount ?? null,
+    scope_reasons: detail.scope_reasons,
     officer_name: detail.officer_name ?? null,
     officer_email: detail.officer_email ?? null,
     officer_phone: detail.officer_phone ?? null,
@@ -2221,6 +2244,8 @@ function violationTypes(row) {
 }
 async function loadDataset() {
   const store = openStore();
+  const checkpoint = await store.getCursor(INGEST_KEY);
+  const ingestion = checkpoint ? JSON.parse(checkpoint) : null;
   const flags = await store.allRiskFlags();
   const rules = await store.allRiskRules();
   const tenders = await store.allTenders();
@@ -2272,7 +2297,18 @@ async function loadDataset() {
     bidsByTender.set(bid.tender_id, list);
   }
   const byTender = /* @__PURE__ */ new Map();
-  for (const flag of flags) {
+  const flaggedIds = new Set(flags.map((f) => f.tender_id));
+  const unflagged = tenders.filter((t) => !flaggedIds.has(t.id)).map((t) => ({
+    tender_id: t.id,
+    tender_ref: t.tender_id,
+    risk_id: "",
+    date_assessed: null,
+    region: t.region,
+    entity_edrpou: t.entity_edrpou,
+    entity_name: t.entity_name,
+    value_amount: t.value_amount
+  }));
+  for (const flag of [...flags, ...unflagged]) {
     let entry = byTender.get(flag.tender_id);
     if (!entry) {
       const detail = tenderById.get(flag.tender_id);
@@ -2316,10 +2352,11 @@ async function loadDataset() {
       entry.tender_date = tenderDateOf(flag.tender_ref);
     }
     if (entry.value_amount === null) entry.value_amount = flag.value_amount;
-    if (!entry.risks.includes(flag.risk_id)) entry.risks.push(flag.risk_id);
+    if (flag.risk_id && !entry.risks.includes(flag.risk_id)) entry.risks.push(flag.risk_id);
   }
   const cases = [...byTender.values()];
   return {
+    ingestion,
     cases,
     byTender,
     rules,
@@ -2485,8 +2522,8 @@ function applyControls(cases, c, railwayCodes, opts = {}) {
     );
   }
   if (c.risk) list = list.filter((x) => x.risks.includes(c.risk));
-  if (c.region) list = list.filter((x) => x.region === c.region);
-  if (c.railOnly && !opts.hideRail) list = list.filter((x) => railwayCodes.has(x.entity_edrpou ?? ""));
+  if (c.region) list = list.filter((x) => x.region === c.region || c.region === "\u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0430 \u043E\u0431\u043B\u0430\u0441\u0442\u044C" && x.scope_reasons?.some((r) => r.startsWith("kharkiv_")));
+  if (c.railOnly && !opts.hideRail) list = list.filter((x) => railwayCodes.has(x.entity_edrpou ?? "") || x.scope_reasons?.includes("railway"));
   if (c.soloOnly) list = list.filter((x) => x.bidders === 1);
   if (c.priceOnly && !opts.hidePrice) list = list.filter((x) => x.findings.length > 0);
   if (c.audit === "violation") list = list.filter((x) => x.audit?.violation === true);
@@ -2688,7 +2725,7 @@ function caseRow(entry, opts = {}) {
   const here = currentPath();
   const tenderHref = `/tender/${encodeURIComponent(entry.tender_id)}${here && !here.startsWith("/tender/") ? `?from=${encodeURIComponent(here)}` : ""}`;
   return `<article class="row tender-card sev-${severity}">
-  <div class="card-topline"><span class="card-status">${esc({ proven: "\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0410\u0421\u0423", high: "\u0426\u0456\u043D\u043E\u0432\u0438\u0439 \u0441\u0438\u0433\u043D\u0430\u043B", medium: "\u041F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u0443\u0432\u0430\u0433\u0438", clear: "\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043D\u043E \u0414\u0410\u0421\u0423", low: "\u041E\u0437\u043D\u0430\u043A\u0438 \u0440\u0438\u0437\u0438\u043A\u0443" }[severity])}</span>${star("tender", entry.tender_id, here || tenderHref)}</div>
+  <div class="card-topline"><span class="card-status">${esc({ proven: "\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0410\u0421\u0423", high: "\u0426\u0456\u043D\u043E\u0432\u0438\u0439 \u0441\u0438\u0433\u043D\u0430\u043B", medium: "\u041F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u0443\u0432\u0430\u0433\u0438", clear: "\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043D\u043E \u0414\u0410\u0421\u0423", low: entry.risks.length ? "\u041E\u0437\u043D\u0430\u043A\u0438 \u0440\u0438\u0437\u0438\u043A\u0443" : "\u0411\u0435\u0437 \u0432\u0438\u044F\u0432\u043B\u0435\u043D\u0438\u0445 \u0441\u0438\u0433\u043D\u0430\u043B\u0456\u0432" }[severity])}</span>${star("tender", entry.tender_id, here || tenderHref)}</div>
   <div class="who"><h3 class="card-title"><a href="${esc(tenderHref)}">${esc(title)}</a></h3><div class="card-buyer">${showEntity && buyer && hasOwnTitle ? esc(buyer) : !hasOwnTitle ? "\u041D\u0430\u0437\u0432\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u044F \u0443 \u0441\u043F\u0438\u0441\u043A\u0443" : ""}</div></div>
   <div class="card-facts"><div><span>\u0421\u0443\u043C\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</span><strong>${shortMoney(entry.value_amount)}</strong></div><div><span>\u041E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043E</span><strong>${entry.tender_date ? date(entry.tender_date) : "\u041D\u0435\u043C\u0430\u0454 \u0434\u0430\u0442\u0438"}</strong></div></div>
   ${signalLine(entry) ? `<p class="card-reason"><span>${severity === "clear" ? "\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438" : "\u0427\u043E\u043C\u0443 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438"}</span>${signalLine(entry)}</p>` : ""}
@@ -2903,12 +2940,13 @@ function feedPage(url) {
 <div class="results-heading"><h2 id="results-heading">\u0417\u043D\u0430\u0439\u0434\u0456\u0442\u044C \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E</h2><span>\u0412\u0456\u0434 \u043F\u043E\u0448\u0443\u043A\u0443 \u0434\u043E \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u0430</span></div>
 <nav class="scope-nav" aria-label="\u0422\u0435\u0440\u0438\u0442\u043E\u0440\u0456\u044F \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443">${scopes.map((s) => `<a href="${esc(keepControls("/", c, { region: s.region, rail: s.rail, page: "1" }))}"${s.active ? ' aria-current="page"' : ""}>${s.label}</a>`).join("")}</nav>
 <div class="scope-caption"><span>${esc(scope)} \xB7 \u043F\u043E\u0442\u043E\u0447\u043D\u0430 \u0432\u0438\u0431\u0456\u0440\u043A\u0430</span><a href="/updates">${latest ? `\u041E\u0441\u0442\u0430\u043D\u043D\u0456\u0439 \u0437\u0430\u043F\u0443\u0441\u043A: ${shortDate(latest.started_at)}${latest.status !== "ok" || latest.errors ? " \xB7 \u0454 \u043F\u043E\u043C\u0438\u043B\u043A\u0438" : ""}` : "\u0406\u0441\u0442\u043E\u0440\u0456\u044F \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u044C"}</a></div>
+<p class="coverage-note">${ds.ingestion ? `\u041D\u0435\u0437\u0430\u043B\u0435\u0436\u043D\u0438\u0439 \u0437\u0431\u0456\u0440 Prozorro: ${ds.ingestion.historyComplete ? "\u0456\u0441\u0442\u043E\u0440\u0438\u0447\u043D\u0438\u0439 \u043F\u0440\u043E\u0445\u0456\u0434 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E" : "\u0456\u0441\u0442\u043E\u0440\u0456\u044F \u0449\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u0442\u044C\u0441\u044F"}. ${ds.ingestion.liveCaughtUp ? "\u041F\u043E\u0442\u0456\u043A \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u044C \u043D\u0430\u0437\u0434\u043E\u0433\u043D\u0430\u043D\u043E." : "\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0449\u0435 \u043E\u0431\u0440\u043E\u0431\u043B\u044F\u044E\u0442\u044C\u0441\u044F."} \u041F\u0435\u0440\u0435\u0433\u043B\u044F\u043D\u0443\u0442\u043E ${ds.ingestion.scanned.toLocaleString("uk-UA")} \u0437\u0430\u043F\u0438\u0441\u0456\u0432 \u043F\u043E\u0442\u043E\u043A\u0443 (\u0432\u043A\u043B\u044E\u0447\u043D\u043E \u0437 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u0438\u043C\u0438 \u0437\u043C\u0456\u043D\u0430\u043C\u0438).${ds.ingestion.error ? " \u0404 \u043F\u043E\u043C\u0438\u043B\u043A\u0430 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F; \u043F\u043E\u0432\u043D\u043E\u0442\u0430 \u043D\u0435 \u0433\u0430\u0440\u0430\u043D\u0442\u043E\u0432\u0430\u043D\u0430." : ""}` : "\u0406\u0441\u0442\u043E\u0440\u0438\u0447\u043D\u0438\u0439 \u0437\u0431\u0456\u0440 \u0449\u0435 \u043D\u0435 \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043E; \u043F\u043E\u0442\u043E\u0447\u043D\u0430 \u0431\u0430\u0437\u0430 \u043D\u0435\u043F\u043E\u0432\u043D\u0430."} \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0430: \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0430\u0431\u043E \u043C\u0456\u0441\u0446\u0435 \u043F\u043E\u0441\u0442\u0430\u0432\u043A\u0438. \u0423\u0441\u044F \u0423\u043A\u0440\u0430\u0457\u043D\u0430 \u2014 \u043D\u0430\u044F\u0432\u043D\u0456 \u0437\u0430\u043F\u0438\u0441\u0438, \u043D\u0435 \u043F\u043E\u0432\u043D\u0435 \u043F\u043E\u043A\u0440\u0438\u0442\u0442\u044F.</p>
 
 <section class="radar-results" aria-labelledby="results-heading">
 
 ${controlBar("/", c, {}, { url })}
 <details class="data-overview"><summary>\u041E\u0433\u043B\u044F\u0434 \u0434\u0430\u043D\u0438\u0445: \u0441\u0443\u043C\u0438, \u0441\u0438\u0433\u043D\u0430\u043B\u0438 \u0442\u0430 \u043F\u043E\u0432\u043D\u043E\u0442\u0430 \u043A\u0430\u0440\u0442\u043E\u043A</summary><section class="radar-metrics" aria-label="\u041F\u043E\u043A\u0430\u0437\u043D\u0438\u043A\u0438 \u043F\u043E\u0442\u043E\u0447\u043D\u043E\u0457 \u0432\u0438\u0431\u0456\u0440\u043A\u0438">
- <div><span>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0437\u043D\u0430\u043A\u0430\u043C\u0438 \u0440\u0438\u0437\u0438\u043A\u0443</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>\u041D\u0435 \u0432\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0440\u0435\u0433\u0456\u043E\u043D\u0443</small></div>
+ <div><span>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0443 \u0432\u0438\u0431\u0456\u0440\u0446\u0456</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>\u0417 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0442\u0430 \u0431\u0435\u0437 \u043D\u0438\u0445</small></div>
  <div><span>\u0417\u0430\u0433\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C</span><strong>${shortMoney(list.reduce((n, x) => n + (x.value_amount ?? 0), 0))}</strong><small>\u041E\u0431\u0441\u044F\u0433 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C, \u043D\u0435 \u0437\u0431\u0438\u0442\u043A\u0438</small></div>
  <div><span>\u0426\u0456\u043D\u043E\u0432\u0456 \u0441\u0438\u0433\u043D\u0430\u043B\u0438</span><strong>${signals.toLocaleString("uk-UA")}</strong><small>\u041F\u043E\u0442\u0440\u0435\u0431\u0443\u044E\u0442\u044C \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u0430\u043D\u0430\u043B\u043E\u0433\u0456\u0432</small></div>
  <div><span>\u0417 \u0434\u0435\u0442\u0430\u043B\u044F\u043C\u0438 \u0443 \u0441\u043F\u0438\u0441\u043A\u0443</span><strong>${full.toLocaleString("uk-UA")} <em>/ ${list.length.toLocaleString("uk-UA")}</em></strong><small>${full === list.length ? "\u0414\u0435\u0442\u0430\u043B\u0456 \u0454 \u0434\u043B\u044F \u0432\u0441\u0456\u0454\u0457 \u0432\u0438\u0431\u0456\u0440\u043A\u0438" : "\u0420\u0435\u0448\u0442\u0430 \u043C\u043E\u0436\u0443\u0442\u044C \u043C\u0430\u0442\u0438 \u043D\u0435\u043F\u043E\u0432\u043D\u0456 \u0434\u0430\u043D\u0456"}</small></div>
