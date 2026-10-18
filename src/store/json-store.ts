@@ -1,4 +1,5 @@
-import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename, unlink } from "node:fs/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type {
@@ -28,7 +29,17 @@ export class JsonStore implements Store {
     const target = join(this.#dir, `${table}.json`);
     const temporary = `${target}.${randomUUID()}.tmp`;
     await writeFile(temporary, JSON.stringify(rows), "utf8");
-    await rename(temporary, target);
+    try {
+      // Windows readers / OneDrive can briefly hold the destination open.
+      // Retry the atomic replacement; never truncate the live table as fallback.
+      for (let attempt = 0; ; attempt++) {
+        try { await rename(temporary, target); break; }
+        catch (error) {
+          if (attempt >= 10 || !["EPERM", "EBUSY", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+          await delay(100 * (attempt + 1));
+        }
+      }
+    } finally { await unlink(temporary).catch(error => { if (error.code !== "ENOENT") throw error; }); }
   }
 
   async replaceTenderCards(cards: { tender: TenderRow; items: TenderItemRow[]; bids: BidRow[]; awards: AwardRow[] }[]): Promise<void> {

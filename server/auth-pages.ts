@@ -32,7 +32,7 @@ a.btn:hover{filter:brightness(1.08)}
 function shell(title: string, body: string): string {
   return `<!doctype html>
 <html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} — Tender Radar</title>
+<title>${esc(title)} — ТендоScope</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -44,7 +44,7 @@ function shell(title: string, body: string): string {
 export function loginPage(): string {
   return shell(
     "Вхід",
-    `<h1>Tender Radar</h1>
+    `<h1>ТендоScope</h1>
 <p>Доступ до сайту відкрито для перевірених облікових записів. Увійдіть через Google, щоб продовжити.</p>
 <a class="btn" href="/auth/login">Увійти через Google</a>`,
   );

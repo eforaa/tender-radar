@@ -2,7 +2,9 @@
 // other tenders that bought the same thing, and against the same buyer's own
 // earlier purchase.
 import { pricePoints, priceGroups, detectPeerPrice, detectOwnPriceGrowth } from "../src/analysis/peer-price.ts";
-import { openStore } from "../src/config.ts";
+import { openStore, dataDir } from "../src/config.ts";
+import { readMarketPrices } from "../src/ingest/market.ts";
+import { detectMarketPrice } from "../src/analysis/market-price.ts";
 import type { FindingRow, TenderItemRow, AwardRow } from "../src/store/types.ts";
 
 const store = openStore();
@@ -33,7 +35,10 @@ console.log(`${tenders.length} tenders → ${points.length} with a comparable un
 console.log(`grouped into ${groups.size} subject/unit buckets`);
 
 const findings: FindingRow[] = [];
+const market = await readMarketPrices(dataDir());
 for (const point of points) {
+  const marketFinding = detectMarketPrice(point, market, now);
+  if (marketFinding) findings.push(marketFinding);
   const group = groups.get(`${point.cpv_code}|${point.unit_code}`);
   if (!group) continue;
   const peer = detectPeerPrice(point, group, now);
@@ -42,7 +47,7 @@ for (const point of points) {
   if (growth) findings.push(growth);
 }
 
-await store.replaceDetectorFindings(["peer_price", "own_price_growth"], findings);
+await store.replaceDetectorFindings(["peer_price", "own_price_growth", "market_price"], findings);
 
 const bySeverity = { high: 0, medium: 0, low: 0 };
 const byDetector: Record<string, number> = {};

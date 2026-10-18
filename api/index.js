@@ -557,6 +557,7 @@ body .wrap{padding-top:32px}body[data-nav="feed"] .wrap{padding-top:0}.railway-h
 .compact-pager .jump input::-webkit-inner-spin-button,.compact-pager .jump input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .pager.compact-pager .jump button{height:44px;min-height:44px;width:36px;padding:0;border:0;background:transparent;font-size:20px}
 @media(max-width:360px){.top .inner{gap:6px;padding-inline:14px}.top .menu-trigger{padding-left:4px}.pager.compact-pager{gap:8px}}
+@media(min-width:64rem){.top .inner{max-width:none;flex-wrap:nowrap;padding-inline:clamp(24px,3vw,56px);gap:16px}.top .brand{margin-right:auto}.top .nav{margin-left:0;flex-wrap:nowrap}.top .starred-btn,.top .theme-btn,.top .menu-trigger{flex-shrink:0}}
 `;
 
 // server/favourite-interaction.ts
@@ -1390,12 +1391,13 @@ function layout(opts) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(opts.title)} \u2014 \u0422\u0435\u043D\u0434\u043E\u0441\u043A\u043E\u043F</title>
+<title>${esc(opts.title)} \u2014 \u0422\u0435\u043D\u0434\u043EScope</title>
 <meta name="description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
-<meta property="og:site_name" content="\u0422\u0435\u043D\u0434\u043E\u0441\u043A\u043E\u043F">
+<meta property="og:site_name" content="\u0422\u0435\u043D\u0434\u043EScope">
+${opts.nav === "feed" && siteOrigin() ? `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite", name: "\u0422\u0435\u043D\u0434\u043EScope", url: siteOrigin() + "/" }).replace(/</g, "\\u003c")}</script>` : ""}
 <meta property="og:type" content="website">
 <meta property="og:locale" content="uk_UA">
-<meta property="og:title" content="${esc(opts.title)} \u2014 \u0422\u0435\u043D\u0434\u043E\u0441\u043A\u043E\u043F">
+<meta property="og:title" content="${esc(opts.title)} \u2014 \u0422\u0435\u043D\u0434\u043EScope">
 <meta property="og:description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2042%2042%22%20color%3D%22%23172a20%22%3E%3Cpath%20d%3D%22M24%206A13%2013%200%201%200%2010%2029%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%224.5%22%2F%3E%3Cpath%20d%3D%22M28%2010A13%2013%200%200%201%2028%2025%22%20fill%3D%22none%22%20stroke%3D%22%23187443%22%20stroke-width%3D%224.5%22%2F%3E%3Cpath%20d%3D%22m28%2029%208%208%22%20stroke%3D%22%23187443%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20d%3D%22M8%2016%2010%2012Q11%2010%2014%2010H23A3%203%200%200%201%2023%2016Z%22%20fill%3D%22currentColor%22%2F%3E%3Cpath%20d%3D%22M15%2024Q15%2020%2021%2018V29L15%2033Z%22%20fill%3D%22currentColor%22%2F%3E%3Cpath%20d%3D%22M21%2018V23L15%2029V24Q15%2020%2021%2018Z%22%20fill%3D%22%23187443%22%2F%3E%3C%2Fsvg%3E">
 
@@ -1418,7 +1420,7 @@ ${STUDIO_STYLES}</style>
 <a class="skip" href="#main">\u0414\u043E \u0432\u043C\u0456\u0441\u0442\u0443</a>
 
 <header class="top"><div class="inner">
-  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 42 42" aria-hidden="true"><path d="M24 6A13 13 0 1 0 10 29" fill="none" stroke="currentColor" stroke-width="4.5"/><path d="M28 10A13 13 0 0 1 28 25" fill="none" stroke="#187443" stroke-width="4.5"/><path d="m28 29 8 8" stroke="#187443" stroke-width="5" stroke-linecap="round"/><path d="M8 16 10 12Q11 10 14 10H23A3 3 0 0 1 23 16Z" fill="currentColor"/><path d="M15 24Q15 20 21 18V29L15 33Z" fill="currentColor"/><path d="M21 18V23L15 29V24Q15 20 21 18Z" fill="#187443"/></svg><span class="brand-word">\u0422\u0435\u043D\u0434\u043E\u0441\u043A\u043E\u043F</span></a>
+  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 42 42" aria-hidden="true"><path d="M24 6A13 13 0 1 0 10 29" fill="none" stroke="currentColor" stroke-width="4.5"/><path d="M28 10A13 13 0 0 1 28 25" fill="none" stroke="#187443" stroke-width="4.5"/><path d="m28 29 8 8" stroke="#187443" stroke-width="5" stroke-linecap="round"/><path d="M8 16 10 12Q11 10 14 10H23A3 3 0 0 1 23 16Z" fill="currentColor"/><path d="M15 24Q15 20 21 18V29L15 33Z" fill="currentColor"/><path d="M21 18V23L15 29V24Q15 20 21 18Z" fill="#187443"/></svg><span class="brand-word">\u0422\u0435\u043D\u0434\u043EScope</span></a>
   <nav class="nav" aria-label="\u041E\u0441\u043D\u043E\u0432\u043D\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</a>
@@ -1992,7 +1994,7 @@ function reportHtml(ctx) {
 <div class="sheet">
   <h1>${esc(title)}</h1>
   <div class="ref">${esc(entry.tender_ref || entry.tender_id)}</div>
-  <div class="made">Tender Radar \xB7 \u0437\u0432\u0456\u0442 \u0441\u0444\u043E\u0440\u043C\u043E\u0432\u0430\u043D\u043E ${esc(day(ctx.generatedAt))}</div>
+  <div class="made">\u0422\u0435\u043D\u0434\u043EScope \xB7 \u0437\u0432\u0456\u0442 \u0441\u0444\u043E\u0440\u043C\u043E\u0432\u0430\u043D\u043E ${esc(day(ctx.generatedAt))}</div>
   ${body}
 </div>
 </body>
@@ -2004,7 +2006,8 @@ import { existsSync } from "node:fs";
 import { join as join2 } from "node:path";
 
 // src/store/json-store.ts
-import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename, unlink } from "node:fs/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 var JsonStore = class {
@@ -2025,7 +2028,21 @@ var JsonStore = class {
     const target = join(this.#dir, `${table}.json`);
     const temporary = `${target}.${randomUUID()}.tmp`;
     await writeFile(temporary, JSON.stringify(rows), "utf8");
-    await rename(temporary, target);
+    try {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await rename(temporary, target);
+          break;
+        } catch (error) {
+          if (attempt >= 10 || !["EPERM", "EBUSY", "EACCES"].includes(error.code ?? "")) throw error;
+          await delay(100 * (attempt + 1));
+        }
+      }
+    } finally {
+      await unlink(temporary).catch((error) => {
+        if (error.code !== "ENOENT") throw error;
+      });
+    }
   }
   async replaceTenderCards(cards) {
     if (!cards.length) return;
@@ -2253,7 +2270,7 @@ async function loadDataset() {
   const bids = await store.allBids();
   const runs = await store.allRuns();
   const findings = (await store.allFindings()).filter(
-    (row) => row.detector_key === "peer_price" || row.detector_key === "own_price_growth"
+    (row) => ["peer_price", "own_price_growth", "market_price"].includes(row.detector_key)
   );
   const monitorings = await store.allMonitorings();
   const monitoringsByTender = /* @__PURE__ */ new Map();
@@ -2933,14 +2950,13 @@ function feedPage(url) {
   const signals = list.reduce((n, x) => n + x.findings.length, 0);
   return layout({ title: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", nav: "feed", body: `
 <section class="studio-hero">
- <div class="studio-copy"><span class="studio-eyebrow">\u0422\u0415\u041D\u0414\u041E\u0421\u041A\u041E\u041F / \u041C\u041E\u041D\u0406\u0422\u041E\u0420\u0418\u041D\u0413 \u0417\u0410\u041A\u0423\u041F\u0406\u0412\u0415\u041B\u042C</span><h1>\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u043A\u043E\u0448\u0442\u0438.<br><span>\u041F\u0440\u043E\u0437\u043E\u0440\u0456 \u0440\u0456\u0448\u0435\u043D\u043D\u044F.</span></h1><p>\u0417\u043D\u0430\u0439\u0434\u0456\u0442\u044C \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E, \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0441\u0438\u0433\u043D\u0430\u043B\u0438 \u0440\u0438\u0437\u0438\u043A\u0443 \u0442\u0430 \u0432\u0456\u0434\u043A\u0440\u0438\u0439\u0442\u0435 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E.</p><a class="studio-help" href="/about">\u042F\u043A \u043F\u0440\u0430\u0446\u044E\u0454 \u0440\u0430\u0434\u0430\u0440 <span aria-hidden="true">\u2197</span></a></div>
+ <div class="studio-copy"><span class="studio-eyebrow">\u0422\u0435\u043D\u0434\u043EScope / \u041C\u041E\u041D\u0406\u0422\u041E\u0420\u0418\u041D\u0413 \u0417\u0410\u041A\u0423\u041F\u0406\u0412\u0415\u041B\u042C</span><h1>\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u043A\u043E\u0448\u0442\u0438.<br><span>\u041F\u0440\u043E\u0437\u043E\u0440\u0456 \u0440\u0456\u0448\u0435\u043D\u043D\u044F.</span></h1><p>\u0417\u043D\u0430\u0439\u0434\u0456\u0442\u044C \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E, \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0441\u0438\u0433\u043D\u0430\u043B\u0438 \u0440\u0438\u0437\u0438\u043A\u0443 \u0442\u0430 \u0432\u0456\u0434\u043A\u0440\u0438\u0439\u0442\u0435 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E.</p><a class="studio-help" href="/about">\u042F\u043A \u043F\u0440\u0430\u0446\u044E\u0454 \u0440\u0430\u0434\u0430\u0440 <span aria-hidden="true">\u2197</span></a></div>
  <div class="studio-visual" aria-label="\u0414\u0430\u043D\u0456 \u043F\u043E\u0442\u043E\u0447\u043D\u043E\u0457 \u0432\u0438\u0431\u0456\u0440\u043A\u0438"><div class="studio-orbit" aria-hidden="true"></div><div class="studio-stat"><span>\u0417\u0410\u041A\u0423\u041F\u0406\u0412\u041B\u0406 \u0412 \u041F\u041E\u0422\u041E\u0427\u041D\u0406\u0419 \u0412\u0418\u0411\u0406\u0420\u0426\u0406</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0456 \u0434\u0430\u043D\u0456 \u0434\u043B\u044F \u0432\u0430\u0448\u043E\u0457 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438</small><div class="studio-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="studio-signal"><span class="studio-dot" aria-hidden="true"></span><div><strong>${signals.toLocaleString("uk-UA")} \u0446\u0456\u043D\u043E\u0432\u0438\u0445 \u0441\u0438\u0433\u043D\u0430\u043B\u0456\u0432</strong><small>\u0421\u0438\u0433\u043D\u0430\u043B \u2014 \u043F\u0440\u0438\u0432\u0456\u0434 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438, \u0430 \u043D\u0435 \u0437\u0432\u0438\u043D\u0443\u0432\u0430\u0447\u0435\u043D\u043D\u044F</small></div></div></div>
 </section>
 <section class="studio-workspace" aria-label="\u041F\u043E\u0448\u0443\u043A \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C">
 <div class="results-heading"><h2 id="results-heading">\u0417\u043D\u0430\u0439\u0434\u0456\u0442\u044C \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E</h2><span>\u0412\u0456\u0434 \u043F\u043E\u0448\u0443\u043A\u0443 \u0434\u043E \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u0430</span></div>
 <nav class="scope-nav" aria-label="\u0422\u0435\u0440\u0438\u0442\u043E\u0440\u0456\u044F \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443">${scopes.map((s) => `<a href="${esc(keepControls("/", c, { region: s.region, rail: s.rail, page: "1" }))}"${s.active ? ' aria-current="page"' : ""}>${s.label}</a>`).join("")}</nav>
 <div class="scope-caption"><span>${esc(scope)} \xB7 \u043F\u043E\u0442\u043E\u0447\u043D\u0430 \u0432\u0438\u0431\u0456\u0440\u043A\u0430</span><a href="/updates">${latest ? `\u041E\u0441\u0442\u0430\u043D\u043D\u0456\u0439 \u0437\u0430\u043F\u0443\u0441\u043A: ${shortDate(latest.started_at)}${latest.status !== "ok" || latest.errors ? " \xB7 \u0454 \u043F\u043E\u043C\u0438\u043B\u043A\u0438" : ""}` : "\u0406\u0441\u0442\u043E\u0440\u0456\u044F \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u044C"}</a></div>
-<p class="coverage-note">${ds.ingestion ? `\u041D\u0435\u0437\u0430\u043B\u0435\u0436\u043D\u0438\u0439 \u0437\u0431\u0456\u0440 Prozorro: ${ds.ingestion.historyComplete ? "\u0456\u0441\u0442\u043E\u0440\u0438\u0447\u043D\u0438\u0439 \u043F\u0440\u043E\u0445\u0456\u0434 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E" : "\u0456\u0441\u0442\u043E\u0440\u0456\u044F \u0449\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0443\u0454\u0442\u044C\u0441\u044F"}. ${ds.ingestion.liveCaughtUp ? "\u041F\u043E\u0442\u0456\u043A \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u044C \u043D\u0430\u0437\u0434\u043E\u0433\u043D\u0430\u043D\u043E." : "\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0449\u0435 \u043E\u0431\u0440\u043E\u0431\u043B\u044F\u044E\u0442\u044C\u0441\u044F."} \u041F\u0435\u0440\u0435\u0433\u043B\u044F\u043D\u0443\u0442\u043E ${ds.ingestion.scanned.toLocaleString("uk-UA")} \u0437\u0430\u043F\u0438\u0441\u0456\u0432 \u043F\u043E\u0442\u043E\u043A\u0443 (\u0432\u043A\u043B\u044E\u0447\u043D\u043E \u0437 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u0438\u043C\u0438 \u0437\u043C\u0456\u043D\u0430\u043C\u0438).${ds.ingestion.error ? " \u0404 \u043F\u043E\u043C\u0438\u043B\u043A\u0430 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F; \u043F\u043E\u0432\u043D\u043E\u0442\u0430 \u043D\u0435 \u0433\u0430\u0440\u0430\u043D\u0442\u043E\u0432\u0430\u043D\u0430." : ""}` : "\u0406\u0441\u0442\u043E\u0440\u0438\u0447\u043D\u0438\u0439 \u0437\u0431\u0456\u0440 \u0449\u0435 \u043D\u0435 \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043E; \u043F\u043E\u0442\u043E\u0447\u043D\u0430 \u0431\u0430\u0437\u0430 \u043D\u0435\u043F\u043E\u0432\u043D\u0430."} \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0430: \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0430\u0431\u043E \u043C\u0456\u0441\u0446\u0435 \u043F\u043E\u0441\u0442\u0430\u0432\u043A\u0438. \u0423\u0441\u044F \u0423\u043A\u0440\u0430\u0457\u043D\u0430 \u2014 \u043D\u0430\u044F\u0432\u043D\u0456 \u0437\u0430\u043F\u0438\u0441\u0438, \u043D\u0435 \u043F\u043E\u0432\u043D\u0435 \u043F\u043E\u043A\u0440\u0438\u0442\u0442\u044F.</p>
 
 <section class="radar-results" aria-labelledby="results-heading">
 
@@ -3286,6 +3302,7 @@ ${entry.findings.map((f) => {
       return `<div class="card">
   <h3><span class="tier own">\u041F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043C\u0438</span> &nbsp;${esc(f.title)}</h3>
   <p class="lead">${esc(f.explanation)}</p>
+  ${typeof e.source_url === "string" && e.source_url.startsWith("https://market-api.prozorro.gov.ua/api/prices/") ? `<p><a href="${esc(e.source_url)}" target="_blank" rel="noopener noreferrer">\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0434\u0436\u0435\u0440\u0435\u043B\u043E \u0446\u0456\u043D\u0438 \u2197</a></p>` : ""}
   <dl class="facts">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl>
 </div>`;
     }).join("")}` : ""}
@@ -3959,33 +3976,35 @@ function pricesPage(url) {
   const withFindings = dataset().cases.filter((c2) => c2.findings.length > 0);
   const gapOf = (c2) => c2.findings.reduce((total, f) => {
     const e = f.evidence;
-    return total + (e.overpayment ?? e.extra_cost ?? 0);
+    return Math.max(total, e.overpayment ?? e.extra_cost ?? 0);
   }, 0);
   const totalGap = withFindings.reduce((t, c2) => t + gapOf(c2), 0);
   const peer = withFindings.filter((c2) => c2.findings.some((f) => f.detector_key === "peer_price")).length;
   const growth = withFindings.filter((c2) => c2.findings.some((f) => f.detector_key === "own_price_growth")).length;
+  const market = withFindings.filter((c2) => c2.findings.some((f) => f.detector_key === "market_price")).length;
   const c = readControls(url);
   const list = applyControls(withFindings, c, RAILWAY_EDRPOU, { hidePrice: true });
   return layout({
-    title: "\u0417\u0430\u0432\u0438\u0449\u0435\u043D\u0456 \u0446\u0456\u043D\u0438",
+    title: "\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0430 \u0446\u0456\u043D",
     nav: "prices",
     body: `
 <h1>\u0414\u0435 \u0446\u0456\u043D\u0430 \u0432\u0438\u0433\u043B\u044F\u0434\u0430\u0454 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u043E\u044E</h1>
-<p class="sub">\u0420\u0430\u0445\u0443\u0454\u043C\u043E \u0441\u0430\u043C\u0456: \u0446\u0456\u043D\u0430 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E \u043F\u0440\u043E\u0442\u0438 \u0456\u043D\u0448\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456 \u043F\u0440\u043E\u0442\u0438 \u043C\u0438\u043D\u0443\u043B\u0438\u0445 \u0446\u0456\u043D \u0446\u044C\u043E\u0433\u043E \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430.</p>
+<p class="sub">\u041F\u043E\u0440\u0456\u0432\u043D\u044E\u0454\u043C\u043E \u0437 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456\u043C\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438 \u0442\u0430 \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u043E\u044E Prozorro Market. \u041A\u043E\u0436\u0435\u043D \u0441\u0438\u0433\u043D\u0430\u043B \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u0443\u043C\u043E\u0432.</p>
 
 <p class="statline">
-  <b>${withFindings.length}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u043E\u044E \u0446\u0456\u043D\u043E\u044E \xB7
-  <b>${shortMoney(totalGap)}</b> \u0440\u0456\u0437\u043D\u0438\u0446\u044F \u043F\u0440\u043E\u0442\u0438 \u0437\u0432\u0438\u0447\u0430\u0439\u043D\u043E\u0457 \u0446\u0456\u043D\u0438 \xB7
+  <b>${withFindings.length}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \xB7
+  <b>${shortMoney(totalGap)}</b> \u0440\u0456\u0437\u043D\u0438\u0446\u044F \u0437 \u0456\u043D\u0448\u0438\u043C\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u043C\u0438 \xB7
   <b>${peer}</b> \u0434\u043E\u0440\u043E\u0436\u0447\u0435, \u043D\u0456\u0436 \u0432 \u0456\u043D\u0448\u0438\u0445 \xB7
-  <b>${growth}</b> \u0434\u043E\u0440\u043E\u0436\u0447\u0435, \u043D\u0456\u0436 \u0431\u0443\u043B\u043E \u0442\u043E\u0440\u0456\u043A
+  <b>${growth}</b> \u0434\u043E\u0440\u043E\u0436\u0447\u0435 \u0437\u0430 \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \xB7
+  <b>${market}</b> \u0441\u0438\u0433\u043D\u0430\u043B\u0438 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0443
 </p>
 
 <details class="help">
   <summary>\u042F\u043A \u043C\u0438 \u0446\u0435 \u0440\u0430\u0445\u0443\u0454\u043C\u043E</summary>
   <div class="inner">
-    <p>\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0440\u0430\u0445\u0443\u0454\u043C\u043E <strong>\u0446\u0456\u043D\u0443 \u0437\u0430 \u043E\u0434\u0438\u043D\u0438\u0446\u044E</strong>: \u0441\u0443\u043C\u0443 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443 \u0434\u0456\u043B\u0438\u043C\u043E \u043D\u0430 \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C. \u041D\u0430\u043F\u0440\u0438\u043A\u043B\u0430\u0434, 4 \u043C\u043B\u043D \u0433\u0440\u043D \u0437\u0430 200 \u0445\u043E\u043B\u043E\u0434\u0438\u043B\u044C\u043D\u0438\u043A\u0456\u0432 \u2014 \u0446\u0435 20 \u0442\u0438\u0441\u044F\u0447 \u0437\u0430 \u0448\u0442\u0443\u043A\u0443.</p>
+    <p>\u0420\u0430\u0445\u0443\u0454\u043C\u043E \u0446\u0456\u043D\u0443 \u043E\u0434\u0438\u043D\u0438\u0446\u0456 \u043B\u0438\u0448\u0435 \u0434\u043B\u044F \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0434\u043D\u0456\u0454\u044E \u043F\u043E\u0437\u0438\u0446\u0456\u0454\u044E \u0442\u0430 \u043E\u0434\u043D\u0438\u043C \u0430\u043A\u0442\u0438\u0432\u043D\u0438\u043C \u0440\u0456\u0448\u0435\u043D\u043D\u044F\u043C \u043F\u0440\u043E \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F. \u041E\u0447\u0456\u043A\u0443\u0432\u0430\u043D\u0438\u0439 \u0431\u044E\u0434\u0436\u0435\u0442 \u043D\u0435 \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u043C\u043E.</p>
     <p>\u0414\u0430\u043B\u0456 \u0448\u0443\u043A\u0430\u0454\u043C\u043E, \u0437\u0430 \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0442\u0435 \u0441\u0430\u043C\u0435 \u043A\u0443\u043F\u0443\u0432\u0430\u043B\u0438 \u0456\u043D\u0448\u0456, \u0456 \u0431\u0435\u0440\u0435\u043C\u043E \u0441\u0435\u0440\u0435\u0434\u0438\u043D\u0443. \u042F\u043A\u0449\u043E \u0446\u0456\u043D\u0430 \u043F\u043E\u043C\u0456\u0442\u043D\u043E \u0432\u0438\u0449\u0430 \u0437\u0430 \u0441\u0435\u0440\u0435\u0434\u0438\u043D\u0443 \u2014 \u043F\u043E\u043A\u0430\u0437\u0443\u0454\u043C\u043E.</p>
-    <p>\u041E\u043A\u0440\u0435\u043C\u043E \u043F\u043E\u0440\u0456\u0432\u043D\u044E\u0454\u043C\u043E \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430 \u0437 \u043D\u0438\u043C \u0441\u0430\u043C\u0438\u043C: \u0441\u043A\u0456\u043B\u044C\u043A\u0438 \u0432\u0456\u043D \u043F\u043B\u0430\u0442\u0438\u0432 \u0437\u0430 \u0446\u0435 \u0440\u0430\u043D\u0456\u0448\u0435. \u0422\u0443\u0442 \u043C\u0456\u0441\u0446\u0435\u0432\u0456 \u0443\u043C\u043E\u0432\u0438 \u043E\u0434\u043D\u0430\u043A\u043E\u0432\u0456, \u0442\u043E\u0436 \u0441\u0442\u0440\u0438\u0431\u043E\u043A \u0446\u0456\u043D\u0438 \u0441\u043A\u043B\u0430\u0434\u043D\u0456\u0448\u0435 \u043F\u043E\u044F\u0441\u043D\u0438\u0442\u0438.</p>
+    <p>\u0414\u043B\u044F \u043F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E \u0434\u0430\u0442\u0443, \u043E\u0434\u043D\u0430\u043A\u043E\u0432\u0438\u0439 \u043E\u043F\u0438\u0441, \u043E\u0434\u0438\u043D\u0438\u0446\u044E, \u0432\u0430\u043B\u044E\u0442\u0443 \u0442\u0430 \u041F\u0414\u0412. \u0414\u043B\u044F \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0443 \u043F\u043E\u0442\u0440\u0456\u0431\u043D\u0430 \u043E\u0434\u043D\u043E\u0437\u043D\u0430\u0447\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u043D\u0456\u0441\u0442\u044C \u043D\u0430\u0437\u0432\u0438 \u0442\u0430 \u0446\u0456\u043D\u0430 \u043D\u0435 \u043F\u0456\u0437\u043D\u0456\u0448\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0434\u0430\u0432\u043D\u0456\u0441\u0442\u044E \u0434\u043E 30 \u0434\u043D\u0456\u0432, \u0456\u0437 \u0432\u0438\u0431\u0456\u0440\u043A\u0438 \u0449\u043E\u043D\u0430\u0439\u043C\u0435\u043D\u0448\u0435 5 \u0441\u043F\u043E\u0441\u0442\u0435\u0440\u0435\u0436\u0435\u043D\u044C. \u0414\u043E\u0441\u0442\u0430\u0432\u043A\u0430, \u043A\u043E\u043C\u043F\u043B\u0435\u043A\u0442\u0430\u0446\u0456\u044F \u0439 \u0443\u043C\u043E\u0432\u0438 \u043E\u043F\u043B\u0430\u0442\u0438 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u044E\u0442\u044C \u043E\u043A\u0440\u0435\u043C\u043E\u0457 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438.</p>
     <p><strong>\u041C\u0438 \u043C\u043E\u0432\u0447\u0438\u043C\u043E, \u043A\u043E\u043B\u0438 \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u0442\u0438 \u0447\u0435\u0441\u043D\u043E \u043D\u0435 \u043C\u043E\u0436\u043D\u0430.</strong> \u0420\u0435\u043C\u043E\u043D\u0442\u0438 \u0439 \u043F\u043E\u0441\u043B\u0443\u0433\u0438 \u043D\u0435 \u043F\u043E\u0440\u0456\u0432\u043D\u044E\u0454\u043C\u043E \u2014 \u043A\u043E\u0436\u0435\u043D \u043E\u0431'\u0454\u043A\u0442 \u0441\u0432\u0456\u0439. \u041D\u0435 \u043F\u043E\u0440\u0456\u0432\u043D\u044E\u0454\u043C\u043E \u0439 \u0442\u043E\u0432\u0430\u0440\u0438 \u0432\u0441\u0435\u0440\u0435\u0434\u0438\u043D\u0456 \u043D\u0430\u0434\u0442\u043E \u0448\u0438\u0440\u043E\u043A\u043E\u0433\u043E \u043A\u043E\u0434\u0443: \u043F\u0456\u0434 \u043E\u0434\u043D\u0438\u043C \u043A\u043E\u0434\u043E\u043C \u043C\u043E\u0436\u0443\u0442\u044C \u0431\u0443\u0442\u0438 \u0456 \u043F\u0440\u043E\u043A\u043B\u0430\u0434\u043A\u0430 \u0437\u0430 400 \u0433\u0440\u043D, \u0456 \u0440\u0435\u0434\u0443\u043A\u0442\u043E\u0440 \u0437\u0430 \u043C\u0456\u043B\u044C\u0439\u043E\u043D.</p>
   </div>
 </details>
@@ -4119,7 +4138,7 @@ a.btn:hover{filter:brightness(1.08)}
 function shell(title, body) {
   return `<!doctype html>
 <html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} \u2014 Tender Radar</title>
+<title>${esc(title)} \u2014 \u0422\u0435\u043D\u0434\u043EScope</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -4130,7 +4149,7 @@ function shell(title, body) {
 function loginPage() {
   return shell(
     "\u0412\u0445\u0456\u0434",
-    `<h1>Tender Radar</h1>
+    `<h1>\u0422\u0435\u043D\u0434\u043EScope</h1>
 <p>\u0414\u043E\u0441\u0442\u0443\u043F \u0434\u043E \u0441\u0430\u0439\u0442\u0443 \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u043E \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043D\u0438\u0445 \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0438\u0445 \u0437\u0430\u043F\u0438\u0441\u0456\u0432. \u0423\u0432\u0456\u0439\u0434\u0456\u0442\u044C \u0447\u0435\u0440\u0435\u0437 Google, \u0449\u043E\u0431 \u043F\u0440\u043E\u0434\u043E\u0432\u0436\u0438\u0442\u0438.</p>
 <a class="btn" href="/auth/login">\u0423\u0432\u0456\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 Google</a>`
   );

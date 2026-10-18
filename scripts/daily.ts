@@ -10,6 +10,8 @@
 import { listRiskRuleIds, fetchRiskReportCsv, fetchRisksPage } from "../src/sources/risks.ts";
 import { normalizeRiskReport, normalizeRiskRules } from "../src/normalize/risk.ts";
 import { ingestTenders } from "../src/ingest/tenders.ts";
+import { ingestMarket, readMarketPrices } from "../src/ingest/market.ts";
+import { detectMarketPrice } from "../src/analysis/market-price.ts";
 
 import { pricePoints, priceGroups, detectPeerPrice, detectOwnPriceGrowth } from "../src/analysis/peer-price.ts";
 import { join } from "node:path";
@@ -101,9 +103,14 @@ try {
   }
 
   const points = pricePoints(allTenders, itemsByTender, awardsByTender);
+  try { await ingestMarket(dataDir(), Number(process.env.TR_MARKET_MAX_PAGES ?? 6)); }
+  catch (error) { errors++; log(`market ingestion failed: ${(error as Error).message}`); }
+  const market = await readMarketPrices(dataDir());
   const groups = priceGroups(points);
   const findings: FindingRow[] = [];
   for (const point of points) {
+    const marketFinding = detectMarketPrice(point, market, runId);
+    if (marketFinding) findings.push(marketFinding);
     const group = groups.get(`${point.cpv_code}|${point.unit_code}`);
     if (!group) continue;
     const peer = detectPeerPrice(point, group, new Date().toISOString());
@@ -111,7 +118,7 @@ try {
     const growth = detectOwnPriceGrowth(point, group, new Date().toISOString());
     if (growth) findings.push(growth);
   }
-  await store.replaceDetectorFindings(["peer_price", "own_price_growth"], findings);
+  await store.replaceDetectorFindings(["peer_price", "own_price_growth", "market_price"], findings);
   log(`price analysis: ${points.length} comparable prices, ${groups.size} groups, ${findings.length} findings`);
 
   /* ---- 3b. what the auditors concluded ---- */

@@ -10,6 +10,8 @@
     "test": "node --test \"tests/**/*.test.ts\"",
     "ingest:tenders": "node scripts/ingest-tenders.ts",
     "ai:extract": "node scripts/ai-extract.ts",
+    "ai:batch": "node scripts/ai-batch.ts",
+    "scheduled:run": "node scripts/scheduled-run.ts",
     "ingest:risks": "node scripts/ingest-risks.ts",
     "daily": "node scripts/daily.ts",
     "ingest:details": "node scripts/ingest-details.ts",

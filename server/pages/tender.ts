@@ -89,6 +89,7 @@ ${entry.findings
     return `<div class="card">
   <h3><span class="tier own">Порахували ми</span> &nbsp;${esc(f.title)}</h3>
   <p class="lead">${esc(f.explanation)}</p>
+  ${typeof e.source_url === "string" && e.source_url.startsWith("https://market-api.prozorro.gov.ua/api/prices/") ? `<p><a href="${esc(e.source_url)}" target="_blank" rel="noopener noreferrer">Перевірити джерело ціни ↗</a></p>` : ""}
   <dl class="facts">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl>
 </div>`;
   })

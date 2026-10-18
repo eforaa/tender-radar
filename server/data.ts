@@ -137,7 +137,7 @@ export async function loadDataset(): Promise<Dataset> {
   // Monitoring conclusions have their own audit field. They are not price
   // anomalies and must not enter the price counter, preset or severity.
   const findings: FindingRow[] = (await store.allFindings()).filter(
-    (row) => row.detector_key === "peer_price" || row.detector_key === "own_price_growth",
+    (row) => ["peer_price", "own_price_growth", "market_price"].includes(row.detector_key),
   );
   const monitorings = await store.allMonitorings();
 

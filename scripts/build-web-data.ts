@@ -23,6 +23,8 @@ const COPY = [
   "awards.json",
   "findings.json",
   "runs.json",
+  "market-prices.json",
+  "market-cursor.json",
 ];
 
 async function sizeOf(path: string): Promise<number> {

@@ -72,4 +72,5 @@ body .wrap{padding-top:32px}body[data-nav="feed"] .wrap{padding-top:0}.railway-h
 .compact-pager .jump input::-webkit-inner-spin-button,.compact-pager .jump input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .pager.compact-pager .jump button{height:44px;min-height:44px;width:36px;padding:0;border:0;background:transparent;font-size:20px}
 @media(max-width:360px){.top .inner{gap:6px;padding-inline:14px}.top .menu-trigger{padding-left:4px}.pager.compact-pager{gap:8px}}
+@media(min-width:64rem){.top .inner{max-width:none;flex-wrap:nowrap;padding-inline:clamp(24px,3vw,56px);gap:16px}.top .brand{margin-right:auto}.top .nav{margin-left:0;flex-wrap:nowrap}.top .starred-btn,.top .theme-btn,.top .menu-trigger{flex-shrink:0}}
 `;

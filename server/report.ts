@@ -394,7 +394,7 @@ export function reportHtml(ctx: ReportContext): string {
 <div class="sheet">
   <h1>${esc(title)}</h1>
   <div class="ref">${esc(entry.tender_ref || entry.tender_id)}</div>
-  <div class="made">Tender Radar · звіт сформовано ${esc(day(ctx.generatedAt))}</div>
+  <div class="made">ТендоScope · звіт сформовано ${esc(day(ctx.generatedAt))}</div>
   ${body}
 </div>
 </body>
