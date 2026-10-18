@@ -53,7 +53,7 @@ const STATIC_ROUTES = [
   ["/indicators", "Що ми перевіряємо"],
   ["/about", "Звідки дані"],
   ["/starred", "Список зберігається у вашому браузері"],
-  ["/lookup", "Пошук підприємства за ЄДРПОУ"],
+  ["/lookup", "Знайти компанію"],
 ] as const;
 
 for (const [path, marker] of STATIC_ROUTES) {

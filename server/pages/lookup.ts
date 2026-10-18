@@ -6,16 +6,6 @@ import { caseRow, star } from "../components/case-row.ts";
 
 /* ---------- saved companies and EDRPOU lookup ---------- */
 
-/** The save / unsave button. A plain form so the site still needs no scripts. */
-function saveControl(edrpou: string, saved: string[], back: string): string {
-  const isSaved = saved.includes(edrpou);
-  return `<form class="save-form" method="post" action="/saved/toggle">
-  <input type="hidden" name="edrpou" value="${esc(edrpou)}">
-  <input type="hidden" name="back" value="${esc(back)}">
-  <button type="submit" class="save-btn${isSaved ? " on" : ""}">${isSaved ? "★ У збережених" : "☆ Зберегти підприємство"}</button>
-</form>`;
-}
-
 /** What we hold on one EDRPOU, from either side of a tender. */
 function profileOf(edrpou: string): { asBuyer: Case[]; asWinner: Case[]; name: string | null } {
   const asBuyer = dataset().cases.filter((c) => c.entity_edrpou === edrpou);
@@ -29,55 +19,22 @@ export function lookupPage(code: string | null, typed: string): string {
   const profile = code ? profileOf(code) : null;
   const found = Boolean(profile && (profile.asBuyer.length > 0 || profile.asWinner.length > 0));
 
+  const cases = profile ? [...new Map([...profile.asBuyer, ...profile.asWinner].map(c => [c.tender_id, c])).values()].sort((a,b)=>(b.value_amount ?? 0)-(a.value_amount ?? 0)) : [];
+  const invalid = Boolean(typed && !code);
   return layout({
-    title: "Пошук за ЄДРПОУ",
-    nav: "lookup",
-    body: `
-<h1>Пошук підприємства за ЄДРПОУ</h1>
-<p class="sub">Код підприємства — покажемо все, що про нього є в базі.</p>
-
-<form class="filters" method="get" action="/lookup">
-  <div class="filter-row">
-    <input type="search" name="edrpou" value="${esc(typed)}" placeholder="Наприклад, 00131954 — АТ «Харківобленерго»" aria-label="ЄДРПОУ" inputmode="numeric">
-    <button type="submit">Знайти</button>
-  </div>
+    title: "Знайти компанію", nav: "lookup",
+    body: `<section class="company-search">
+<header class="company-search-heading"><span class="company-eyebrow">КОМПАНІЇ</span><h1>Знайти компанію</h1><p>Перевірте її закупівлі та перемоги за кодом ЄДРПОУ.</p></header>
+<form class="company-search-form" method="get" action="/lookup">
+<label for="company-code">Код ЄДРПОУ</label><div class="company-search-input"><input id="company-code" type="search" name="edrpou" value="${esc(typed)}" placeholder="Наприклад, 40081347" inputmode="numeric" autocomplete="off" aria-describedby="company-code-hint${invalid ? ' company-error' : ''}"${invalid ? ' aria-invalid="true"' : ''}><button type="submit">Знайти <span aria-hidden="true">→</span></button></div>
+<p id="company-code-hint">Від 6 до 10 цифр. Пошук за назвою поки не підтримується.</p>
+${invalid ? '<p class="company-error" id="company-error" role="alert">Перевірте код: потрібно від 6 до 10 цифр.</p>' : ''}
 </form>
-
-${
-  typed && !code
-    ? `<div class="empty">«${esc(typed)}» не схоже на код ЄДРПОУ. Це від шести до десяти цифр.</div>`
-    : ""
-}
-
-${
-  code && !found
-    ? `<div class="empty">
-  <p>Код <strong>${esc(code)}</strong> у нашій базі не зустрічається.</p>
-  <p class="faint">У базі — закупівлі всієї України, у яких спрацював державний індикатор ризику. Якщо коду тут немає, за цим підприємством позначених закупівель не знайдено — це добрий знак, а не помилка.</p>
-  <p><a href="https://prozorro.gov.ua/search/tenders?edrpou=${encodeURIComponent(code)}" target="_blank" rel="noopener">Пошук цього коду в Prozorro →</a></p>
-</div>`
-    : ""
-}
-
-${
-  found && profile
-    ? `${star("entity", code as string, "/lookup?edrpou=" + encodeURIComponent(code as string), { label: true })}
-<h2>${esc(readableName(profile.name))}</h2>
-<p class="statline">
-  <b>${profile.asBuyer.length}</b> ${plural(profile.asBuyer.length, "закупівля як замовник", "закупівлі як замовник", "закупівель як замовник")} ·
-  <b>${profile.asWinner.length}</b> ${plural(profile.asWinner.length, "перемога як постачальник", "перемоги як постачальник", "перемог як постачальник")}
-</p>
-<div class="filter-row" style="margin-bottom:1.5rem">
-  ${profile.asBuyer.length ? `<a class="flag" href="/entity/${encodeURIComponent(code as string)}">Досьє замовника →</a>` : ""}
-  ${profile.asWinner.length ? `<a class="flag" href="/supplier/${encodeURIComponent(code as string)}">Досьє постачальника →</a>` : ""}
-</div>
-<div class="rows">${[...profile.asBuyer, ...profile.asWinner]
-        .sort((a, b) => (b.value_amount ?? 0) - (a.value_amount ?? 0))
-        .slice(0, 30)
-        .map((c) => caseRow(c))
-        .join("")}</div>`
-    : ""
-}
-`,
+${!typed ? `<div class="company-search-guide"><h2>Що можна побачити</h2><div><p><strong>Як замовник</strong><span>Що компанія закуповує та які є сигнали ризику.</span></p><p><strong>Як постачальник</strong><span>У яких закупівлях вона перемогла.</span></p></div><a href="/lookup?edrpou=40081347">Переглянути приклад компанії →</a></div>` : ''}
+${code && !found ? `<section class="company-empty" aria-live="polite"><h2>У поточних даних компанію не знайдено</h2><p>Код <strong>${esc(code)}</strong>. Наша база охоплює лише частину закупівель. Відсутність запису не підтверджує відсутність порушень.</p><a href="https://prozorro.gov.ua/search/tenders?edrpou=${encodeURIComponent(code)}" target="_blank" rel="noopener">Перевірити в Prozorro ↗</a></section>` : ''}
+</section>
+${found && profile ? `<section class="company-results" aria-label="Результат пошуку"><header class="company-profile"><div><p class="company-eyebrow">ЄДРПОУ ${esc(code)}</p><h2>${esc(readableName(profile.name))}</h2></div>${star(profile.asBuyer.length ? 'entity' : 'supplier',code as string,'/lookup?edrpou='+encodeURIComponent(code as string),{label:true})}</header>
+<div class="company-roles">${profile.asBuyer.length ? `<a href="/entity/${encodeURIComponent(code as string)}"><span>Замовник</span><strong>${profile.asBuyer.length} ${plural(profile.asBuyer.length,'закупівля','закупівлі','закупівель')}</strong><span>Відкрити досьє →</span></a>` : ''}${profile.asWinner.length ? `<a href="/supplier/${encodeURIComponent(code as string)}"><span>Постачальник</span><strong>${profile.asWinner.length} ${plural(profile.asWinner.length,'перемога','перемоги','перемог')}</strong><span>Відкрити досьє →</span></a>` : ''}</div>
+<div class="company-list-heading"><h2>Закупівлі компанії</h2><span>${cases.length > 6 ? '6 найбільших за сумою · повний список у досьє' : cases.length + ' у поточних даних'}</span></div><div class="rows">${cases.slice(0,6).map(c=>caseRow(c)).join('')}</div></section>` : ''}`,
   });
 }

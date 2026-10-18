@@ -281,7 +281,7 @@ test("looking up a EDRPOU we hold shows its dossier links", async () => {
   await withEnv({}, async () => {
     const res = await handle({ url: new URL("https://x.example/lookup?edrpou=40081216"), cookieHeader: null });
     assert.equal(res.status, 200);
-    assert.match(res.body, /Досьє замовника/);
+    assert.match(res.body, /href="\/entity\/40081216"/);
   });
 });
 
@@ -289,14 +289,15 @@ test("looking up an unknown EDRPOU says so plainly instead of 404", async () => 
   await withEnv({}, async () => {
     const res = await handle({ url: new URL("https://x.example/lookup?edrpou=99999999"), cookieHeader: null });
     assert.equal(res.status, 200);
-    assert.match(res.body, /у нашій базі не зустрічається/);
+    assert.match(res.body, /У поточних даних компанію не знайдено/);
   });
 });
 
 test("a lookup that is not a EDRPOU explains the format", async () => {
   await withEnv({}, async () => {
     const res = await handle({ url: new URL("https://x.example/lookup?edrpou=abc"), cookieHeader: null });
-    assert.match(res.body, /не схоже на код ЄДРПОУ/);
+    assert.match(res.body, /Перевірте код: потрібно від 6 до 10 цифр/);
+    assert.match(res.body, /aria-invalid="true"/);
   });
 });
 
