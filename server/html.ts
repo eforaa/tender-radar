@@ -285,7 +285,7 @@ ol.findings li.w-medium::marker{color:var(--warn);font-weight:700}
 
 /* one-click starting points */
 .presets{display:flex;flex-wrap:wrap;gap:var(--s2);margin:0 0 var(--s3)}
-.preset{text-decoration:none;font-size:.8rem;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:var(--s1) var(--s3);white-space:nowrap}
+.preset{text-decoration:none;font-size:.8rem;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);border-radius:var(--control-radius,8px);padding:var(--s1) var(--s3);white-space:nowrap}
 .preset:hover{border-color:var(--accent);color:var(--accent)}
 .preset.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
 
@@ -379,7 +379,7 @@ select:disabled{opacity:.5;cursor:not-allowed}
 /* Base chip. Every coloured variant below builds on this; without it the
    risk chips and "ще N" links rendered as bare text. */
 .flags{display:flex;flex-wrap:wrap;gap:var(--s1)}
-.flag{display:inline-flex;align-items:center;font-size:.8rem;line-height:1.3;padding:var(--s1) var(--s2);border:1px solid var(--line);border-radius:999px;color:var(--ink-soft);text-decoration:none;white-space:nowrap}
+.flag{display:inline-flex;align-items:center;font-size:.8rem;line-height:1.3;padding:var(--s1) var(--s2);border:1px solid var(--line);border-radius:var(--control-radius,8px);color:var(--ink-soft);text-decoration:none;white-space:nowrap}
 a.flag:hover{border-color:var(--accent);color:var(--accent)}
 .flag.alarm{border-color:var(--alarm);background:var(--alarm-bg);color:var(--alarm);font-weight:500}
 .flag.warn{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
@@ -604,7 +604,7 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
 
   /* "back" as a pill at the top of inner pages: a thumb target, not a
      text link at the very top edge. */
-  .back{display:inline-flex;align-items:center;min-height:2.4rem;padding:0 var(--s3);border:1px solid var(--line);border-radius:999px;background:var(--surface);text-decoration:none;font-size:.9rem;margin-bottom:var(--s3)}
+  .back{display:inline-flex;align-items:center;min-height:2.4rem;padding:0 var(--s3);border:1px solid var(--line);border-radius:var(--control-radius,8px);background:var(--surface);text-decoration:none;font-size:.9rem;margin-bottom:var(--s3)}
 
   /* ---------- lists ----------
      The whole row is the tap target: the title link stretches over the row,
@@ -619,7 +619,7 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
      the trigger first, then the chips, no wrapping */
   .filter-sheet{display:flex;align-items:center;gap:var(--s2);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 calc(-1 * var(--s4)) var(--s3);padding:0 var(--s4)}
   .filter-sheet::-webkit-scrollbar{display:none}
-  .filters-trigger{flex:none;width:auto;margin:0;min-height:2.5rem;padding:0 var(--s3);border-radius:999px;font-size:.88rem}
+  .filters-trigger{flex:none;width:auto;margin:0;min-height:2.5rem;padding:0 var(--s3);border-radius:var(--control-radius,8px);font-size:.88rem}
   .presets{display:flex;flex-wrap:nowrap;gap:var(--s2);margin:0}
   .preset{min-height:2.5rem;padding:0 var(--s3);font-size:.86rem;white-space:nowrap}
 
@@ -683,15 +683,15 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(opts.title)} — Tender Radar</title>
+<title>${esc(opts.title)} — Видно</title>
 <meta name="description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
-<meta property="og:site_name" content="Tender Radar">
+<meta property="og:site_name" content="Видно">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="uk_UA">
-<meta property="og:title" content="${esc(opts.title)} — Tender Radar">
+<meta property="og:title" content="${esc(opts.title)} — Видно">
 <meta property="og:description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%226%22%20fill%3D%22white%22%2F%3E%3Cpath%20d%3D%22M3%2016s4.5-8%2013-8%2013%208%2013%208-4.5%208-13%208S3%2016%203%2016Z%22%20fill%3D%22none%22%20stroke%3D%22%23172a20%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2216%22%20r%3D%224%22%20fill%3D%22%23172a20%22%2F%3E%3C%2Fsvg%3E">
+
 <link rel="apple-touch-icon" href="/icon-180.png">
 ${siteOrigin() ? `<link rel="canonical" href="${esc(siteOrigin() + canonicalPath())}">
 <meta property="og:url" content="${esc(siteOrigin() + canonicalPath())}">` : ""}
@@ -710,7 +710,7 @@ ${STUDIO_STYLES}</style>
 <a class="skip" href="#main">До вмісту</a>
 
 <header class="top"><div class="inner">
-  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><circle cx="16" cy="16" r="9" fill="none" stroke="white" stroke-width="1.5"/><circle cx="16" cy="16" r="4" fill="none" stroke="white" stroke-width="1.5"/><path d="M16 16L25 7" stroke="white" stroke-width="2"/></svg>Tender<span>Radar</span></a>
+  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M3 16s4.5-8 13-8 13 8 13 8-4.5 8-13 8S3 16 3 16Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="16" r="4" fill="currentColor"/><path d="m23 6 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="brand-word">Видно</span></a>
   <nav class="nav" aria-label="Основні розділи">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Закупівлі</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>Залізниця</a>

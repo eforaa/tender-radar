@@ -45,4 +45,11 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{border-radius:var(-
 .detail-fold-body p,.detail-next ol{font-size:15px;line-height:1.65}
 .card-buyer,.card-facts span,.card-reason>span,.detail-ref,.detail-overview span{font-size:12px}
 @media(max-width:44rem){.card-title{font-size:16px}.detail-heading h1{font-size:21px}.card-facts strong{font-size:21px}.detail-overview strong{font-size:22px}.detail-fold>summary{font-size:15px}.control-panel .preset{font-size:12px}.menu-section small{font-size:13px}.detail-buyer{font-size:14px}.detail-next ol,.detail-fold-body p{font-size:16px}}
+
+.detail-toolbar .back,.detail-toolbar .star{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;min-height:44px;padding:0 14px;margin:0;border:1px solid var(--line);border-radius:8px!important;background:var(--surface);color:var(--accent);font-size:13px;font-weight:500;line-height:1;white-space:nowrap;text-decoration:none}
+.detail-toolbar .star span{font-size:13px;font-weight:500}.detail-toolbar .star-form{display:flex;align-items:center;margin:0}
+
+.detail-toolbar .star-form:has(.star span){margin:0;line-height:1;height:44px}
+.top .brand .brand-word{display:inline;font-size:23px;font-weight:700;letter-spacing:-.7px;color:var(--ink)}.top .studio-logo{color:var(--ink);width:32px;height:32px;margin-right:7px}
+@media(max-width:44rem){.top .brand .brand-word{font-size:22px}.top .studio-logo{width:29px;height:29px}}
 `;

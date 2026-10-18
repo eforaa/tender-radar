@@ -20,7 +20,7 @@ export function feedPage(url: URL): string {
   const signals = list.reduce((n, x) => n + x.findings.length, 0);
   return layout({ title: "Закупівлі", nav: "feed", body: `
 <section class="studio-hero">
- <div class="studio-copy"><span class="studio-eyebrow">TENDER RADAR / МОНІТОРИНГ ЗАКУПІВЕЛЬ</span><h1>Публічні кошти.<br><span>Прозорі рішення.</span></h1><p>Знайдіть закупівлю, перевірте сигнали ризику та відкрийте першоджерело.</p><a class="studio-help" href="/about">Як працює радар <span aria-hidden="true">↗</span></a></div>
+ <div class="studio-copy"><span class="studio-eyebrow">ВИДНО / МОНІТОРИНГ ЗАКУПІВЕЛЬ</span><h1>Публічні кошти.<br><span>Прозорі рішення.</span></h1><p>Знайдіть закупівлю, перевірте сигнали ризику та відкрийте першоджерело.</p><a class="studio-help" href="/about">Як працює радар <span aria-hidden="true">↗</span></a></div>
  <div class="studio-visual" aria-label="Дані поточної вибірки"><div class="studio-orbit" aria-hidden="true"></div><div class="studio-stat"><span>ЗАКУПІВЛІ В ПОТОЧНІЙ ВИБІРЦІ</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>Відкриті дані для вашої перевірки</small><div class="studio-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="studio-signal"><span class="studio-dot" aria-hidden="true"></span><div><strong>${signals.toLocaleString("uk-UA")} цінових сигналів</strong><small>Сигнал — привід перевірити, а не звинувачення</small></div></div></div>
 </section>
 <section class="studio-workspace" aria-label="Пошук закупівель">
