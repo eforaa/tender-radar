@@ -690,7 +690,7 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
 <meta property="og:locale" content="uk_UA">
 <meta property="og:title" content="${esc(opts.title)} — Тендоскоп">
 <meta property="og:description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2038%2036%22%20color%3D%22%23172a20%22%3E%3Cpath%20d%3D%22M2%2014%205%208Q7%205%2011%205H21A4.5%204.5%200%200%201%2021%2014Z%22%20fill%3D%22currentColor%22%2F%3E%3Cpath%20d%3D%22M10%2025Q10%2020%2017%2017V28L10%2034Z%22%20fill%3D%22currentColor%22%2F%3E%3Cpath%20d%3D%22M17%2017V23L10%2030V25Q10%2020%2017%2017Z%22%20fill%3D%22%23187443%22%2F%3E%3Cpath%20d%3D%22M24%202A14%2014%200%200%201%2035%2015%22%20fill%3D%22none%22%20stroke%3D%22%23187443%22%20stroke-width%3D%223.5%22%2F%3E%3C%2Fsvg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2042%2042%22%20color%3D%22%23172a20%22%3E%3Cpath%20d%3D%22M24%206A13%2013%200%201%200%2010%2029%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%224.5%22%2F%3E%3Cpath%20d%3D%22M28%2010A13%2013%200%200%201%2028%2025%22%20fill%3D%22none%22%20stroke%3D%22%23187443%22%20stroke-width%3D%224.5%22%2F%3E%3Cpath%20d%3D%22m28%2029%208%208%22%20stroke%3D%22%23187443%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20d%3D%22M8%2016%2010%2012Q11%2010%2014%2010H23A3%203%200%200%201%2023%2016Z%22%20fill%3D%22currentColor%22%2F%3E%3Cpath%20d%3D%22M15%2024Q15%2020%2021%2018V29L15%2033Z%22%20fill%3D%22currentColor%22%2F%3E%3Cpath%20d%3D%22M21%2018V23L15%2029V24Q15%2020%2021%2018Z%22%20fill%3D%22%23187443%22%2F%3E%3C%2Fsvg%3E">
 
 <link rel="apple-touch-icon" href="/icon-180.png">
 ${siteOrigin() ? `<link rel="canonical" href="${esc(siteOrigin() + canonicalPath())}">
@@ -710,7 +710,7 @@ ${STUDIO_STYLES}</style>
 <a class="skip" href="#main">До вмісту</a>
 
 <header class="top"><div class="inner">
-  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 38 36" aria-hidden="true"><path d="M2 14 5 8Q7 5 11 5H21A4.5 4.5 0 0 1 21 14Z" fill="currentColor"/><path d="M10 25Q10 20 17 17V28L10 34Z" fill="currentColor"/><path d="M17 17V23L10 30V25Q10 20 17 17Z" fill="#187443"/><path d="M24 2A14 14 0 0 1 35 15" fill="none" stroke="#187443" stroke-width="3.5"/></svg><span class="brand-word">Тендоскоп</span></a>
+  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 42 42" aria-hidden="true"><path d="M24 6A13 13 0 1 0 10 29" fill="none" stroke="currentColor" stroke-width="4.5"/><path d="M28 10A13 13 0 0 1 28 25" fill="none" stroke="#187443" stroke-width="4.5"/><path d="m28 29 8 8" stroke="#187443" stroke-width="5" stroke-linecap="round"/><path d="M8 16 10 12Q11 10 14 10H23A3 3 0 0 1 23 16Z" fill="currentColor"/><path d="M15 24Q15 20 21 18V29L15 33Z" fill="currentColor"/><path d="M21 18V23L15 29V24Q15 20 21 18Z" fill="#187443"/></svg><span class="brand-word">Тендоскоп</span></a>
   <nav class="nav" aria-label="Основні розділи">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Закупівлі</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>Залізниця</a>
