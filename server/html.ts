@@ -595,7 +595,7 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
   .burger,.starred-btn{display:none}
   .theme-btn{margin-left:auto;width:2.5rem;height:2.5rem}
   .wrap{padding-bottom:calc(4.5rem + env(safe-area-inset-bottom))}
-  .tabbar{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  .tabbar{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
   .tabbar a,.tabbar label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:3.5rem;padding:var(--s1) 0;color:var(--ink-faint);text-decoration:none;font-size:.68rem;font-weight:500;letter-spacing:.01em;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .tabbar svg{width:1.4rem;height:1.4rem;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
   .tabbar a[aria-current]{color:var(--accent)}
@@ -728,7 +728,7 @@ ${opts.body}
   <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Закупівлі</a>
   <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 21l1.5-3M15 21l-1.5-3"/><circle cx="9" cy="14" r=".6"/><circle cx="15" cy="14" r=".6"/></svg>Залізниця</a>
   <a href="/starred"${opts.nav === "starred" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9L3.5 9.7l5.9-.8z"/></svg>Обране</a>
-  <button type="button" class="tab-menu" data-menu-open aria-controls="site-menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Меню</button>
+
 </nav>
 ${NAVIGATION_SCRIPT}
 ${FAVOURITE_SCRIPT}
