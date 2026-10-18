@@ -717,7 +717,7 @@ ${STUDIO_STYLES}</style>
     <a href="/lookup"${opts.nav === "lookup" ? ' aria-current="page"' : ""}>Знайти компанію</a>
   </nav>
   <a class="starred-btn${opts.nav === "starred" ? " on" : ""}" href="/starred" title="Обране">★<span>Обране</span></a>
-  <button class="theme-btn" type="button" title="Світла або темна тема" aria-label="Перемкнути тему" onclick="(function(){try{var r=document.documentElement,n=r.dataset.theme==='light'?'dark':'light';r.dataset.theme=n;localStorage.setItem('theme',n);}catch(e){}})()"><span class="theme-sun">☀</span><span class="theme-moon">☾</span></button>
+  <button class="theme-btn" type="button" title="Світла або темна тема" aria-label="Перемкнути тему" onclick="(function(){try{var r=document.documentElement,n=r.dataset.theme==='light'?'dark':'light';r.dataset.theme=n;localStorage.setItem('theme',n);}catch(e){}})()"><svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14A9 9 0 0 1 10 3.5 9 9 0 1 0 20.5 14Z"/></svg></button>
   <button type="button" class="menu-trigger" data-menu-open aria-controls="site-menu" aria-expanded="false"><span aria-hidden="true">☰</span> Меню</button>
 </div></header>
 ${navigationDialog(opts.nav)}

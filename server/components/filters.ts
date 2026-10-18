@@ -278,11 +278,11 @@ export function listBody(
 <div class="rows">${slice.map((x) => caseRow(x, rowOpts)).join("")}</div>
 ${
   pages > 1
-    ? `<div class="pager">
-  ${page > 1 ? `<a href="${link({})}" title="Перша сторінка" aria-label="Перша сторінка">«</a><a href="${link({ page: String(page - 1) })}">← попередні</a>` : ""}
-  <form class="jump" method="get" action="${esc(action)}">${hiddenControls(c, esc)}${extraHidden}<label>сторінка <input type="number" name="page" value="${page}" min="1" max="${pages}" aria-label="Номер сторінки"> з ${pages.toLocaleString("uk-UA")}</label><button type="submit">Перейти</button></form>
-  ${page < pages ? `<a href="${link({ page: String(page + 1) })}">наступні →</a><a href="${link({ page: String(pages) })}" title="Остання сторінка" aria-label="Остання сторінка">»</a>` : ""}
-</div>`
+    ? `<nav class="pager compact-pager" aria-label="Сторінки результатів">
+  ${page > 1 ? `<a class="page-step" href="${link({ page: String(page - 1) })}" aria-label="Попередня сторінка">←</a>` : '<span class="page-step" aria-disabled="true">←</span>'}
+  <form class="jump" method="get" action="${esc(action)}">${hiddenControls(c, esc)}${extraHidden}<label><input type="number" name="page" value="${page}" min="1" max="${pages}" aria-label="Номер сторінки"><span> / ${pages.toLocaleString("uk-UA")}</span></label><button type="submit" aria-label="Перейти до сторінки" title="Перейти до сторінки">↵</button></form>
+  ${page < pages ? `<a class="page-step" href="${link({ page: String(page + 1) })}" aria-label="Наступна сторінка">→</a>` : '<span class="page-step" aria-disabled="true">→</span>'}
+</nav>`
     : ""
 }`;
 }
