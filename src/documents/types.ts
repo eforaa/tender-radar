@@ -1,6 +1,7 @@
 import type { Claim } from "../analysis/ai-extract.ts";
 export type SourceDocument = { id: string; title: string; url: string; format: string; modified: string; kind: string };
 export type DocumentResult = {
+  analyzer_version?: number; format?: "pdf" | "doc" | "docx"; locator_kind?: "page" | "fragment"; truncated?: boolean;
   key: string; tender_id: string; document: SourceDocument; source_sha256?: string;
   status: "ready" | "partial" | "unsupported" | "error"; updated_at: string;
   page_count: number; processed_pages: number; ocr_pages: number[];
@@ -27,6 +28,13 @@ export function sourceDocuments(raw: unknown): SourceDocument[] {
 }
 
 export function allowedDocumentUrl(value: string): boolean {
-  try { const url = new URL(value); return url.protocol === "https:" && url.hostname === "public-docs.prozorro.gov.ua" &&
+  try { const url = new URL(value); return url.protocol === "https:" && ["public-docs.prozorro.gov.ua", "swift-prod.prozorro.gov.ua"].includes(url.hostname) &&
     !url.username && !url.password && (!url.port || url.port === "443"); } catch { return false; }
+}
+
+export function documentFormat(doc: Pick<SourceDocument, "title" | "format">): "pdf" | "doc" | "docx" | null {
+  const extension = /\.(pdf|docx?)\s*$/i.exec(doc.title)?.[1]?.toLowerCase();
+  if (extension) return extension as "pdf" | "doc" | "docx";
+  const types: Record<string, "pdf" | "doc" | "docx"> = { "application/pdf": "pdf", "application/msword": "doc", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx" };
+  return types[doc.format.toLowerCase().split(";")[0]] ?? null;
 }

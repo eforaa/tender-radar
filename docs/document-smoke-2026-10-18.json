@@ -1,0 +1,96 @@
+{
+  "checked_at": "2026-10-18T14:43:08.263Z",
+  "pipeline": [
+    {
+      "step": "ingest-tenders.ts",
+      "code": 0
+    },
+    {
+      "step": "ingest-market.ts",
+      "code": 0
+    },
+    {
+      "step": "analyze.ts",
+      "code": 0
+    },
+    {
+      "step": "ai-batch.ts",
+      "code": 0
+    },
+    {
+      "step": "analyze-documents.ts",
+      "code": 0
+    },
+    {
+      "step": "build-web-data.ts",
+      "code": 0
+    }
+  ],
+  "documents": [
+    {
+      "tender": "UA-2026-10-02-011305-a",
+      "url": "https://prozorro.gov.ua/tender/UA-2026-10-02-011305-a",
+      "document": "Додаток 5 до ТД (Проект договору) Док_8186 ПЗ 2026.docx",
+      "format": "docx",
+      "status": "ready",
+      "processed": 8,
+      "total": 8,
+      "locator": "fragment",
+      "ocr_pages": 0,
+      "claims": 0,
+      "sha256": "754d9a39fa9865ddda979c40dc2ea1939184ea5e28623bc7d208a163456bd70b"
+    },
+    {
+      "tender": "UA-2026-09-25-013678-a",
+      "url": "https://prozorro.gov.ua/tender/UA-2026-09-25-013678-a",
+      "document": "Додаток № 2 Технічні характеристики .doc",
+      "format": "doc",
+      "status": "ready",
+      "processed": 1,
+      "total": 1,
+      "locator": "fragment",
+      "ocr_pages": 0,
+      "claims": 13,
+      "sha256": "f1154dbdab40b9da9e146288cdabbf5bf6344ec2ac7d7c9d854a7ecf839d6b7f"
+    },
+    {
+      "tender": "UA-2026-09-25-013678-a",
+      "url": "https://prozorro.gov.ua/tender/UA-2026-09-25-013678-a",
+      "document": "Рішення про визначення переможця.PDF",
+      "format": "pdf",
+      "status": "ready",
+      "processed": 2,
+      "total": 2,
+      "locator": "page",
+      "ocr_pages": 0,
+      "claims": 0,
+      "sha256": "73c5d859f710299849de36b291148655837947a14b12d0458e50520d401a68e0"
+    },
+    {
+      "tender": "UA-2026-10-16-011843-a",
+      "url": "https://prozorro.gov.ua/tender/UA-2026-10-16-011843-a",
+      "document": "Договір № 31-25-АВР.pdf",
+      "format": "pdf",
+      "status": "ready",
+      "processed": 22,
+      "total": 22,
+      "locator": "page",
+      "ocr_pages": 22,
+      "claims": 29,
+      "sha256": "889ecc5da0d11b24305139262eceba34b431d8187267f114f50b0190bbd4cfea"
+    },
+    {
+      "tender": "UA-2026-07-22-002261-a",
+      "url": "https://prozorro.gov.ua/tender/UA-2026-07-22-002261-a",
+      "document": "Додаток 1_Технічна специфікація.docx",
+      "format": "docx",
+      "status": "ready",
+      "processed": 2,
+      "total": 2,
+      "locator": "fragment",
+      "ocr_pages": 0,
+      "claims": 5,
+      "sha256": "09b4d47cda54562600889454e565977f9e7897623ca508452c266ac15cc2afc3"
+    }
+  ]
+}

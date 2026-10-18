@@ -1,16 +1,60 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { allowedDocumentUrl, sourceDocuments } from "../src/documents/types.ts";
-import { downloadDocument, extractPdf } from "../src/documents/extract.ts";
+import { allowedDocumentUrl, sourceDocuments, documentFormat } from "../src/documents/types.ts";
+import { extractWord, textFragments } from "../src/documents/word.ts";
+import { analyzeDocument, downloadDocument, extractPdf } from "../src/documents/extract.ts";
 import { documentSection } from "../server/components/documents.ts";
 
 test("document allowlist rejects private hosts, credentials and misleading suffixes", () => {
   assert.ok(allowedDocumentUrl("https://public-docs.prozorro.gov.ua/get/123?Signature=abc"));
   for (const url of ["http://public-docs.prozorro.gov.ua/x", "https://127.0.0.1/x", "https://public-docs.prozorro.gov.ua.evil.test/x", "https://x@public-docs.prozorro.gov.ua/x", "https://public-docs.prozorro.gov.ua:8080/x", "file:///etc/passwd"])
     assert.equal(allowedDocumentUrl(url), false);
+});
+test("follows the real Prozorro storage redirect and retries temporary server failures", async t => {
+  const urls: string[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    urls.push(url);
+    if (urls.length === 1) return new Response(null, { status: 503 });
+    if (url.includes("public-docs")) return new Response(null, { status: 302, headers: { location: "https://swift-prod.prozorro.gov.ua/file" } });
+    return new Response("%PDF-test");
+  });
+  assert.equal(Buffer.from(await downloadDocument("https://public-docs.prozorro.gov.ua/get/x")).toString(), "%PDF-test");
+  assert.equal(urls.length, 3);
+  assert.equal(allowedDocumentUrl("https://swift-prod.prozorro.gov.ua.evil.test/x"), false);
+});
+test("recognizes Word formats from names and MIME; rejects unrelated files", () => {
+  assert.equal(documentFormat({ title: "Специфікація.DOCX", format: "text/plain" }), "docx");
+  assert.equal(documentFormat({ title: "Документ", format: "application/msword" }), "doc");
+  assert.equal(documentFormat({ title: "sign.p7s", format: "application/octet-stream" }), null);
+});
+test("Word worker extracts Cyrillic text and table cells without normalizing quotes", async () => {
+  const text = await extractWord(await readFile(new URL("fixtures/documents/specification.docx", import.meta.url)));
+  assert.match(text, /Товар «Кабель»/); assert.match(text, /100 м/); assert.match(text, /200 грн з ПДВ/);
+  await assert.rejects(extractWord(Buffer.from("<html>not Word</html>")), /Not a binary DOC or DOCX/);
+});
+test("Word fragment numbers are deterministic and text is not silently truncated", () => {
+  const text = ("Текст договору та специфікації\n").repeat(1200);
+  const parts = textFragments(text);
+  assert.ok(parts.length > 2); assert.ok(parts.every((p, i) => p.page === i + 1 && p.text.length <= 12000));
+  assert.equal(parts.map(p => p.text).join("").replace(/\s/g, ""), text.replace(/\s/g, ""));
+});
+test("long Word document reaches Claude in batches including its final item", async t => {
+  const bytes = await readFile(new URL("fixtures/documents/long-specification.docx", import.meta.url));
+  t.mock.method(globalThis, "fetch", async () => new Response(bytes));
+  const dir = await mkdtemp(join(tmpdir(), "tendoscope-long-word-"));
+  let calls = 0;
+  try {
+    const result = await analyzeDocument("https://public-docs.prozorro.gov.ua/doc", dir, "docx", async source => {
+      calls++; assert.ok(source.length < 100000);
+      return { rejected: [], claims: source.includes("Остання позиція: 987 метрів") ? [{ item_id: "last", field: "quantity", value: "987", quote: "Остання позиція: 987 метрів" }] : [] };
+    });
+    assert.ok(calls > 1); assert.equal(result.truncated, false);
+    assert.equal(result.processed_pages, result.page_count); assert.equal(result.locator_kind, "fragment");
+    assert.equal(result.claims[0].value, "987"); assert.equal(result.claims[0].page, result.page_count);
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });
 test("collects amendments and award documents, deduplicates repeated sources", () => {
   const doc = { id: "one", title: "Contract.pdf", url: "https://public-docs.prozorro.gov.ua/one" };
