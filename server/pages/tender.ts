@@ -1,9 +1,10 @@
+import { buildConclusion } from "../conclusion.ts";
 import { procedureLabel, readableName } from "../../src/labels.ts";
 import { layout, esc, money, unitMoney, shortMoney, date, plural, trim } from "../html.ts";
 import { dataset } from "../context.ts";
 import { star, alarms, auditSection } from "../components/case-row.ts";
-import { riskCard } from "../components/risk.ts";
-import { qualificationBlock, conclusionBlock, verdictSummary } from "../components/verdict.ts";
+import { shortRisk } from "../components/risk.ts";
+import { qualificationBlock } from "../components/verdict.ts";
 import { notFound } from "./static.ts";
 import { loadDbConfig } from "../../src/store/db.ts";
 import { getCard } from "../../src/store/cards.ts";
@@ -50,6 +51,7 @@ export async function tenderPage(tenderId: string, url?: URL): Promise<string> {
   const signals = alarms(entry);
   const prozorro = `https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}`;
   const buyer = readableName(entry.entity_name);
+  const conclusion = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
 
   return layout({
     // The tab and any link preview name the thing, not just its number.
@@ -58,71 +60,15 @@ export async function tenderPage(tenderId: string, url?: URL): Promise<string> {
       signals[0] ?? (entry.risks.length ? `${entry.risks.length} ${plural(entry.risks.length, "ознака", "ознаки", "ознак")} ризику` : "закупівля з позначками")
     } · ${entry.tender_ref || entry.tender_id}`,
     body: `
-<a class="back" href="${esc(back)}">${back === "/" ? "← до переліку закупівель" : "← назад до переліку"}</a>
-${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id), { label: true })}
-<h1 class="long">${esc(title)}</h1>
-<p class="sub">${esc(readableName(entry.entity_name))} · <span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span></p>
-
-${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
-${verdictSummary(entry, sameEntity, sameOfficer, sameWinner)}
-
-<div class="actions">
-  <a class="action primary download" href="/tender/${encodeURIComponent(entry.tender_id)}/report">Звіт для друку та PDF</a>
-  <a class="action" href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">Текстовим файлом</a>
-  <a class="action" href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">Першоджерело в Prozorro</a>
-</div>
-
-<div class="card">
-  <dl class="facts">
-    <dt>Сума</dt><dd><strong>${money(entry.value_amount)}</strong> <span class="faint">(${shortMoney(entry.value_amount)})</span></dd>
-    <dt>Замовник</dt><dd><a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">${esc(readableName(entry.entity_name))}</a><br><span class="faint">ЄДРПОУ ${esc(entry.entity_edrpou ?? "—")}</span></dd>
-    <dt>Регіон</dt><dd>${entry.region ? `<a href="/?region=${encodeURIComponent(entry.region)}">${esc(entry.region)}</a>` : "—"}</dd>
-    ${entry.method ? `<dt>Процедура</dt><dd>${esc(procedureLabel(entry.method) ?? "—")}</dd>` : ""}
-    ${entry.detailed ? `<dt>Учасників</dt><dd>${entry.bidders === 1 ? "<strong>один</strong> — конкуренції не було" : entry.bidders || "—"}</dd>` : ""}
-    <dt>Дата закупівлі</dt><dd>${date(entry.tender_date)}</dd>
-    <dt>Позначено державою</dt><dd>${date(entry.date_assessed)}</dd>
-    <dt>Першоджерело</dt><dd><a href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">Відкрити картку в Prozorro →</a></dd>
-  </dl>
-</div>
-
-<h2>Хто відповідав за закупівлю</h2>
-${
-  entry.officer_name
-    ? `<div class="card">
-  <h3><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a></h3>
-  <p class="lead">${
-    otherOfficer.length
-      ? `Ця особа вказана відповідальною ще у <strong>${otherOfficer.length}</strong> ${plural(otherOfficer.length, "закупівлі", "закупівлях", "закупівлях")} із позначками, разом на <strong>${shortMoney(officerValue)}</strong>.`
-      : "Інших закупівель із позначками за цією особою в базі немає."
-  }</p>
-  <dl class="facts">
-    <dt>Пошта</dt><dd>${esc(entry.officer_email ?? "—")}</dd>
-    <dt>Телефон</dt><dd>${esc(entry.officer_phone ?? "—")}</dd>
-  </dl>
-  <p style="margin-top:.9rem"><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">Відкрити досьє посадовця →</a></p>
-</div>`
-    : `<div class="card"><p>Картку цієї закупівлі ще не завантажено, тому відповідальна особа невідома.</p><p><a href="${prozorro}" target="_blank" rel="noopener">Подивитися відповідальну особу в Prozorro →</a></p></div>`
-}
-
-<h2>Хто виграв</h2>
-${
-  entry.winner_name
-    ? `<div class="card">
-  <h3><a href="/supplier/${encodeURIComponent(entry.winner_edrpou ?? "")}">${esc(readableName(entry.winner_name))}</a></h3>
-  <p class="lead">${
-    otherWinner.length
-      ? `Ця компанія перемогла ще у <strong>${otherWinner.length}</strong> ${plural(otherWinner.length, "закупівлі", "закупівлях", "закупівлях")} із позначками, разом на <strong>${shortMoney(winnerValue)}</strong>.`
-      : "Інших закупівель із позначками за цією компанією в базі немає."
-  }</p>
-  <dl class="facts">
-    <dt>ЄДРПОУ</dt><dd>${esc(entry.winner_edrpou ?? "—")}</dd>
-    <dt>Сума договору</dt><dd>${money(entry.winner_amount)}</dd>
-  </dl>
-</div>`
-    : `<div class="card"><p>Переможця не визначено або картку ще не завантажено.</p><p><a href="${prozorro}" target="_blank" rel="noopener">Подивитися переможця в Prozorro →</a></p></div>`
-}
-
-${
+<article class="tender-detail">
+<div class="detail-toolbar"><a class="back" href="${esc(back)}">← До переліку</a>${star("tender", entry.tender_id, url ? url.pathname + url.search : "/tender/" + encodeURIComponent(entry.tender_id), { label: true })}</div>
+<header class="detail-heading"><p class="detail-ref">${esc(entry.tender_ref || entry.tender_id)}</p><h1>${esc(title)}</h1><p class="detail-buyer">${esc(buyer)}</p></header>
+<section class="detail-overview" id="facts" aria-label="Основні дані"><div><span>Сума закупівлі</span><strong>${shortMoney(entry.value_amount)}</strong></div><div><span>Учасників</span><strong>${entry.detailed ? entry.bidders ?? 'Немає даних' : 'Немає даних'}</strong></div><div><span>Дата закупівлі</span><strong>${date(entry.tender_date)}</strong></div></section>
+<div class="detail-source"><a href="${prozorro}" target="_blank" rel="noopener">Відкрити в Prozorro <span aria-hidden="true">↗</span></a><span>Документи та першоджерело</span></div>
+<div class="detail-columns"><section class="detail-signals" id="signals"><h2>Що потребує уваги <span>${entry.risks.length + entry.findings.length}</span></h2><p class="detail-caution">Сигнал не доводить порушення.</p>
+${entry.bidders === 1 ? '<p class="detail-competition">Один учасник — немає іншої пропозиції для порівняння.</p>' : ''}
+${entry.risks.map(r => `<details class="detail-fold signal-fold"><summary><span><small>Державний індикатор</small><strong>${esc(shortRisk(r))}</strong></span></summary><div class="detail-fold-body"><p>${esc(dataset().ruleById.get(r)?.name ?? r)}</p><p class="detail-caution">Це автоматична ознака. Перевірте договір та зміни до нього в першоджерелі.</p><a href="${prozorro}" target="_blank" rel="noopener">Перевірити документи ↗</a><p class="detail-ref">Індикатор ${esc(r)} · <a href="/?risk=${encodeURIComponent(r)}">Інші закупівлі з цією ознакою</a></p></div></details>`).join('')}
+${entry.findings.length ? `<details class="detail-fold"><summary><span><small>Розрахунок системи</small><strong>Порівняння цін · ${entry.findings.length}</strong></span></summary><div class="detail-fold-body">${
   entry.findings.length
     ? `<h2>Скільки це коштує в інших</h2>
 <p class="hint">Рахувала система, не держава. Нижче — числа.</p>
@@ -150,27 +96,65 @@ ${entry.findings
     : ""
 }
 
-${auditSection(entry)}
-<h2>Що тут не так</h2>
-<p class="hint">Спрацювало ${entry.risks.length} ${plural(entry.risks.length, "індикатор", "індикатори", "індикаторів")} із ${dataset().rules.length} чинних. <a href="/indicators">Що означає кожен →</a></p>
-${entry.risks.map((r) => riskCard(r)).join("")}
+</div></details>` : ''}
+${!entry.risks.length && !entry.findings.length ? '<p>Додаткових сигналів у поточних даних немає.</p>' : ''}
+${entry.audit ? `<details class="detail-fold"><summary><span><small>Держаудитслужба</small><strong>${entry.audit.violation ? 'Встановлено порушення' : 'Порушень не встановлено'}</strong></span></summary><div class="detail-fold-body">${auditSection(entry)}</div></details>` : ''}
+</section><section class="detail-next" id="conclusion"><h2>Що перевірити далі</h2><ol>${conclusion.nextSteps.map(step=>`<li>${esc(step)}</li>`).join('')}</ol><details class="detail-fold"><summary>Чому система пропонує ці кроки</summary><div class="detail-fold-body">${conclusion.observations.map(o=>`<p><strong>${esc(o.title)}</strong><br>${esc(o.detail)}</p>`).join('')}<p class="detail-caution">Автоматичний аналіз не встановлює порушення.</p></div></details></section></div>
+<section class="detail-reference" aria-label="Додаткові відомості">
+<details class="detail-fold" id="participants"><summary><span><strong>Учасники та контакти</strong><small>${entry.winner_name ? 'Переможець: ' + esc(readableName(entry.winner_name)) : 'Замовник, переможець, контактна особа'}</small></span></summary><div class="detail-fold-body"><h3>Контактна особа замовника</h3>${
+  entry.officer_name
+    ? `<div class="card">
+  <h3><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a></h3>
+  <p class="lead">${
+    otherOfficer.length
+      ? `Цей контакт зазначено ще у <strong>${otherOfficer.length}</strong> ${plural(otherOfficer.length, "закупівлі", "закупівлях", "закупівлях")} із позначками, разом на <strong>${shortMoney(officerValue)}</strong>.`
+      : "Інших закупівель із позначками за цією особою в базі немає."
+  }</p>
+  <dl class="facts">
+    <dt>Пошта</dt><dd>${esc(entry.officer_email ?? "—")}</dd>
+    <dt>Телефон</dt><dd>${esc(entry.officer_phone ?? "—")}</dd>
+  </dl>
+  <p style="margin-top:.9rem"><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">Переглянути закупівлі з цим контактом →</a></p>
+</div>`
+    : `<div class="card"><p>Картку цієї закупівлі ще не завантажено, тому контактні дані недоступні.</p><p><a href="${prozorro}" target="_blank" rel="noopener">Переглянути контакт в Prozorro →</a></p></div>`
+}
 
-<h2>Правова кваліфікація</h2>
-<details class="fold">
-  <summary>Норми, наслідки, відповідальність — розгорнути</summary>
-  <div class="fold-body">${qualificationBlock(entry)}</div>
-</details>
+<h2>Хто виграв</h2>
+${
+  entry.winner_name
+    ? `<div class="card">
+  <h3><a href="/supplier/${encodeURIComponent(entry.winner_edrpou ?? "")}">${esc(readableName(entry.winner_name))}</a></h3>
+  <p class="lead">${
+    otherWinner.length
+      ? `Ця компанія перемогла ще у <strong>${otherWinner.length}</strong> ${plural(otherWinner.length, "закупівлі", "закупівлях", "закупівлях")} із позначками, разом на <strong>${shortMoney(winnerValue)}</strong>.`
+      : "Інших закупівель із позначками за цією компанією в базі немає."
+  }</p>
+  <dl class="facts">
+    <dt>ЄДРПОУ</dt><dd>${esc(entry.winner_edrpou ?? "—")}</dd>
+    <dt>Сума договору</dt><dd>${money(entry.winner_amount)}</dd>
+  </dl>
+</div>`
+    : `<div class="card"><p>Переможця не визначено або картку ще не завантажено.</p><p><a href="${prozorro}" target="_blank" rel="noopener">Подивитися переможця в Prozorro →</a></p></div>`
+}
 
-<h2 id="conclusion">Наш висновок</h2>
-${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
-
-<h2>Цей замовник загалом</h2>
-<div class="card">
-  <p class="lead">За ${esc(readableName(entry.entity_name))} обліковано <strong>${sameEntity.length}</strong> закупівель із позначками.</p>
-  <p><a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">Відкрити досьє замовника →</a></p>
+</div></details>
+<details class="detail-fold"><summary>Усі реквізити закупівлі</summary><div class="detail-fold-body"><div class="card">
+  <dl class="facts">
+    <dt>Сума</dt><dd><strong>${money(entry.value_amount)}</strong> <span class="faint">(${shortMoney(entry.value_amount)})</span></dd>
+    <dt>Замовник</dt><dd><a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">${esc(readableName(entry.entity_name))}</a><br><span class="faint">ЄДРПОУ ${esc(entry.entity_edrpou ?? "—")}</span></dd>
+    <dt>Регіон</dt><dd>${entry.region ? `<a href="/?region=${encodeURIComponent(entry.region)}">${esc(entry.region)}</a>` : "—"}</dd>
+    ${entry.method ? `<dt>Процедура</dt><dd>${esc(procedureLabel(entry.method) ?? "—")}</dd>` : ""}
+    ${entry.detailed ? `<dt>Учасників</dt><dd>${entry.bidders === 1 ? "<strong>один</strong> — конкуренції не було" : entry.bidders || "—"}</dd>` : ""}
+    <dt>Дата закупівлі</dt><dd>${date(entry.tender_date)}</dd>
+    <dt>Позначено державою</dt><dd>${date(entry.date_assessed)}</dd>
+    <dt>Першоджерело</dt><dd><a href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">Відкрити картку в Prozorro →</a></dd>
+  </dl>
 </div>
 
-<p class="note">Наявність позначки не означає, що встановлено порушення, і не є звинуваченням названих осіб. Це підстава для перевірки закупівлі людиною.</p>
+<a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? '')}">Досьє замовника · ${sameEntity.length} закупівель із позначками →</a></div></details>
+<details class="detail-fold"><summary><span><strong>Правова довідка</strong><small>Норми та пояснення для фахівців</small></span></summary><div class="detail-fold-body">${qualificationBlock(entry)}</div></details>
+<details class="detail-fold"><summary>Завантажити або надрукувати звіт</summary><div class="detail-fold-body detail-downloads"><a href="/tender/${encodeURIComponent(entry.tender_id)}/report">Для друку та PDF</a><a href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">Текстовий файл</a></div></details>
+</section></article>
 `,
   });
 }

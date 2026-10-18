@@ -42,7 +42,7 @@ for (const point of points) {
   if (growth) findings.push(growth);
 }
 
-await store.upsertFindings(findings);
+await store.replaceDetectorFindings(["peer_price", "own_price_growth"], findings);
 
 const bySeverity = { high: 0, medium: 0, low: 0 };
 const byDetector: Record<string, number> = {};

@@ -43,7 +43,7 @@ async function page(path: string) {
 // "/starred" - "Список зберігається у вашому браузері" (starredPage body line 1649, verified absent from server/html.ts)
 // "/lookup" - "Пошук підприємства за ЄДРПОУ" (lookupPage line 1551)
 const STATIC_ROUTES = [
-  ["/", "Закупівлі, які варто перевірити"],
+  ["/", "Знайдіть закупівлю"],
   ["/entities", "Замовники"],
   ["/officers", "Відповідальні посадовці"],
   ["/suppliers", "Переможці закупівель"],

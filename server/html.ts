@@ -1,4 +1,8 @@
+import { STUDIO_STYLES } from "./studio-styles.ts";
+import { FAVOURITE_SCRIPT } from "./favourite-interaction.ts";
 /** Layout, styles and small rendering helpers. No template engine, no deps. */
+import { navigationDialog, NAVIGATION_SCRIPT, NAVIGATION_STYLES } from "./navigation.ts";
+import { RADAR_STYLES } from "./radar-styles.ts";
 
 export function esc(value: unknown): string {
   return String(value ?? "")
@@ -639,28 +643,6 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
 
 `;
 
-/** Everything reachable from the burger menu, with a line of orientation. */
-const MENU = [
-  { href: "/", nav: "feed", label: "Усі закупівлі", hint: "повний перелік, з пошуком і фільтрами" },
-  { href: "/railway", nav: "railway", label: "Залізниця", hint: "закупівлі залізниці Харківщини" },
-  { href: "/prices", nav: "prices", label: "Завищені ціни", hint: "де ми самі порахували переплату" },
-  { href: "/starred", nav: "starred", label: "Обране", hint: "усе, що ви позначили зірочкою" },
-  { href: "/lookup", nav: "lookup", label: "Пошук за ЄДРПОУ", hint: "перевірити будь-яке підприємство" },
-  { href: "/article/366", nav: "article-366", label: "Підроблення документів", hint: "розбіжності в договорах і звітах" },
-  {
-    label: "Хто є хто",
-    hint: "замовники, переможці, посадовці",
-    children: [
-      { href: "/entities", nav: "entities", label: "Хто купує", hint: "установи-замовники" },
-      { href: "/suppliers", nav: "suppliers", label: "Хто продає", hint: "компанії-переможці" },
-      { href: "/officers", nav: "officers", label: "Хто відповідає", hint: "посадовці, що вели закупівлі" },
-    ],
-  },
-  { href: "/indicators", nav: "indicators", label: "Що ми перевіряємо", hint: "усі ознаки простими словами" },
-  { href: "/updates", nav: "updates", label: "Що нового", hint: "останнє оновлення бази" },
-  { href: "/about", nav: "about", label: "Про систему", hint: "звідки дані і чого вона не робить" },
-];
-
 /**
  * What a link to this site looks like when it is pasted somewhere. The daily
  * notifier posts links to Telegram, which renders whatever these say; without
@@ -697,7 +679,7 @@ function canonicalPath(): string {
 
 export function layout(opts: { title: string; nav?: string; body: string; description?: string }): string {
   return `<!doctype html>
-<html lang="uk">
+<html lang="uk" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -716,57 +698,40 @@ ${siteOrigin() ? `<link rel="canonical" href="${esc(siteOrigin() + canonicalPath
 <meta property="og:image" content="${esc(siteOrigin())}/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<style>${STYLES}</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>${STYLES}\n${RADAR_STYLES}
+${NAVIGATION_STYLES}
+${STUDIO_STYLES}</style>
 <!-- The site's only script: it applies the saved theme before the first paint,
      so a light-theme reader never sees a dark flash. Everything else is CSS. -->
 <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body data-nav="${esc(opts.nav ?? "")}">
 <a class="skip" href="#main">До вмісту</a>
-<input type="checkbox" id="menu-toggle" class="sr-only" aria-label="Показати всі розділи">
+
 <header class="top"><div class="inner">
-  <a class="brand" href="/"><img class="brand-mark" src="/icon-192.png" alt="" width="28" height="28" decoding="async">Tender<span>&nbsp;Radar</span></a>
-  <nav class="nav">
+  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><circle cx="16" cy="16" r="9" fill="none" stroke="white" stroke-width="1.5"/><circle cx="16" cy="16" r="4" fill="none" stroke="white" stroke-width="1.5"/><path d="M16 16L25 7" stroke="white" stroke-width="2"/></svg>Tender<span>Radar</span></a>
+  <nav class="nav" aria-label="Основні розділи">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Закупівлі</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>Залізниця</a>
-    <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>Про систему</a>
+    <a href="/lookup"${opts.nav === "lookup" ? ' aria-current="page"' : ""}>Знайти компанію</a>
   </nav>
   <a class="starred-btn${opts.nav === "starred" ? " on" : ""}" href="/starred" title="Обране">★<span>Обране</span></a>
   <button class="theme-btn" type="button" title="Світла або темна тема" aria-label="Перемкнути тему" onclick="(function(){try{var r=document.documentElement,n=r.dataset.theme==='light'?'dark':'light';r.dataset.theme=n;localStorage.setItem('theme',n);}catch(e){}})()"><span class="theme-sun">☀</span><span class="theme-moon">☾</span></button>
-  <label class="burger" for="menu-toggle" role="button" aria-label="Усі розділи" title="Усі розділи"><span></span><span></span><span></span></label>
+  <button type="button" class="menu-trigger" data-menu-open aria-controls="site-menu" aria-expanded="false"><span aria-hidden="true">☰</span> Меню</button>
 </div></header>
-<label class="scrim" for="menu-toggle" aria-hidden="true"></label>
-<nav class="drawer" aria-label="Усі розділи">
-  <div class="drawer-head">
-    <strong>Розділи</strong>
-    <label class="drawer-close" for="menu-toggle" role="button" aria-label="Закрити">&times;</label>
-  </div>
-  ${MENU.map((item) => {
-    if (!item.children) {
-      return `<a href="${item.href}"${opts.nav === item.nav ? ' aria-current="page"' : ""}>${item.label}<small>${item.hint}</small></a>`;
-    }
-    // A collapsible group so the three directory pages do not crowd the drawer.
-    // <details> is the CSS-only disclosure this whole site relies on; it opens
-    // itself when the reader is already on one of its pages.
-    const here = item.children.some((c) => c.nav === opts.nav);
-    return `<details class="drawer-group"${here ? " open" : ""}>
-    <summary>${item.label}<small>${item.hint}</small></summary>
-    ${item.children
-      .map((c) => `<a href="${c.href}"${opts.nav === c.nav ? ' aria-current="page"' : ""}>${c.label}<small>${c.hint}</small></a>`)
-      .join("")}
-  </details>`;
-  }).join("")}
-</nav>
+${navigationDialog(opts.nav)}
 <main class="wrap" id="main">
 ${opts.body}
 </main>
 <nav class="tabbar" aria-label="Головне">
-  <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Стрічка</a>
+  <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Закупівлі</a>
   <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 21l1.5-3M15 21l-1.5-3"/><circle cx="9" cy="14" r=".6"/><circle cx="15" cy="14" r=".6"/></svg>Залізниця</a>
   <a href="/starred"${opts.nav === "starred" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9L3.5 9.7l5.9-.8z"/></svg>Обране</a>
-  <label class="tab-menu" for="menu-toggle" role="button" aria-label="Усі розділи"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>Розділи</label>
+  <button type="button" class="tab-menu" data-menu-open aria-controls="site-menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Меню</button>
 </nav>
+${NAVIGATION_SCRIPT}
+${FAVOURITE_SCRIPT}
 </body>
 </html>`;
 }

@@ -158,7 +158,7 @@ try {
     const growth = detectOwnPriceGrowth(point, group, new Date().toISOString());
     if (growth) findings.push(growth);
   }
-  await store.upsertFindings(findings);
+  await store.replaceDetectorFindings(["peer_price", "own_price_growth"], findings);
   log(`price analysis: ${points.length} comparable prices, ${groups.size} groups, ${findings.length} findings`);
 
   /* ---- 3b. what the auditors concluded ---- */

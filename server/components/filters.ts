@@ -24,8 +24,8 @@ type Preset = { label: string; hint: string; query: string };
 export function presetsFor(action: string): Preset[] {
   const base: Preset[] = [
     { label: "Усі", hint: "повний перелік", query: "" },
-    { label: "Порушення доведено", hint: "Держаудитслужба встановила порушення", query: "audit=violation" },
-    { label: "Завищена ціна", hint: "ми порахували переплату", query: "price=1" },
+    { label: "Висновок ДАСУ", hint: "Держаудитслужба встановила порушення", query: "audit=violation" },
+    { label: "Цінові сигнали", hint: "розбіжності цін, які потребують перевірки", query: "price=1" },
     { label: "Без конкурентів", hint: "подався один учасник", query: "solo=1" },
     { label: "Від 100 млн", hint: "найбільші суми", query: "min=100000000" },
     // "Кілька ознак" and "Найновіші" used to live here too, but they are sorts,
@@ -71,7 +71,7 @@ export function sortBar(action: string, c: Controls, extra = ""): string {
     value ? `<input type="hidden" name="${name}" value="${esc(value)}">` : "";
 
   return `<form class="sortbar" method="get" action="${esc(action)}">
-  <input type="search" name="q" value="${esc(c.q)}" placeholder="Пошук за назвою, замовником, ЄДРПОУ" aria-label="Пошук">
+  <input type="search" name="q" value="${esc(c.q)}" placeholder="Назва або ЄДРПОУ" aria-label="Пошук">
   ${extra}
   ${hidden("risk", c.risk)}${hidden("region", c.region)}
   ${hidden("from", c.dateFrom)}${hidden("to", c.dateTo)}
@@ -81,8 +81,10 @@ export function sortBar(action: string, c: Controls, extra = ""): string {
   ${c.priceOnly ? '<input type="hidden" name="price" value="1">' : ""}
   ${c.audit ? `<input type="hidden" name="audit" value="${esc(c.audit)}">` : ""}
 
-  <label>Сорт.
-    <select name="sort" onchange="this.form.submit()">
+  <details class="sort-options">
+  <summary>Сортування та групування</summary><div class="sort-options-fields">
+  <label>Сортування
+    <select name="sort">
       <option value="value"${c.sort === "value" ? " selected" : ""}>за сумою, спадання</option>
       <option value="value-asc"${c.sort === "value-asc" ? " selected" : ""}>за сумою, зростання</option>
       <option value="date"${c.sort === "date" ? " selected" : ""}>новіші закупівлі</option>
@@ -92,19 +94,20 @@ export function sortBar(action: string, c: Controls, extra = ""): string {
     </select>
   </label>
 
-  <label>Групи
-    <select name="group" onchange="this.form.submit()">${dimensionOptions(c.group)}</select>
+  <label>Групування
+    <select name="group">${dimensionOptions(c.group)}</select>
   </label>
 
   ${
     c.group
       ? `<label>потім
-    <select name="then" onchange="this.form.submit()">${dimensionOptions(c.then, c.group)}</select>
+    <select name="then">${dimensionOptions(c.then, c.group)}</select>
   </label>`
       : ""
   }
 
-  <button type="submit" class="go">Показати</button>
+  </div><button type="submit" class="sort-apply">Застосувати</button></details>
+  <button type="submit" class="go">Знайти закупівлі <span aria-hidden="true">→</span></button>
 </form>`;
 }
 
@@ -173,87 +176,40 @@ function datasetBounds() {
  * where it submits, so each tab filters its own scope.
  */
 export function filterPanel(action: string, c: Controls, opts: ControlOptions = {}, extra = ""): string {
-  const dimensionOptions = (selected: Dimension, skip?: Dimension) =>
-    DIMENSIONS.filter((d) => d.value !== skip || d.value === "")
-      .map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`)
-      .join("");
-
-  const { earliest, latest, regions, rangeHint } = datasetBounds();
-
-  const active = activeCount(c);
-  // The panel opens when a filter is on; the reset link also shows for a
-  // non-default sort, which is otherwise the one state with no way back.
-  const open = isFiltered(c) || Boolean(c.group);
-  const showReset = open || c.sort !== "value";
-
-  return `<form class="filters" method="get" action="${esc(action)}">
-  <input type="hidden" name="q" value="${esc(c.q)}">
-  ${extra}
-  <details class="filters-more"${open ? " open" : ""}>
-    <summary>Більше фільтрів${active > 0 ? ` <span class="badge">${active}</span>` : ""}${showReset ? ` <a class="reset" href="${esc(action)}">скинути все</a>` : ""}</summary>
-    <div class="inner">
-      <div class="filter-row">
-        <select name="risk" aria-label="Ознака">
-          <option value="">Будь-яка ознака</option>
-          ${dataset().rules
-            .map(
-              (r) =>
-                `<option value="${esc(r.risk_id)}"${r.risk_id === c.risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`,
-            )
-            .join("")}
-        </select>
-        <select name="region" aria-label="Область">
-          <option value="">Уся Україна</option>
-          ${regions
-            .map((r) => `<option value="${esc(r)}"${r === c.region ? " selected" : ""}>${esc(r)}</option>`)
-            .join("")}
-        </select>
-        <select name="audit" aria-label="Висновок Держаудитслужби">
-          <option value="">Будь-який висновок ДАСУ</option>
-          <option value="violation"${c.audit === "violation" ? " selected" : ""}>порушення доведено</option>
-          <option value="clear"${c.audit === "clear" ? " selected" : ""}>перевірено, порушень немає</option>
-        </select>
-        <input type="hidden" name="sort" value="${esc(c.sort)}">
-        <input type="hidden" name="group" value="${esc(c.group)}">
-        <input type="hidden" name="then" value="${esc(c.then)}">
-      </div>
-
-      <div class="filter-row">
-        <span class="filter-label">Дата закупівлі</span>
-        <input type="date" name="from" value="${esc(c.dateFrom)}" aria-label="Дата від" min="${esc(earliest)}" max="${esc(latest)}">
-        <span class="filter-label">по</span>
-        <input type="date" name="to" value="${esc(c.dateTo)}" aria-label="Дата по" min="${esc(earliest)}" max="${esc(latest)}">
-      </div>
-
-      <div class="filter-row">
-        <span class="filter-label">Сума, ₴</span>
-        <input type="number" name="min" value="${c.min > 0 ? c.min : ""}" placeholder="від" aria-label="Сума від" min="0" step="100000" class="num">
-        <span class="filter-label">по</span>
-        <input type="number" name="max" value="${c.max > 0 ? c.max : ""}" placeholder="до" aria-label="Сума до" min="0" step="100000" class="num">
-        <span class="filter-label faint">${esc(rangeHint)}</span>
-      </div>
-
-      <div class="filter-row">
-        ${opts.hideRail ? "" : `<label class="check"><input type="checkbox" name="rail" value="1"${c.railOnly ? " checked" : ""}> лише залізниця</label>`}
-        <label class="check"><input type="checkbox" name="solo" value="1"${c.soloOnly ? " checked" : ""}> лише без конкурентів</label>
-        ${opts.hidePrice ? "" : `<label class="check"><input type="checkbox" name="price" value="1"${c.priceOnly ? " checked" : ""}> лише де ціна завищена</label>`}
-        <button type="submit">Застосувати фільтри</button>
-      </div>
-    </div>
-  </details>
-</form>`;
+ const {earliest,latest,regions}=datasetBounds();
+ const selected=(v:string,current:string)=>v===current?' selected':'';
+ const active=activeCount(c);
+ return `<form class="filters" method="get" action="${esc(action)}">
+ <input type="hidden" name="q" value="${esc(c.q)}"><input type="hidden" name="sort" value="${esc(c.sort)}"><input type="hidden" name="group" value="${esc(c.group)}"><input type="hidden" name="then" value="${esc(c.then)}">${extra}
+ <details class="filters-more"><summary>Уточнити пошук${active?` <span class="badge">${active}</span>`:''}</summary>
+ <div class="filter-fieldsets">
+ <fieldset><legend>Де шукати</legend><label>Область<select name="region"><option value="">Уся Україна</option>${regions.map(r=>`<option value="${esc(r)}"${selected(r,c.region)}>${esc(r)}</option>`).join('')}</select></label>
+ ${opts.hideRail?'':`<label class="check"><input type="checkbox" name="rail" value="1"${c.railOnly?' checked':''}>Лише залізничні організації</label>`}</fieldset>
+ <fieldset><legend>Що перевірити</legend><label>Ознака ризику<select name="risk"><option value="">Будь-яка ознака</option>${dataset().rules.map(r=>`<option value="${esc(r.risk_id)}"${selected(r.risk_id,c.risk)}>${esc(shortRisk(r.risk_id))}</option>`).join('')}</select></label>
+ <label>Висновок Держаудитслужби<select name="audit"><option value="">Будь-який або відсутній</option><option value="violation"${selected('violation',c.audit)}>ДАСУ встановила порушення</option><option value="clear"${selected('clear',c.audit)}>ДАСУ не встановила порушень</option></select></label>
+ <label class="check"><input type="checkbox" name="solo" value="1"${c.soloOnly?' checked':''}>Один учасник</label>${opts.hidePrice?'':`<label class="check"><input type="checkbox" name="price" value="1"${c.priceOnly?' checked':''}>Є ціновий сигнал</label>`}</fieldset>
+ <fieldset><legend>Коли опубліковано закупівлю</legend><label>Від дати<input type="date" name="from" value="${esc(c.dateFrom)}" min="${esc(earliest)}" max="${esc(latest)}"></label><label>До дати<input type="date" name="to" value="${esc(c.dateTo)}" min="${esc(earliest)}" max="${esc(latest)}"></label></fieldset>
+ <fieldset><legend>Сума закупівлі, грн</legend><label>Мінімальна сума<input type="number" name="min" min="0" step="any" inputmode="decimal" value="${c.min||''}" placeholder="Без обмеження"></label><label>Максимальна сума<input type="number" name="max" min="0" step="any" inputmode="decimal" value="${c.max||''}" placeholder="Без обмеження"></label></fieldset>
+ </div><div class="filter-actions"><button type="submit">Застосувати фільтри</button><a href="${esc(action)}">Скинути всі фільтри</a></div>
+ </details></form>`;
 }
 
-/**
- * Presets, sort/group and the filter panel, wrapped as one unit.
- *
- * On a wide screen this renders in place, exactly as the three pieces did
- * before. Below 44rem the CSS turns the same markup into a checkbox-driven
- * sheet — the same mechanism as the nav drawer in html.ts, just scoped to
- * this component so the two do not fight over one checkbox. Reusing that
- * pattern here (instead of a second one) is what step 1 of the phone task
- * asked for: one interaction model for the whole site.
- */
+/** Each selected condition can be removed without clearing other choices. */
+function appliedFilters(action:string,c:Controls):string {
+ const chips:[string,Record<string,string>][]=[];
+ if(c.q)chips.push([`Пошук: ${c.q}`,{q:''}]);
+ if(c.region)chips.push([c.region,{region:''}]);
+ if(c.railOnly)chips.push(['Залізниця',{rail:''}]);
+ if(c.risk)chips.push([shortRisk(c.risk),{risk:''}]);
+ if(c.audit)chips.push([c.audit==='violation'?'Висновок ДАСУ: порушення':'Висновок ДАСУ: без порушень',{audit:''}]);
+ if(c.priceOnly)chips.push(['Ціновий сигнал',{price:''}]);
+ if(c.soloOnly)chips.push(['Один учасник',{solo:''}]);
+ if(c.dateFrom||c.dateTo)chips.push([`${c.dateFrom||'Початок'} — ${c.dateTo||'сьогодні'}`,{from:'',to:''}]);
+ if(c.min||c.max)chips.push([`Сума: ${c.min||0} — ${c.max||'без межі'} грн`,{min:'',max:''}]);
+ return chips.length?`<div class="applied-filters" aria-label="Застосовані фільтри"><span>Ви обрали:</span>${chips.map(([label,over])=>`<a href="${esc(keepControls(action,c,{...over,page:'1'}))}" aria-label="${esc('Прибрати фільтр: '+label)}">${esc(label)} <span aria-hidden="true"> ×</span></a>`).join('')}</div>`:'';
+}
+
+/** Search, sorting, presets and expandable filters share one panel. */
 export function controlBar(
   action: string,
   c: Controls,
@@ -264,21 +220,11 @@ export function controlBar(
   const presets = params.url ? presetBar(action, params.url, c) : "";
   const extra = params.extra ?? "";
 
-  return `<div class="filter-sheet">
-  <input type="checkbox" id="filters-toggle" class="sr-only" aria-label="Фільтри">
-  <label class="filters-trigger" for="filters-toggle">Фільтри${active > 0 ? ` <span class="badge">${active}</span>` : ""}</label>
-  <label class="scrim filters-scrim" for="filters-toggle" aria-hidden="true"></label>
+  return `<div class="control-panel">
+  ${sortBar(action, c, extra)}
   ${presets}
-  <div class="drawer filters-drawer" aria-label="Фільтри">
-    <div class="drawer-head">
-      <strong>Фільтри</strong>
-      <label class="drawer-close" for="filters-toggle" role="button" aria-label="Закрити">&times;</label>
-    </div>
-    <div class="filters-drawer-body">
-      ${sortBar(action, c, extra)}
-      ${filterPanel(action, c, opts, extra)}
-    </div>
-  </div>
+  ${appliedFilters(action,c)}
+  ${filterPanel(action, c, opts, extra)}
 </div>`;
 }
 

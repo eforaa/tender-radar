@@ -62,6 +62,17 @@ export class JsonStore implements Store {
   upsertFindings(rows: FindingRow[]) {
     return this.#upsert("findings", rows, (r) => `${r.tender_id}|${r.detector_key}`);
   }
+  async replaceDetectorFindings(detectorKeys: string[], rows: FindingRow[]): Promise<void> {
+    const keys = new Set(detectorKeys);
+    if (rows.some((row) => !keys.has(row.detector_key))) {
+      throw new Error("Finding belongs to a detector outside this completed run");
+    }
+    const existing = await this.allFindings();
+    await this.#write("findings", [
+      ...existing.filter((row) => !keys.has(row.detector_key)),
+      ...rows,
+    ]);
+  }
   upsertRuns(rows: RunRow[]) {
     return this.#upsert("runs", rows, (r) => r.run_id);
   }

@@ -134,6 +134,8 @@ export interface Store {
   upsertMonitorings(rows: MonitoringRow[]): Promise<void>;
   upsertCatalogPrices(rows: CatalogPriceRow[]): Promise<void>;
   upsertFindings(rows: FindingRow[]): Promise<void>;
+  /** Replace a completed detector run, including removal of withdrawn signals. */
+  replaceDetectorFindings(detectorKeys: string[], rows: FindingRow[]): Promise<void>;
   upsertRuns(rows: RunRow[]): Promise<void>;
   /** Replaces the whole run history — used to trim it. */
   replaceRuns(rows: RunRow[]): Promise<void>;

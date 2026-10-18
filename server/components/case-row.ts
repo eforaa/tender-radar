@@ -29,7 +29,10 @@ export function rowSeverity(entry: Case): "proven" | "high" | "medium" | "clear"
  * common risk, short — the detail lives on the tender page behind a tap.
  */
 export function signalLine(entry: Case): string {
-  if (entry.audit?.violation) return "Порушення доведено";
+  if (entry.audit?.violation) return "ДАСУ встановила порушення";
+  if (entry.findings.length) return "Є розбіжність у ціні — перевірте порівняння";
+  if (entry.audit && !entry.audit.violation) return "ДАСУ не встановила порушень";
+  if (entry.bidders === 1) return "На закупівлю подався один учасник";
   const n = entry.risks.length;
   if (n === 0) return "";
   const topRisk = rankRisks([entry])[0]?.[0] ?? entry.risks[0];
@@ -142,7 +145,7 @@ export function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?:
 
   const people: string[] = [];
   if (showOfficer && entry.officer_name) {
-    people.push(`вів(ла) <a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a>`);
+    people.push(`контакт: <a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a>`);
   }
   if (entry.winner_name) {
     people.push(
@@ -155,27 +158,12 @@ export function caseRow(entry: Case, opts: { showOfficer?: boolean; showEntity?:
   const here = currentPath();
   const tenderHref = `/tender/${encodeURIComponent(entry.tender_id)}${here && !here.startsWith("/tender/") ? `?from=${encodeURIComponent(here)}` : ""}`;
 
-  return `<div class="row sev-${severity}">
-  <span class="dot" title="${esc(SEVERITY_TITLE[severity])}" aria-hidden="true"></span><span class="sr-only">${esc(SEVERITY_TITLE[severity])}.</span>
-  <div class="who">
-    <div class="name">${star("tender", entry.tender_id, here || tenderHref)}<a href="${esc(tenderHref)}">${esc(title)}</a></div>
-    <div class="meta">${meta.join(" · ")}</div>
-    ${people.length ? `<div class="meta">${people.join(" · ")}</div>` : ""}
-  </div>
-  <div class="amount">
-    <span class="big">${shortMoney(entry.value_amount)}</span>
-    <span class="exact">${esc(entry.tender_ref || entry.tender_id)}</span>
-  </div>
-  <div class="flags">
-    ${auditFlag(entry)}
-    ${alarms(entry).map((a) => `<span class="flag alarm">${esc(a)}</span>`).join("")}
-    ${entry.risks.slice(0, MAX_ROW_FLAGS).map(riskFlag).join("")}
-    ${
-      entry.risks.length > MAX_ROW_FLAGS
-        ? `<a class="flag more" href="${esc(tenderHref)}">ще ${entry.risks.length - MAX_ROW_FLAGS}</a>`
-        : ""
-    }
-  </div>
-  <div class="signal">${signalLine(entry)}</div>
-</div>`;
+  return `<article class="row tender-card sev-${severity}">
+  <div class="card-topline"><span class="card-status">${esc({proven:'Висновок ДАСУ',high:'Ціновий сигнал',medium:'Потребує уваги',clear:'Перевірено ДАСУ',low:'Ознаки ризику'}[severity])}</span>${star("tender", entry.tender_id, here || tenderHref)}</div>
+  <div class="who"><h3 class="card-title"><a href="${esc(tenderHref)}">${esc(title)}</a></h3><div class="card-buyer">${showEntity && buyer && hasOwnTitle ? esc(buyer) : !hasOwnTitle ? 'Назва закупівлі відсутня у списку' : ''}</div></div>
+  <div class="card-facts"><div><span>Сума закупівлі</span><strong>${shortMoney(entry.value_amount)}</strong></div><div><span>Оприлюднено</span><strong>${entry.tender_date ? date(entry.tender_date) : 'Немає дати'}</strong></div></div>
+  ${signalLine(entry) ? `<p class="card-reason"><span>${severity === "clear" ? "Результат перевірки" : "Чому перевірити"}</span>${signalLine(entry)}</p>` : ''}
+  <details class="card-extra"><summary>Додаткові відомості</summary><div class="card-extra-body"><div class="meta">${meta.join(" · ")}</div>${people.length ? `<div class="meta">${people.join(" · ")}</div>` : ''}<div class="meta">${esc(entry.tender_ref || entry.tender_id)}</div>${!entry.detailed ? '<p class="coverage-note">Неповні дані у списку · відкрийте картку для деталей</p>' : ''}<div class="card-flags">${auditFlag(entry)}${alarms(entry).map(a=>`<span class="flag alarm">${esc(a)}</span>`).join('')}${entry.risks.slice(0,MAX_ROW_FLAGS).map(riskFlag).join('')}</div></div></details>
+  <div class="case-open"><a href="${esc(tenderHref)}">Переглянути закупівлю <span aria-hidden="true">→</span></a></div>
+</article>`;
 }

@@ -8,7 +8,7 @@ const db = await loadDataset();
 test("a proven violation leads the line", () => {
   const proven = db.cases.find((c) => c.audit?.violation);
   if (!proven) { assert.ok(true, "no proven case in fixture — skipped"); return; }
-  assert.match(signalLine(proven), /Порушення доведено/);
+  assert.match(signalLine(proven), /ДАСУ встановила порушення/);
 });
 
 test("otherwise the line is a count plus the top risk, short", () => {
@@ -25,7 +25,7 @@ test("otherwise the line is a count plus the top risk, short", () => {
 test("a single-risk case reads in the singular", () => {
   const one = db.cases.find((c) => !c.audit?.violation && c.risks.length === 1);
   if (!one) { assert.ok(true, "no single-risk case — skipped"); return; }
-  assert.match(signalLine(one), /1 ознака/);
+  assert.match(signalLine({ ...one, audit: null, findings: [], bidders: 2 }), /1 ознака/);
 });
 
 test("a case with no risks and no audit yields an empty line", () => {

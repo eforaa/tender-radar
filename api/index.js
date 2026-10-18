@@ -483,6 +483,247 @@ function isJointStock(name) {
   return name !== null && JOINT_STOCK.test(name);
 }
 
+// server/studio-styles.ts
+var STUDIO_STYLES = `
+:root[data-theme="light"]{--paper:#fff;--surface:#fff;--surface-2:#f3f7f4;--ink:#15251d;--ink-soft:#57665e;--ink-faint:#68766e;--line:#dce5df;--line-soft:#edf1ee;--accent:#187443;--accent-bg:#e7f5eb}
+:root:not([data-theme="light"]){--paper:#111e17;--surface:#182a20;--surface-2:#22392b;--ink:#eff8f1;--ink-soft:#b3c7b8;--line:#355441;--line-soft:#284533;--accent:#8bdeb0;--accent-bg:#254b35}
+body{font-family:var(--f-body);line-height:1.5}button,input,select{font-family:inherit}
+.wrap{max-width:1240px;padding-top:0}.top .inner{max-width:1240px;padding-block:18px}.top{box-shadow:none}.brand{font-family:inherit;gap:5px;font-size:21px;letter-spacing:-.7px}.brand span{color:var(--ink)}.studio-logo{width:32px;height:32px;color:var(--accent);margin-right:5px;flex:none}
+.top .nav a{font-size:14px}.menu-trigger{border-radius:6px}.theme-btn{border:0;background:none}.studio-hero{display:grid;grid-template-columns:1.15fr 1fr;gap:48px;align-items:center;padding:64px 0 56px}.studio-eyebrow{font-size:11px;font-weight:700;letter-spacing:1.4px;color:var(--accent)}.studio-copy h1{font-family:inherit;font-size:clamp(38px,4.5vw,60px);line-height:1.08;letter-spacing:-2.4px;font-weight:700;margin:22px 0}.studio-copy h1 span{color:var(--accent)}.studio-copy p{font-size:17px;line-height:1.6;max-width:420px;color:var(--ink-soft);margin:0 0 20px}.studio-help{display:inline-flex;gap:28px;align-items:center;min-height:44px;font-size:14px;font-weight:600;text-decoration:none;border-bottom:1px solid var(--line)}
+.studio-visual{position:relative;min-height:300px;display:flex;align-items:center;justify-content:center}.studio-orbit{position:absolute;inset:0;background:radial-gradient(circle at 25% 25%,#c6ebd3 0 24%,transparent 24.5%),radial-gradient(circle at 75% 25%,#dff2e5 0 24%,transparent 24.5%),radial-gradient(circle at 25% 75%,#e8f6ec 0 24%,transparent 24.5%),radial-gradient(circle at 75% 75%,#c6ebd3 0 24%,transparent 24.5%);opacity:.85}.studio-stat{position:relative;width:72%;background:var(--surface);border:1px solid var(--line);box-shadow:0 16px 40px #133d2010;border-radius:12px;padding:26px;transform:rotate(-3deg)}.studio-stat>span{font-size:9px;font-weight:700;letter-spacing:1px;color:var(--ink-soft)}.studio-stat strong{display:block;font-size:48px;line-height:1.2;letter-spacing:-2px;margin:8px 0}.studio-stat small{font-size:12px;color:var(--ink-soft)}.studio-bars{height:52px;display:flex;gap:8px;align-items:end;margin-top:16px}.studio-bars i{background:#93cfa7;width:100%;height:35%;border-radius:3px 3px 0 0}.studio-bars i:nth-child(2n){height:65%;background:#54a872}.studio-bars i:nth-child(3n){height:85%;background:#187443}.studio-bars i:last-child{height:100%}.studio-signal{position:absolute;right:0;bottom:-6px;max-width:85%;padding:16px 20px;display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px #133d2010}.studio-signal strong{font-size:14px}.studio-signal small{display:block;font-size:11px;max-width:230px;color:var(--ink-soft);margin-top:4px}.studio-dot{width:12px;height:12px;border-radius:50%;background:#3ca865;box-shadow:0 0 0 5px #e6f5eb;flex:none}
+.studio-workspace{border-top:1px solid var(--line);padding-top:28px}.results-heading{margin:0 0 20px}.results-heading h2{font-family:inherit;font-size:24px;letter-spacing:-.6px}.results-heading>span{font-size:12px}.scope-nav{border:0;gap:4px;padding:4px;background:var(--surface-2);border-radius:8px;width:max-content;max-width:100%}.scope-nav a{font-size:13px;min-height:40px;padding:8px 22px;border-radius:5px}.scope-nav a[aria-current]{background:var(--surface);color:var(--accent);box-shadow:0 1px 4px #0001;border:1px solid var(--line)}.scope-caption{font-size:11px;padding:12px 0 18px}.scope-caption a{text-decoration:none}
+.control-panel{border:0;border-radius:0;padding:0;background:none}.control-panel .sortbar{display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:16px}.control-panel .sortbar input[type=search]{width:100%;min-width:0;height:52px;background:var(--surface);border-radius:6px;font-size:16px;border:1px solid var(--line);padding:14px 16px}.control-panel .sortbar .go{grid-column:2;grid-row:1;height:52px;border-radius:6px;padding:12px 24px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:22px;background:var(--accent);color:var(--paper)}.sort-options{grid-column:1 / -1;grid-row:2;border-top:1px solid var(--line-soft);padding-top:4px}.sort-options>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-soft)}.sort-options>summary::after{content:'+';margin-left:auto;font-size:20px}.sort-options[open]>summary::after{content:'\u2212'}.sort-options-fields{display:flex;flex-wrap:wrap;gap:16px;padding:8px 0 12px}.sort-options-fields label{flex:1;min-width:180px!important}.sort-options-fields select{max-width:none!important;width:100%}.sort-apply{margin-bottom:12px;padding:10px 20px}
+.control-panel .presets{display:flex;flex-wrap:wrap;gap:8px;border:0;padding:0;margin:0 0 14px}.control-panel .preset{width:auto;min-height:38px;border-radius:5px;padding:8px 14px;font-size:12px;background:var(--surface);color:var(--ink-soft);border:1px solid var(--line)}.control-panel .preset.on{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:700}.control-panel .filters-more summary{border:0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);border-radius:0;padding:12px 0;font-size:13px}.data-overview{font-size:12px}.data-overview>summary{font-size:12px}.row{box-shadow:none;border-radius:8px;padding:20px}.row .name{font-family:inherit}.case-open a{font-size:12px}.menu-section h3{font-family:inherit;color:var(--accent)}.site-menu nav{gap:28px}.menu-header h2{font-family:inherit}.menu-icon{background:var(--accent-bg);border:0}
+@media(max-width:44rem){
+ .top .inner{padding:12px 18px;gap:10px}.top .brand{font-size:18px;gap:3px}.top .brand span{display:inline}.studio-logo{width:27px;height:27px;margin-right:4px}.top .theme-btn{display:none}.top .menu-trigger{border:0;background:none;padding:8px 0 8px 12px;font-size:13px;min-height:44px}.wrap{padding:0 20px 88px}
+ .studio-hero{display:block;padding:28px 0 26px}.studio-eyebrow{font-size:9px;letter-spacing:1px}.studio-copy h1{font-size:36px;letter-spacing:-1.4px;margin:14px 0;line-height:1.08}.studio-copy p{font-size:14px;line-height:1.55;margin:0;max-width:330px}.studio-help{font-size:12px;min-height:38px;margin-top:8px;gap:16px}.studio-visual{display:none}
+ .studio-workspace{padding-top:20px}.results-heading{margin-bottom:14px}.results-heading h2{font-size:20px}.results-heading>span{display:none}.scope-nav{width:100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px}.scope-nav a{padding:8px 3px;font-size:11px;min-height:40px}.scope-caption{font-size:10px;padding:10px 0 16px;gap:4px}.scope-caption>span{display:none}
+ .control-panel{padding:0}.control-panel .sortbar{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}.control-panel .sortbar input[type=search]{grid-column:1;grid-row:1;height:48px;border-radius:6px}.control-panel .sortbar .go{grid-column:1;grid-row:2;height:46px;min-height:46px;font-size:14px}.sort-options{grid-column:1;grid-row:3}.sort-options-fields{display:grid;grid-template-columns:1fr;gap:12px}.control-panel .sortbar label{gap:6px;font-size:12px}.control-panel .sortbar select{height:46px;font-size:16px}.control-panel .presets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.control-panel .preset{width:100%;min-height:40px;padding:8px 4px;font-size:11px;justify-content:center}.control-panel .preset:first-child{grid-column:1 / -1}.control-panel .filters-more summary{min-height:44px}.row{padding:16px}.tabbar{box-shadow:0 -2px 12px #00000005}.tabbar a,.tabbar button{font-size:10px!important}.data-overview>summary{line-height:1.5}.menu-section strong{font-size:15px}.menu-section small{font-size:12px}
+}
+@media(max-width:350px){.studio-copy h1{font-size:32px}.wrap{padding-inline:16px}.top .inner{padding-inline:16px}.top .brand{font-size:17px}}
+
+/* Compact railway overview and shared procurement cards. */
+.railway-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:32px 0 12px}.railway-heading h1{font:700 28px/1.2 var(--f-body);letter-spacing:-.7px;margin:0 0 8px}.railway-heading .sub{font-size:14px;margin:0;color:var(--ink-soft)}.railway-count{font-size:13px;white-space:nowrap;color:var(--ink-soft)}.railway-about{margin-bottom:20px;border-bottom:1px solid var(--line)}.railway-about>summary,.railway-analysis>summary{font-size:13px;cursor:pointer;padding:14px 0;min-height:44px;color:var(--accent)}.railway-about-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:0 0 16px}.railway-about-grid p{font-size:13px;color:var(--ink-soft);margin:0;line-height:1.6}.railway-about-grid strong{color:var(--ink)}.railway-analysis{margin-top:24px;border-top:1px solid var(--line)}.railway-analysis-body{padding-bottom:20px}
+.rows .tender-card{scroll-margin-top:90px;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px 32px;padding:22px;position:relative;align-items:start}.tender-card .card-topline{grid-column:1 / -1;display:flex;align-items:center;justify-content:space-between;min-width:0}.card-status{font-size:11px;font-weight:600;color:var(--ink-soft);background:var(--surface-2);border-radius:4px;padding:5px 8px}.sev-proven .card-status{color:var(--alarm);background:var(--alarm-bg)}.sev-high .card-status{color:var(--accent);background:var(--accent-bg)}.tender-card .star-form{margin:0}.tender-card .star{font-size:22px;min-width:44px;min-height:44px}.tender-card .who{grid-column:1;grid-row:2;min-width:0}.card-title{font:600 17px/1.45 var(--f-body);margin:0;letter-spacing:-.2px}.card-title a{color:var(--ink);text-decoration:none}.card-title a:hover{text-decoration:underline}.card-buyer{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-top:6px}.card-buyer:empty{display:none}.card-facts{grid-column:2;grid-row:2;display:grid;grid-template-columns:1fr;gap:10px}.card-facts>div{display:flex;flex-direction:column;gap:3px}.card-facts span,.card-reason>span{font-size:11px;color:var(--ink-soft)}.card-facts strong{font-size:18px;letter-spacing:-.4px;font-weight:600}.card-facts>div+div strong{font-size:12px;font-weight:400;letter-spacing:0}.card-reason{grid-column:1;grid-row:3;margin:0;font-size:13px;line-height:1.5}.card-reason>span{display:block;margin-bottom:3px}.card-extra{grid-column:1;grid-row:4;min-width:0}.card-extra>summary{font-size:12px;color:var(--ink-soft);cursor:pointer;min-height:44px;padding:12px 0}.card-extra-body{padding:8px 0}.card-flags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.tender-card .case-open{grid-column:2;grid-row:4;align-self:end;justify-content:stretch}.tender-card .case-open a{display:flex;justify-content:space-between;gap:16px;width:100%;border-top:1px solid var(--line);border-radius:0;background:none;text-decoration:none;font-size:13px;min-height:44px;font-weight:600}
+@media(max-width:44rem){.railway-heading{display:block;padding:24px 0 8px}.railway-heading h1{font-size:24px;max-width:300px}.railway-heading .sub{font-size:13px}.railway-count{display:block;margin-top:10px;font-size:12px}.railway-about-grid{grid-template-columns:1fr;gap:14px}.railway-about{margin-bottom:16px}.rows .tender-card{display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:10px}.tender-card .card-topline{width:100%;min-height:30px}.tender-card .who{order:initial;width:100%}.tender-card .star{min-height:36px;min-width:44px}.card-title{font-size:16px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.card-buyer{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.card-facts{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;padding:12px 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)}.card-facts strong{font-size:20px}.card-facts>div+div strong{font-size:12px;line-height:1.5}.card-reason{font-size:13px;width:100%}.card-extra{width:100%}.tender-card .case-open{order:initial;width:100%}.tender-card .case-open a{padding:8px 0}.card-extra>summary{min-height:36px;padding:8px 0}}
+
+.tender-detail{max-width:1040px;margin:auto;padding:24px 0 40px}.detail-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}.detail-toolbar .back{margin:0;font-size:13px}.detail-toolbar .star-form{margin:0}.detail-toolbar .star{display:flex;gap:8px;align-items:center;min-height:44px;font-size:20px}.detail-toolbar .star span{font-size:13px}.detail-ref{font-size:12px;color:var(--ink-soft);margin:0 0 10px;overflow-wrap:anywhere}.detail-heading h1{font:600 28px/1.3 var(--f-body);letter-spacing:-.6px;max-width:900px;margin:0 0 12px}.detail-buyer{font-size:14px;color:var(--ink-soft);margin:0}.detail-overview{display:grid;grid-template-columns:1.2fr .7fr 1fr;gap:24px;margin:24px 0;padding:20px 0;border-block:1px solid var(--line)}.detail-overview>div{display:flex;flex-direction:column;gap:6px}.detail-overview span{font-size:12px;color:var(--ink-soft)}.detail-overview strong{font-size:22px;font-weight:600}.detail-overview>div:last-child strong{font-size:16px}.detail-source{display:flex;align-items:center;gap:16px;margin-bottom:28px}.detail-source>a{background:var(--accent);color:var(--paper);padding:12px 18px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;min-height:44px;display:flex;gap:24px;align-items:center;justify-content:space-between}.detail-source>span{font-size:12px;color:var(--ink-soft)}.detail-columns{display:grid;grid-template-columns:1.15fr 1fr;gap:32px;align-items:start}.tender-detail h2{font:600 18px/1.4 var(--f-body);border:0;margin:0 0 10px;padding:0}.detail-signals h2>span{font-size:12px;background:var(--surface-2);padding:4px 8px;border-radius:4px;margin-left:6px}.detail-caution{font-size:12px!important;color:var(--ink-soft);margin:0 0 14px}.detail-competition{font-size:14px;color:var(--ink-soft);margin:0 0 14px}.detail-fold{border-bottom:1px solid var(--line);margin:0}.detail-fold>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;min-height:48px;cursor:pointer;font-size:14px;line-height:1.5}.detail-fold>summary::-webkit-details-marker{display:none}.detail-fold>summary::after{content:'+';flex:none;font-size:20px;color:var(--accent)}.detail-fold[open]>summary::after{content:'\u2212'}.detail-fold>summary strong{display:block;font-weight:500}.detail-fold>summary small{display:block;color:var(--ink-soft);font-size:12px;margin:3px 0}.detail-fold-body{padding:4px 0 20px;font-size:14px;overflow-wrap:anywhere}.detail-fold-body p{font-size:14px;line-height:1.65}.detail-fold-body .card{box-shadow:none;border:0;padding:12px 0;margin:0;border-radius:0;background:none}.detail-fold-body .card h3{font-size:16px}.detail-next{background:var(--surface-2);padding:20px;border-radius:8px}.detail-next ol{padding-left:22px;margin:14px 0;font-size:14px;line-height:1.6}.detail-next li{padding:0 0 12px 4px}.detail-next li:last-child{padding-bottom:0}.detail-next .detail-fold{border:0;border-top:1px solid var(--line)}.detail-next .detail-fold>summary{font-size:12px;padding-bottom:0}.detail-next .detail-fold[open]>summary{padding-bottom:12px}.detail-reference{margin-top:28px;border-top:1px solid var(--line)}.detail-downloads{display:flex;gap:24px;flex-wrap:wrap}.detail-downloads a{min-height:44px;display:flex;align-items:center}.tender-detail [id]{scroll-margin-top:100px}
+@media(max-width:44rem){.tender-detail{padding-top:12px}.detail-toolbar{margin-bottom:14px}.detail-heading h1{font-size:21px;line-height:1.35;letter-spacing:-.3px}.detail-buyer{font-size:13px;line-height:1.5}.detail-overview{grid-template-columns:1fr 1fr;gap:16px;margin:18px 0;padding:16px 0}.detail-overview>div:last-child{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between;gap:12px}.detail-overview strong{font-size:21px}.detail-overview>div:last-child strong{font-size:14px}.detail-source{display:block;margin-bottom:24px}.detail-source>a{width:100%}.detail-source>span{display:none}.detail-columns{display:flex;flex-direction:column;gap:24px}.detail-columns>section{width:100%}.detail-next{padding:16px}.detail-reference{margin-top:24px}.detail-fold>summary{font-size:15px}.detail-fold-body p,.detail-next ol{font-size:15px}.detail-fold-body .facts{display:grid;grid-template-columns:1fr;margin:0}.detail-fold-body .facts dt{padding-top:12px;font-size:12px}.detail-fold-body .facts dd{padding:2px 0 8px;margin:0;font-size:14px}.detail-fold-body .card{margin-inline:0}.detail-fold-body h2{margin-top:16px}}
+
+/* Shared type scale and control geometry: keep overrides in one place. */
+:root{--f-body:"Noto Sans","Segoe UI",Arial,sans-serif;--f-display:var(--f-body);--control-radius:8px}
+body{font-family:var(--f-body);font-weight:400;line-height:1.6}
+h1,h2,h3,.brand{font-family:var(--f-body)}
+h1,.studio-copy h1,.detail-heading h1,.railway-heading h1{font-weight:700;letter-spacing:-.025em}
+h2,.tender-detail h2,.results-heading h2{font-weight:600;letter-spacing:-.015em}
+h3,.card-title,.menu-section strong{font-weight:600}
+.card-title{line-height:1.5}.detail-heading h1{line-height:1.35}
+.card-facts strong,.detail-overview strong,.studio-stat strong,.radar-metrics strong{font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.card-facts>div+div strong,.detail-overview>div:last-child strong{font-weight:500;letter-spacing:0}
+.detail-overview span,.card-facts span,.card-reason>span,.sortbar label,.filter-fieldsets label{font-weight:500}
+.detail-buyer,.card-buyer,.detail-caution,.hint,.meta,.menu-section small{font-weight:400}
+button,.action,.preset,.menu-trigger,.case-open a,.detail-source>a{font-weight:600}
+/* Radius applies to button-like links and disclosure controls as well. */
+button,input[type=submit],input[type=button],a.action,a.preset,a.back,a.starred-btn,a.skip,.scope-nav a,.top .nav a,.tender-sections a,.case-open a,.detail-source>a,.pager>a,summary,.menu-section a{border-radius:var(--control-radius)!important}
+input:not([type=checkbox]):not([type=radio]),select,textarea{border-radius:var(--control-radius)!important}
+.detail-fold>summary{font-weight:500}.detail-fold>summary strong{font-weight:600}
+.detail-fold-body p,.detail-next ol{font-size:15px;line-height:1.65}
+.card-buyer,.card-facts span,.card-reason>span,.detail-ref,.detail-overview span{font-size:12px}
+@media(max-width:44rem){.card-title{font-size:16px}.detail-heading h1{font-size:21px}.card-facts strong{font-size:21px}.detail-overview strong{font-size:22px}.detail-fold>summary{font-size:15px}.control-panel .preset{font-size:12px}.menu-section small{font-size:13px}.detail-buyer{font-size:14px}.detail-next ol,.detail-fold-body p{font-size:16px}}
+`;
+
+// server/favourite-interaction.ts
+var FAVOURITE_SCRIPT = `<script>
+(function(){
+  if(!window.fetch || !window.FormData) return;
+  var prefixes={tender:'t',entity:'e',supplier:'s',officer:'o'}, busy=false, timer;
+  var notice=document.createElement('div');
+  notice.setAttribute('role','status');
+  notice.setAttribute('aria-live','polite');
+  notice.style.cssText='position:fixed;bottom:88px;left:50%;transform:translateX(-50%);z-index:1000;max-width:calc(100% - 32px);width:max-content;padding:12px 16px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);box-shadow:0 4px 20px #0002;font-size:14px;';
+  notice.hidden=true;
+  document.body.appendChild(notice);
+  function announce(message){
+    clearTimeout(timer);notice.hidden=false;notice.textContent=message;
+    timer=setTimeout(function(){notice.hidden=true;notice.textContent='';},6000);
+  }
+  function saved(){
+    var item=document.cookie.split(';').map(function(v){return v.trim();}).find(function(v){return v.indexOf('tr_starred=')===0;});
+    return new Set(item ? item.slice('tr_starred='.length).split('~') : []);
+  }
+  function key(form){return prefixes[form.elements.namedItem('kind').value]+':'+form.elements.namedItem('id').value;}
+  function sync(){
+    var items=saved();
+    document.querySelectorAll('form.star-form').forEach(function(form){
+      var button=form.querySelector('button.star');if(!button)return;
+      var on=items.has(key(form)),label=button.querySelector('span');
+      button.classList.toggle('on',on);
+      button.setAttribute('aria-pressed',String(on));
+      button.title=on?'\u041F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0437 \u043E\u0431\u0440\u0430\u043D\u043E\u0433\u043E':'\u0414\u043E\u0434\u0430\u0442\u0438 \u0434\u043E \u043E\u0431\u0440\u0430\u043D\u043E\u0433\u043E';
+      button.setAttribute('aria-label',button.title);
+      if(button.firstChild && button.firstChild.nodeType===3)button.firstChild.textContent=on?'\u2605':'\u2606';
+      if(label)label.textContent=on?'\u0412 \u043E\u0431\u0440\u0430\u043D\u043E\u043C\u0443':'\u0414\u043E \u043E\u0431\u0440\u0430\u043D\u043E\u0433\u043E';
+    });
+  }
+  document.addEventListener('submit',async function(event){
+    var form=event.target;
+    if(!(form instanceof HTMLFormElement) || !form.matches('form.star-form'))return;
+    event.preventDefault();if(busy)return;
+    var itemKey=key(form),wanted=!saved().has(itemKey);
+    busy=true;
+    var buttons=Array.from(document.querySelectorAll('form.star-form button.star'));
+    buttons.forEach(function(button){button.setAttribute('aria-disabled','true');});
+    form.setAttribute('aria-busy','true');
+    try{
+      var body=new URLSearchParams();
+      new FormData(form).forEach(function(value,name){if(typeof value==='string')body.append(name,value);});
+      // The response sets the cookie. Do not follow the normal form redirect
+      // and fetch an entire page just to update a star.
+      var response=await fetch(form.action,{method:'POST',body:body,credentials:'same-origin',redirect:'manual'});
+      if(response.type!=='opaqueredirect' && !response.ok)throw new Error('save failed');
+      if(saved().has(itemKey)!==wanted)throw new Error('cookie not updated');
+      announce(wanted?'\u0417\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u043E \u0432 \u043E\u0431\u0440\u0430\u043D\u043E\u043C\u0443':'\u041F\u0440\u0438\u0431\u0440\u0430\u043D\u043E \u0437 \u043E\u0431\u0440\u0430\u043D\u043E\u0433\u043E');
+    }catch(error){
+      announce('\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0437\u043C\u0456\u043D\u0438\u0442\u0438 \u043E\u0431\u0440\u0430\u043D\u0435. \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0437\u2019\u0454\u0434\u043D\u0430\u043D\u043D\u044F \u0442\u0430 \u0441\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0449\u0435 \u0440\u0430\u0437.');
+    }finally{
+      sync();busy=false;form.removeAttribute('aria-busy');
+      buttons.forEach(function(button){button.removeAttribute('aria-disabled');});
+    }
+  });
+  window.addEventListener('pageshow',sync);
+  window.addEventListener('focus',function(){if(!busy)sync();});
+})();
+</script>`;
+
+// server/navigation.ts
+var groups = [
+  { title: "\u0417\u043D\u0430\u0439\u0442\u0438 \u0442\u0430 \u0437\u0431\u0435\u0440\u0435\u0433\u0442\u0438", items: [
+    { href: "/", nav: "feed", label: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", hint: "\u041F\u043E\u0448\u0443\u043A \u0437\u0430 \u043D\u0430\u0437\u0432\u043E\u044E, \u0440\u0435\u0433\u0456\u043E\u043D\u043E\u043C \u0430\u0431\u043E \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u043E\u043C", icon: "\u2315" },
+    { href: "/railway", nav: "railway", label: "\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F", hint: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0438\u0445 \u043E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0439", icon: "\u2194" },
+    { href: "/starred", nav: "starred", label: "\u041E\u0431\u0440\u0430\u043D\u0435", hint: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0439 \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457, \u044F\u043A\u0456 \u0432\u0438 \u0437\u0431\u0435\u0440\u0435\u0433\u043B\u0438", icon: "\u2606" }
+  ] },
+  { title: "\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438", items: [
+    { href: "/lookup", nav: "lookup", label: "\u0417\u043D\u0430\u0439\u0442\u0438 \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u044E", hint: "\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u0457\u0457 \u043A\u043E\u0434 \u0404\u0414\u0420\u041F\u041E\u0423", icon: "\u2315" },
+    { href: "/prices", nav: "prices", label: "\u0426\u0456\u043D\u043E\u0432\u0456 \u0441\u0438\u0433\u043D\u0430\u043B\u0438", hint: "\u041F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F \u0446\u0456\u043D, \u044F\u043A\u0456 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u044E\u0442\u044C \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438", icon: "\u20B4" },
+    { href: "/article/366", nav: "article-366", label: "\u0420\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0445", hint: "\u0421\u0438\u0433\u043D\u0430\u043B\u0438 \u0442\u0430 \u043F\u043E\u044F\u0441\u043D\u0435\u043D\u043D\u044F \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438", icon: "\u2261" }
+  ] },
+  { title: "\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C", items: [
+    { href: "/entities", nav: "entities", label: "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438", hint: "\u0425\u0442\u043E \u0437\u0430\u043A\u0443\u043F\u043E\u0432\u0443\u0454 \u0442\u043E\u0432\u0430\u0440\u0438, \u0440\u043E\u0431\u043E\u0442\u0438 \u0439 \u043F\u043E\u0441\u043B\u0443\u0433\u0438", icon: "\u2197" },
+    { href: "/suppliers", nav: "suppliers", label: "\u041F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A\u0438", hint: "\u041A\u043E\u043C\u043F\u0430\u043D\u0456\u0457, \u0437\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0456 \u0443 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u0430\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C", icon: "\u2197" },
+    { href: "/officers", nav: "officers", label: "\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0456 \u043E\u0441\u043E\u0431\u0438", hint: "\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u0438, \u0437\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0456 \u0432 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445", icon: "\u2197" }
+  ] },
+  { title: "\u0414\u043E\u043F\u043E\u043C\u043E\u0433\u0430 \u0442\u0430 \u0434\u0430\u043D\u0456", items: [
+    { href: "/about", nav: "about", label: "\u042F\u043A \u043A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0442\u0438\u0441\u044F \u0440\u0430\u0434\u0430\u0440\u043E\u043C", hint: "\u0417\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456 \u0442\u0430 \u044F\u043A \u0447\u0438\u0442\u0430\u0442\u0438 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442\u0438", icon: "?" },
+    { href: "/indicators", nav: "indicators", label: "\u0429\u043E \u043E\u0437\u043D\u0430\u0447\u0430\u044E\u0442\u044C \u0441\u0438\u0433\u043D\u0430\u043B\u0438", hint: "\u041F\u043E\u044F\u0441\u043D\u0435\u043D\u043D\u044F \u043E\u0437\u043D\u0430\u043A \u0440\u0438\u0437\u0438\u043A\u0443 \u043F\u0440\u043E\u0441\u0442\u0438\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438", icon: "?" },
+    { href: "/updates", nav: "updates", label: "\u041E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0434\u0430\u043D\u0438\u0445", hint: "\u041A\u043E\u043B\u0438 \u0456 \u044F\u043A \u043E\u043D\u043E\u0432\u043B\u044E\u0432\u0430\u043B\u0430\u0441\u044F \u0431\u0430\u0437\u0430", icon: "\u21BB" }
+  ] }
+];
+function navigationContent(current2 = "") {
+  return groups.map((group, i) => `<section class="menu-section" aria-labelledby="menu-group-${i}"><h3 id="menu-group-${i}">${group.title}</h3><ul>${group.items.map((item) => `<li><a href="${item.href}"${current2 === item.nav ? ' aria-current="page"' : ""}><span class="menu-icon" aria-hidden="true">${item.icon}</span><span><strong>${item.label}</strong><small>${item.hint}</small></span>${current2 === item.nav ? '<span class="menu-current">\u0412\u0438 \u0442\u0443\u0442</span>' : ""}</a></li>`).join("")}</ul></section>`).join("");
+}
+function navigationDialog(current2 = "") {
+  return `<dialog class="site-menu" id="site-menu" aria-labelledby="site-menu-title"><div class="menu-header"><div><h2 id="site-menu-title">\u041A\u0443\u0434\u0438 \u043F\u0435\u0440\u0435\u0439\u0442\u0438?</h2><p>\u041E\u0431\u0435\u0440\u0456\u0442\u044C, \u0449\u043E \u0445\u043E\u0447\u0435\u0442\u0435 \u0437\u0440\u043E\u0431\u0438\u0442\u0438</p></div><button type="button" class="menu-close" data-menu-close aria-label="\u0417\u0430\u043A\u0440\u0438\u0442\u0438 \u043C\u0435\u043D\u044E">\xD7</button></div><nav aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">${navigationContent(current2)}</nav><p class="menu-footnote">\u0421\u0438\u0433\u043D\u0430\u043B \u0440\u0438\u0437\u0438\u043A\u0443 \u043D\u0435 \u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0434\u043E\u0432\u0435\u0434\u0435\u043D\u0435 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p></dialog><noscript><details class="no-script-menu"><summary>\u041C\u0435\u043D\u044E \u2014 \u0443\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438</summary><nav>${navigationContent(current2)}</nav></details></noscript>`;
+}
+var NAVIGATION_SCRIPT = `<script>
+(()=>{const dialog=document.getElementById('site-menu');if(!dialog)return;let opener=null;
+const triggers=[...document.querySelectorAll('[data-menu-open]')];
+triggers.forEach(button=>button.addEventListener('click',()=>{opener=button;dialog.showModal();triggers.forEach(t=>t.setAttribute('aria-expanded','true'));document.body.classList.add('menu-open');dialog.querySelector('[data-menu-close]').focus();}));
+dialog.querySelector('[data-menu-close]').addEventListener('click',()=>dialog.close());
+dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});
+dialog.addEventListener('close',()=>{document.body.classList.remove('menu-open');triggers.forEach(t=>t.setAttribute('aria-expanded','false'));if(opener)opener.focus();});
+})();</script>`;
+var NAVIGATION_STYLES = `
+.menu-trigger,.menu-close{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:44px;min-width:44px;padding:.55rem 1rem;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.menu-trigger span{font-size:1.2rem}.menu-open{overflow:hidden}
+.site-menu{position:fixed;inset:0 0 0 auto;margin:0;width:min(45rem,100%);height:100dvh;max-height:100dvh;max-width:100%;border:0;border-left:1px solid var(--line);padding:0;background:var(--paper);color:var(--ink);overflow-y:auto;overscroll-behavior:contain;box-shadow:-20px 0 80px #0002}
+.site-menu::backdrop{background:#10251ecc;backdrop-filter:blur(3px)}
+.menu-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;position:sticky;top:0;z-index:2;background:var(--surface);padding:1.25rem 1.5rem;border-bottom:1px solid var(--line)}
+.menu-header h2{border:0;margin:0;padding:0;font-size:1.4rem}.menu-header p{margin:.2rem 0 0;font-size:.85rem;color:var(--ink-soft)}.menu-close{font-size:1.6rem;flex:none;padding:.2rem .7rem}
+.site-menu nav{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;padding:1.5rem}.menu-section{min-width:0}.menu-section h3{font-size:.73rem;letter-spacing:.06em;text-transform:uppercase;margin:0 0 .65rem;color:var(--ink-soft)}
+.menu-section ul{padding:0;margin:0;list-style:none;display:grid;gap:.4rem}.menu-section a{display:flex;align-items:flex-start;gap:.7rem;border-radius:10px;border:1px solid transparent;padding:.75rem .65rem;min-height:64px;text-decoration:none;color:var(--ink);position:relative}.menu-section a:hover{background:var(--surface);border-color:var(--line)}.menu-section a[aria-current]{background:var(--accent-bg);border-color:var(--accent)}.menu-section strong{display:block;font-size:.9rem;line-height:1.4}.menu-section small{display:block;font-size:.75rem;line-height:1.5;color:var(--ink-soft);margin-top:.25rem}.menu-icon{width:1.75rem;height:1.75rem;flex:none;display:grid;place-items:center;border:1px solid var(--line);border-radius:6px;color:var(--accent)}.menu-current{font-size:.62rem;color:var(--accent);white-space:nowrap;margin-left:auto}.menu-footnote{padding:1rem 1.5rem;border-top:1px solid var(--line);font-size:.8rem;color:var(--ink-soft);max-width:none;margin:0}
+.no-script-menu{padding:1rem}.no-script-menu nav{display:grid;grid-template-columns:repeat(2,1fr)}
+.tabbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:3.5rem;padding:.25rem 0;border:0;border-radius:0;background:transparent;color:var(--ink-soft);font:inherit;font-size:.75rem;cursor:pointer}
+.compact-intro{padding:.4rem 0 1.25rem}.compact-intro h1{font-size:clamp(1.6rem,3vw,2.3rem);margin:0 0 .5rem;line-height:1.2;letter-spacing:-.03em}.compact-intro p{margin:0;color:var(--ink-soft);max-width:48rem}.compact-intro a{font-size:.85rem;display:inline-flex;min-height:44px;align-items:center}
+.data-overview{margin:1rem 0}.data-overview>summary{min-height:44px;cursor:pointer;font-size:.85rem;color:var(--ink-soft);padding:.5rem 0}.data-overview .radar-metrics{margin:.5rem 0 1rem}
+.filter-fieldsets{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem}.filter-fieldsets fieldset{min-width:0;margin:0;padding:1rem;border:1px solid var(--line);border-radius:8px}.filter-fieldsets legend{font-size:.85rem;font-weight:700;padding:0 .4rem}.filter-fieldsets label:not(.check){display:flex;flex-direction:column;gap:.35rem;font-size:.8rem;color:var(--ink-soft);margin-bottom:.8rem}.filter-fieldsets select,.filter-fieldsets input{width:100%;max-width:100%;min-width:0}.filter-fieldsets .check{display:flex;gap:.5rem;align-items:center;min-height:44px;white-space:normal}.filter-fieldsets .check input{width:20px;min-height:20px;flex:none}.filter-actions{display:flex;align-items:center;flex-wrap:wrap;gap:1rem;margin-top:1rem}.filter-actions a{min-height:44px;display:inline-flex;align-items:center}.applied-filters{font-size:.8rem;margin:.5rem 0;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}.applied-filters a{display:inline-flex;min-height:36px;align-items:center;padding:.25rem .65rem;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;text-decoration:none}
+.case-open{grid-column:2 / -1;display:flex;justify-content:flex-end}.case-open a{min-height:44px;display:inline-flex;align-items:center;font-size:.8rem;font-weight:600}.tender-sections{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}.tender-sections a{padding:.5rem .8rem;border:1px solid var(--line);border-radius:8px;min-height:44px;text-decoration:none}h2[id]{scroll-margin-top:6rem}
+@media(max-width:44rem){.site-menu{width:100%}.site-menu nav{grid-template-columns:1fr;gap:1.2rem;padding:1rem}.menu-header{padding:1rem}.menu-section a{padding:.6rem;min-height:64px}.menu-section strong{font-size:1rem}.menu-section small{font-size:.8rem}.top .inner{flex-wrap:nowrap;gap:.5rem}.top .brand{margin-right:auto;min-width:0}.top .menu-trigger{display:inline-flex;flex:none;padding:.5rem .65rem;font-size:.85rem}.top .theme-btn{flex:none;margin:0}.top .brand span{display:none}.filter-fieldsets{grid-template-columns:1fr}.filter-fieldsets input,.filter-fieldsets select{font-size:16px}.compact-intro{padding-bottom:.5rem}.compact-intro h1{font-size:1.6rem}.compact-intro p{font-size:.88rem}.case-open{width:100%;justify-content:stretch;order:2}.case-open a{justify-content:center;width:100%;border:1px solid var(--line);border-radius:7px;background:var(--surface-2)}.tender-sections a{font-size:.8rem}.scope-caption{padding:.5rem 0}}
+`;
+
+// server/radar-styles.ts
+var RADAR_STYLES = `
+:root[data-theme="light"]{--paper:#f4f6f5;--surface:#fff;--surface-2:#edf3f0;--ink:#162d28;--ink-soft:#4d625b;--ink-faint:#5c7069;--line:#d6e1dc;--line-soft:#e7eeea;--accent:#08745b;--accent-bg:#e0f2e9;--alarm:#b53f32;--alarm-bg:#fceeea}
+:root:not([data-theme="light"]){--accent:#77dbc1;--accent-bg:#163d36}
+body{font-size:16px;line-height:1.6}
+.wrap{max-width:78rem}
+.top .inner{max-width:78rem}
+.top{box-shadow:0 1px 0 var(--line-soft)}
+.top .nav a,.theme-btn,.burger{min-height:44px;align-items:center}
+.top .nav a{display:inline-flex;border-radius:8px}
+.theme-btn,.burger{min-width:44px}
+.burger span{width:100%}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+.radar-hero{display:grid;grid-template-columns:1.7fr 1fr;gap:3rem;align-items:center;padding:1.5rem 0 2rem}
+.eyebrow{font-size:.7rem;font-weight:700;letter-spacing:.12em;color:var(--accent);margin:0 0 1rem}
+.radar-hero h1{font-size:clamp(2rem,3.8vw,3.35rem);line-height:1.12;letter-spacing:-.045em;margin:0 0 1.25rem;font-weight:700}
+.radar-hero h1 span{color:var(--accent)}
+.hero-description{max-width:39rem;color:var(--ink-soft);font-size:1rem;margin:0}
+.hero-guide{padding:1.5rem 1.75rem;border-left:2px solid var(--line);color:var(--ink-soft);font-size:.9rem}
+.hero-guide ol{padding-left:1.3rem;margin:.75rem 0 1rem}.hero-guide li{padding:.25rem 0}.hero-guide a{font-weight:600}
+.scope-nav{display:flex;gap:.4rem;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:.75rem}
+.scope-nav a{display:inline-flex;align-items:center;min-height:44px;padding:.5rem 1.25rem;border:1px solid transparent;border-radius:8px;color:var(--ink-soft);text-decoration:none;font-weight:600}
+.scope-nav a:hover{background:var(--surface-2)}.scope-nav a[aria-current]{background:var(--ink);color:var(--paper)}
+.scope-caption{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.5rem;padding:1rem 0;font-size:.8rem;color:var(--ink-soft)}
+.scope-caption a{color:var(--ink-soft)}
+.radar-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-bottom:2.5rem}
+.radar-metrics>div{display:flex;flex-direction:column;gap:.4rem;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.15rem;min-width:0}
+.radar-metrics span{font-size:.8rem;color:var(--ink-soft)}
+.radar-metrics strong{font-size:clamp(1.4rem,2.1vw,1.9rem);letter-spacing:-.04em;line-height:1.4;font-variant-numeric:tabular-nums}
+.radar-metrics em{font-style:normal;font-size:.85rem;color:var(--ink-soft);letter-spacing:0}
+.radar-metrics small{font-size:.72rem;color:var(--ink-faint)}
+.results-heading{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;margin-bottom:1rem}.results-heading h2{margin:0;font-size:1.4rem;border:0;padding:0}.results-heading>span{font-size:.8rem;color:var(--ink-soft)}
+.control-panel{border:1px solid var(--line);border-radius:12px;padding:1.1rem;background:var(--surface);margin-bottom:1.25rem}
+.control-panel .sortbar{border:0;background:none;padding:0;box-shadow:none;gap:.75rem;align-items:flex-end;margin-bottom:1rem}
+.control-panel .sortbar input[type=search]{min-height:48px;font-size:16px;background:var(--paper);border:1px solid var(--line);padding:.7rem .9rem;flex:1 1 19rem}
+.control-panel .sortbar label{display:flex;flex-direction:column;align-items:stretch;gap:.25rem;font-size:.75rem;color:var(--ink-soft)}
+.control-panel .sortbar select{min-height:48px;font-size:.85rem;max-width:14rem;padding:.5rem}
+.control-panel .go{min-height:48px;background:var(--accent);color:var(--paper);border:0;font-weight:700}
+.control-panel .presets{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem}
+.control-panel .preset{min-height:44px;font-size:.82rem;padding:.5rem .9rem;border-radius:8px;white-space:normal;line-height:1.4;display:inline-flex;align-items:center}
+.control-panel .filters{margin:0}.control-panel .filters-more{margin:0;border:0;background:none;box-shadow:none}.control-panel .filters-more summary{padding:.65rem 0;min-height:44px;font-size:.85rem}
+.control-panel .filter-row{gap:.75rem}.control-panel .filter-row select{max-width:100%;min-width:0}.control-panel input,.control-panel select,.control-panel button{min-height:44px}
+.rows{border:0;background:none;display:grid;gap:.8rem;box-shadow:none}
+.row{border:1px solid var(--line)!important;border-radius:12px;padding:1.2rem;gap:.5rem 1rem;box-shadow:0 2px 4px #00000003}
+.row:hover{border-color:var(--accent)!important;background:var(--surface)}
+.row .who{min-width:0}.row .name{font-size:1rem;line-height:1.5}.row .meta{font-size:.8rem;line-height:1.6;color:var(--ink-soft)}
+.row .amount .big{font-size:1.2rem}.row .amount .exact{font-size:.7rem;overflow-wrap:anywhere}
+.row .flags{padding-top:.4rem}.row .flag{font-size:.74rem;line-height:1.5;white-space:normal}
+.row .row-status{font-size:.72rem;color:var(--accent);font-weight:600;margin-bottom:.3rem}.row .coverage-note{font-size:.75rem;color:var(--ink-soft);margin-top:.3rem}
+.row .star{min-width:44px;min-height:44px;display:inline-flex;justify-content:center;align-items:center}
+@media(max-width:60rem){.radar-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-guide{padding:1rem}.radar-hero{gap:1.5rem}.results-heading{align-items:flex-start;flex-direction:column;gap:.25rem}}
+@media(max-width:44rem){
+ .wrap{padding-top:1.25rem}.radar-hero{display:block;padding:0 0 1.5rem}.radar-hero h1{font-size:2.25rem}.radar-hero .eyebrow{font-size:.6rem;letter-spacing:.08em;margin-bottom:.8rem}.hero-description{font-size:.9rem}.hero-guide{display:none}
+ .scope-nav{gap:.25rem;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.scope-nav a{padding:.5rem .25rem;justify-content:center;font-size:.78rem}
+ .scope-caption{font-size:.73rem}.radar-metrics{gap:.5rem;margin-bottom:1.5rem}.radar-metrics>div{padding:.8rem}.radar-metrics span{font-size:.7rem;min-height:2.2em}.radar-metrics strong{font-size:1.4rem}.radar-metrics small{font-size:.68rem}.radar-metrics em{display:block;font-size:.7rem}
+ .control-panel{padding:1rem}
+ .control-panel .sortbar{display:flex;flex-direction:column;align-items:stretch;gap:1rem}
+ .control-panel .sortbar input[type=search]{flex:none;width:100%;min-width:0;height:48px}
+ .control-panel .sortbar label{order:initial;display:flex;flex-direction:column;align-items:stretch;gap:.4rem;width:100%;min-width:0;font-size:.85rem}
+ .control-panel .sortbar select{max-width:none;width:100%;min-width:0;height:48px;font-size:16px;padding:.5rem .75rem}
+ .control-panel .sortbar .go{order:initial;width:100%;height:48px;padding:.5rem 1rem}
+ .control-panel .presets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;overflow:visible;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line)}
+ .control-panel .preset{width:100%;min-width:0;min-height:52px;padding:.5rem;font-size:.8rem;text-align:center;justify-content:center;white-space:normal;line-height:1.35}
+ .control-panel .preset:first-child{grid-column:1 / -1}
+ .control-panel .filters-more summary{display:flex;align-items:center;gap:.5rem;width:100%;padding:.75rem;border:1px solid var(--line);border-radius:8px;min-height:48px}
+ .control-panel .filter-actions{align-items:stretch;flex-direction:column}.control-panel .filter-actions button{width:100%}
+
+ .control-panel .filters-more .inner{padding:.5rem 0}.control-panel .filter-row{display:flex;flex-direction:column;align-items:stretch}.control-panel .filter-row input,.control-panel .filter-row select{width:100%;min-width:0;font-size:16px}.control-panel .check{white-space:normal}
+ .rows{margin-inline:0;gap:.75rem}.row{padding:1rem;display:flex;gap:.4rem}.row .dot{display:none}.row .amount{order:0;display:flex;flex-wrap:wrap;gap:.25rem 1rem;width:100%;justify-content:space-between}.row .amount .exact{display:block;font-size:.65rem}.row .who{order:-1;width:100%}.row .name a{display:block;-webkit-line-clamp:unset;overflow:visible}.row .name a::after{display:none}.row .meta{white-space:normal;overflow:visible}.row .signal{white-space:normal;overflow:visible;font-size:.8rem;width:100%;padding-top:.5rem;border-top:1px solid var(--line-soft)}.row .row-status{font-size:.7rem}.row .coverage-note{font-size:.7rem}
+ .tabbar a,.tabbar label{font-size:.75rem;color:var(--ink-soft)}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+`;
+
 // server/html.ts
 function esc(value) {
   return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -1101,26 +1342,6 @@ details.help + details.help{margin-top:calc(-1 * var(--s4))}
 }
 
 `;
-var MENU = [
-  { href: "/", nav: "feed", label: "\u0423\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", hint: "\u043F\u043E\u0432\u043D\u0438\u0439 \u043F\u0435\u0440\u0435\u043B\u0456\u043A, \u0437 \u043F\u043E\u0448\u0443\u043A\u043E\u043C \u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0430\u043C\u0438" },
-  { href: "/railway", nav: "railway", label: "\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F", hint: "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438" },
-  { href: "/prices", nav: "prices", label: "\u0417\u0430\u0432\u0438\u0449\u0435\u043D\u0456 \u0446\u0456\u043D\u0438", hint: "\u0434\u0435 \u043C\u0438 \u0441\u0430\u043C\u0456 \u043F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442\u0443" },
-  { href: "/starred", nav: "starred", label: "\u041E\u0431\u0440\u0430\u043D\u0435", hint: "\u0443\u0441\u0435, \u0449\u043E \u0432\u0438 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0438 \u0437\u0456\u0440\u043E\u0447\u043A\u043E\u044E" },
-  { href: "/lookup", nav: "lookup", label: "\u041F\u043E\u0448\u0443\u043A \u0437\u0430 \u0404\u0414\u0420\u041F\u041E\u0423", hint: "\u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0431\u0443\u0434\u044C-\u044F\u043A\u0435 \u043F\u0456\u0434\u043F\u0440\u0438\u0454\u043C\u0441\u0442\u0432\u043E" },
-  { href: "/article/366", nav: "article-366", label: "\u041F\u0456\u0434\u0440\u043E\u0431\u043B\u0435\u043D\u043D\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432", hint: "\u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0432 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0430\u0445 \u0456 \u0437\u0432\u0456\u0442\u0430\u0445" },
-  {
-    label: "\u0425\u0442\u043E \u0454 \u0445\u0442\u043E",
-    hint: "\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438, \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456, \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456",
-    children: [
-      { href: "/entities", nav: "entities", label: "\u0425\u0442\u043E \u043A\u0443\u043F\u0443\u0454", hint: "\u0443\u0441\u0442\u0430\u043D\u043E\u0432\u0438-\u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438" },
-      { href: "/suppliers", nav: "suppliers", label: "\u0425\u0442\u043E \u043F\u0440\u043E\u0434\u0430\u0454", hint: "\u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0457-\u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u0456" },
-      { href: "/officers", nav: "officers", label: "\u0425\u0442\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0454", hint: "\u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u0456, \u0449\u043E \u0432\u0435\u043B\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456" }
-    ]
-  },
-  { href: "/indicators", nav: "indicators", label: "\u0429\u043E \u043C\u0438 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E", hint: "\u0443\u0441\u0456 \u043E\u0437\u043D\u0430\u043A\u0438 \u043F\u0440\u043E\u0441\u0442\u0438\u043C\u0438 \u0441\u043B\u043E\u0432\u0430\u043C\u0438" },
-  { href: "/updates", nav: "updates", label: "\u0429\u043E \u043D\u043E\u0432\u043E\u0433\u043E", hint: "\u043E\u0441\u0442\u0430\u043D\u043D\u0454 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u0431\u0430\u0437\u0438" },
-  { href: "/about", nav: "about", label: "\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443", hint: "\u0437\u0432\u0456\u0434\u043A\u0438 \u0434\u0430\u043D\u0456 \u0456 \u0447\u043E\u0433\u043E \u0432\u043E\u043D\u0430 \u043D\u0435 \u0440\u043E\u0431\u0438\u0442\u044C" }
-];
 var SITE_DESCRIPTION = "\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0423\u043A\u0440\u0430\u0457\u043D\u0438 \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443: \u0432\u0438\u0441\u043D\u043E\u0432\u043A\u0438 \u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0438, \u0432\u043B\u0430\u0441\u043D\u0438\u0439 \u0440\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0446\u0456\u043D \u0456 \u043F\u0440\u0430\u0432\u043E\u0432\u0430 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F \u043F\u043E \u043A\u043E\u0436\u043D\u0456\u0439 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456.";
 function siteOrigin() {
   return (process.env.SITE_URL ?? "").replace(/\/$/, "");
@@ -1138,7 +1359,7 @@ function canonicalPath() {
 }
 function layout(opts) {
   return `<!doctype html>
-<html lang="uk">
+<html lang="uk" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1157,52 +1378,41 @@ ${siteOrigin() ? `<link rel="canonical" href="${esc(siteOrigin() + canonicalPath
 <meta property="og:image" content="${esc(siteOrigin())}/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<style>${STYLES}</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>${STYLES}
+${RADAR_STYLES}
+${NAVIGATION_STYLES}
+${STUDIO_STYLES}</style>
 <!-- The site's only script: it applies the saved theme before the first paint,
      so a light-theme reader never sees a dark flash. Everything else is CSS. -->
 <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body data-nav="${esc(opts.nav ?? "")}">
 <a class="skip" href="#main">\u0414\u043E \u0432\u043C\u0456\u0441\u0442\u0443</a>
-<input type="checkbox" id="menu-toggle" class="sr-only" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0432\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
+
 <header class="top"><div class="inner">
-  <a class="brand" href="/"><img class="brand-mark" src="/icon-192.png" alt="" width="28" height="28" decoding="async">Tender<span>&nbsp;Radar</span></a>
-  <nav class="nav">
+  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><circle cx="16" cy="16" r="9" fill="none" stroke="white" stroke-width="1.5"/><circle cx="16" cy="16" r="4" fill="none" stroke="white" stroke-width="1.5"/><path d="M16 16L25 7" stroke="white" stroke-width="2"/></svg>Tender<span>Radar</span></a>
+  <nav class="nav" aria-label="\u041E\u0441\u043D\u043E\u0432\u043D\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</a>
-    <a href="/about"${opts.nav === "about" ? ' aria-current="page"' : ""}>\u041F\u0440\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u0443</a>
+    <a href="/lookup"${opts.nav === "lookup" ? ' aria-current="page"' : ""}>\u0417\u043D\u0430\u0439\u0442\u0438 \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u044E</a>
   </nav>
   <a class="starred-btn${opts.nav === "starred" ? " on" : ""}" href="/starred" title="\u041E\u0431\u0440\u0430\u043D\u0435">\u2605<span>\u041E\u0431\u0440\u0430\u043D\u0435</span></a>
   <button class="theme-btn" type="button" title="\u0421\u0432\u0456\u0442\u043B\u0430 \u0430\u0431\u043E \u0442\u0435\u043C\u043D\u0430 \u0442\u0435\u043C\u0430" aria-label="\u041F\u0435\u0440\u0435\u043C\u043A\u043D\u0443\u0442\u0438 \u0442\u0435\u043C\u0443" onclick="(function(){try{var r=document.documentElement,n=r.dataset.theme==='light'?'dark':'light';r.dataset.theme=n;localStorage.setItem('theme',n);}catch(e){}})()"><span class="theme-sun">\u2600</span><span class="theme-moon">\u263E</span></button>
-  <label class="burger" for="menu-toggle" role="button" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438" title="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438"><span></span><span></span><span></span></label>
+  <button type="button" class="menu-trigger" data-menu-open aria-controls="site-menu" aria-expanded="false"><span aria-hidden="true">\u2630</span> \u041C\u0435\u043D\u044E</button>
 </div></header>
-<label class="scrim" for="menu-toggle" aria-hidden="true"></label>
-<nav class="drawer" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
-  <div class="drawer-head">
-    <strong>\u0420\u043E\u0437\u0434\u0456\u043B\u0438</strong>
-    <label class="drawer-close" for="menu-toggle" role="button" aria-label="\u0417\u0430\u043A\u0440\u0438\u0442\u0438">&times;</label>
-  </div>
-  ${MENU.map((item) => {
-    if (!item.children) {
-      return `<a href="${item.href}"${opts.nav === item.nav ? ' aria-current="page"' : ""}>${item.label}<small>${item.hint}</small></a>`;
-    }
-    const here = item.children.some((c) => c.nav === opts.nav);
-    return `<details class="drawer-group"${here ? " open" : ""}>
-    <summary>${item.label}<small>${item.hint}</small></summary>
-    ${item.children.map((c) => `<a href="${c.href}"${opts.nav === c.nav ? ' aria-current="page"' : ""}>${c.label}<small>${c.hint}</small></a>`).join("")}
-  </details>`;
-  }).join("")}
-</nav>
+${navigationDialog(opts.nav)}
 <main class="wrap" id="main">
 ${opts.body}
 </main>
 <nav class="tabbar" aria-label="\u0413\u043E\u043B\u043E\u0432\u043D\u0435">
-  <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>\u0421\u0442\u0440\u0456\u0447\u043A\u0430</a>
+  <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
   <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 21l1.5-3M15 21l-1.5-3"/><circle cx="9" cy="14" r=".6"/><circle cx="15" cy="14" r=".6"/></svg>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</a>
   <a href="/starred"${opts.nav === "starred" ? ' aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9L3.5 9.7l5.9-.8z"/></svg>\u041E\u0431\u0440\u0430\u043D\u0435</a>
-  <label class="tab-menu" for="menu-toggle" role="button" aria-label="\u0423\u0441\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>\u0420\u043E\u0437\u0434\u0456\u043B\u0438</label>
+  <button type="button" class="tab-menu" data-menu-open aria-controls="site-menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>\u041C\u0435\u043D\u044E</button>
 </nav>
+${NAVIGATION_SCRIPT}
+${FAVOURITE_SCRIPT}
 </body>
 </html>`;
 }
@@ -1820,6 +2030,17 @@ var JsonStore = class {
   upsertFindings(rows) {
     return this.#upsert("findings", rows, (r) => `${r.tender_id}|${r.detector_key}`);
   }
+  async replaceDetectorFindings(detectorKeys, rows) {
+    const keys = new Set(detectorKeys);
+    if (rows.some((row) => !keys.has(row.detector_key))) {
+      throw new Error("Finding belongs to a detector outside this completed run");
+    }
+    const existing = await this.allFindings();
+    await this.#write("findings", [
+      ...existing.filter((row) => !keys.has(row.detector_key)),
+      ...rows
+    ]);
+  }
   upsertRuns(rows) {
     return this.#upsert("runs", rows, (r) => r.run_id);
   }
@@ -1979,7 +2200,9 @@ async function loadDataset() {
   const awards = await store.allAwards();
   const bids = await store.allBids();
   const runs = await store.allRuns();
-  const findings = await store.allFindings();
+  const findings = (await store.allFindings()).filter(
+    (row) => row.detector_key === "peer_price" || row.detector_key === "own_price_growth"
+  );
   const monitorings = await store.allMonitorings();
   const monitoringsByTender = /* @__PURE__ */ new Map();
   for (const row of monitorings) {
@@ -2157,12 +2380,12 @@ function bucketsOf(entry, dimension, riskLabel) {
 function sum(cases) {
   return cases.reduce((total, c) => total + (c.value_amount ?? 0), 0);
 }
-function sortGroups(groups, dimension) {
-  if (dimension === "year") return groups.sort((a, b) => b.bucket.key.localeCompare(a.bucket.key));
+function sortGroups(groups2, dimension) {
+  if (dimension === "year") return groups2.sort((a, b) => b.bucket.key.localeCompare(a.bucket.key));
   if (dimension === "severity") {
-    return groups.sort((a, b) => (SEVERITY_ORDER[a.bucket.key] ?? 9) - (SEVERITY_ORDER[b.bucket.key] ?? 9));
+    return groups2.sort((a, b) => (SEVERITY_ORDER[a.bucket.key] ?? 9) - (SEVERITY_ORDER[b.bucket.key] ?? 9));
   }
-  return groups.sort((a, b) => b.value - a.value || b.cases.length - a.cases.length);
+  return groups2.sort((a, b) => b.value - a.value || b.cases.length - a.cases.length);
 }
 function buildGroups(cases, first, second, riskLabel) {
   if (!first) return [];
@@ -2174,13 +2397,13 @@ function buildGroups(cases, first, second, riskLabel) {
       byKey.set(bucket.key, group);
     }
   }
-  const groups = [...byKey.values()].map(({ bucket, cases: inner }) => ({
+  const groups2 = [...byKey.values()].map(({ bucket, cases: inner }) => ({
     bucket,
     cases: inner,
     value: sum(inner),
     children: second && second !== first ? buildGroups(inner, second, "", riskLabel) : []
   }));
-  return sortGroups(groups, first);
+  return sortGroups(groups2, first);
 }
 
 // server/controls.ts
@@ -2355,20 +2578,16 @@ function rowSeverity(entry) {
   return "low";
 }
 function signalLine(entry) {
-  if (entry.audit?.violation) return "\u041F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0434\u043E\u0432\u0435\u0434\u0435\u043D\u043E";
+  if (entry.audit?.violation) return "\u0414\u0410\u0421\u0423 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F";
+  if (entry.findings.length) return "\u0404 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u0456\u0441\u0442\u044C \u0443 \u0446\u0456\u043D\u0456 \u2014 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F";
+  if (entry.audit && !entry.audit.violation) return "\u0414\u0410\u0421\u0423 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C";
+  if (entry.bidders === 1) return "\u041D\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u043F\u043E\u0434\u0430\u0432\u0441\u044F \u043E\u0434\u0438\u043D \u0443\u0447\u0430\u0441\u043D\u0438\u043A";
   const n = entry.risks.length;
   if (n === 0) return "";
   const topRisk = rankRisks([entry])[0]?.[0] ?? entry.risks[0];
   const count = `${n} ${plural(n, "\u043E\u0437\u043D\u0430\u043A\u0430", "\u043E\u0437\u043D\u0430\u043A\u0438", "\u043E\u0437\u043D\u0430\u043A")}`;
   return `${count} \xB7 ${esc(shortRisk(topRisk))}`;
 }
-var SEVERITY_TITLE = {
-  proven: "\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F",
-  high: "\u041C\u0438 \u0437\u043D\u0430\u0439\u0448\u043B\u0438 \u0440\u043E\u0437\u0431\u0456\u0436\u043D\u0456\u0441\u0442\u044C \u0443 \u0446\u0456\u043D\u0456",
-  medium: "\u0404 \u043D\u0430 \u0449\u043E \u043F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F: \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432 \u0430\u0431\u043E \u043A\u0456\u043B\u044C\u043A\u0430 \u043E\u0437\u043D\u0430\u043A",
-  clear: "\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u043B\u0430 \u0456 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430",
-  low: "\u041F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043E\u044E"
-};
 function auditSection(entry) {
   const audit = entry.audit;
   if (!audit) return "";
@@ -2431,7 +2650,7 @@ function caseRow(entry, opts = {}) {
   if (entry.tender_date) meta.push(date(entry.tender_date));
   const people = [];
   if (showOfficer && entry.officer_name) {
-    people.push(`\u0432\u0456\u0432(\u043B\u0430) <a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a>`);
+    people.push(`\u043A\u043E\u043D\u0442\u0430\u043A\u0442: <a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a>`);
   }
   if (entry.winner_name) {
     people.push(
@@ -2441,25 +2660,14 @@ function caseRow(entry, opts = {}) {
   const severity = rowSeverity(entry);
   const here = currentPath();
   const tenderHref = `/tender/${encodeURIComponent(entry.tender_id)}${here && !here.startsWith("/tender/") ? `?from=${encodeURIComponent(here)}` : ""}`;
-  return `<div class="row sev-${severity}">
-  <span class="dot" title="${esc(SEVERITY_TITLE[severity])}" aria-hidden="true"></span><span class="sr-only">${esc(SEVERITY_TITLE[severity])}.</span>
-  <div class="who">
-    <div class="name">${star("tender", entry.tender_id, here || tenderHref)}<a href="${esc(tenderHref)}">${esc(title)}</a></div>
-    <div class="meta">${meta.join(" \xB7 ")}</div>
-    ${people.length ? `<div class="meta">${people.join(" \xB7 ")}</div>` : ""}
-  </div>
-  <div class="amount">
-    <span class="big">${shortMoney(entry.value_amount)}</span>
-    <span class="exact">${esc(entry.tender_ref || entry.tender_id)}</span>
-  </div>
-  <div class="flags">
-    ${auditFlag(entry)}
-    ${alarms(entry).map((a) => `<span class="flag alarm">${esc(a)}</span>`).join("")}
-    ${entry.risks.slice(0, MAX_ROW_FLAGS).map(riskFlag).join("")}
-    ${entry.risks.length > MAX_ROW_FLAGS ? `<a class="flag more" href="${esc(tenderHref)}">\u0449\u0435 ${entry.risks.length - MAX_ROW_FLAGS}</a>` : ""}
-  </div>
-  <div class="signal">${signalLine(entry)}</div>
-</div>`;
+  return `<article class="row tender-card sev-${severity}">
+  <div class="card-topline"><span class="card-status">${esc({ proven: "\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0410\u0421\u0423", high: "\u0426\u0456\u043D\u043E\u0432\u0438\u0439 \u0441\u0438\u0433\u043D\u0430\u043B", medium: "\u041F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u0443\u0432\u0430\u0433\u0438", clear: "\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043D\u043E \u0414\u0410\u0421\u0423", low: "\u041E\u0437\u043D\u0430\u043A\u0438 \u0440\u0438\u0437\u0438\u043A\u0443" }[severity])}</span>${star("tender", entry.tender_id, here || tenderHref)}</div>
+  <div class="who"><h3 class="card-title"><a href="${esc(tenderHref)}">${esc(title)}</a></h3><div class="card-buyer">${showEntity && buyer && hasOwnTitle ? esc(buyer) : !hasOwnTitle ? "\u041D\u0430\u0437\u0432\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u044F \u0443 \u0441\u043F\u0438\u0441\u043A\u0443" : ""}</div></div>
+  <div class="card-facts"><div><span>\u0421\u0443\u043C\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</span><strong>${shortMoney(entry.value_amount)}</strong></div><div><span>\u041E\u043F\u0440\u0438\u043B\u044E\u0434\u043D\u0435\u043D\u043E</span><strong>${entry.tender_date ? date(entry.tender_date) : "\u041D\u0435\u043C\u0430\u0454 \u0434\u0430\u0442\u0438"}</strong></div></div>
+  ${signalLine(entry) ? `<p class="card-reason"><span>${severity === "clear" ? "\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438" : "\u0427\u043E\u043C\u0443 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438"}</span>${signalLine(entry)}</p>` : ""}
+  <details class="card-extra"><summary>\u0414\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0456 \u0432\u0456\u0434\u043E\u043C\u043E\u0441\u0442\u0456</summary><div class="card-extra-body"><div class="meta">${meta.join(" \xB7 ")}</div>${people.length ? `<div class="meta">${people.join(" \xB7 ")}</div>` : ""}<div class="meta">${esc(entry.tender_ref || entry.tender_id)}</div>${!entry.detailed ? '<p class="coverage-note">\u041D\u0435\u043F\u043E\u0432\u043D\u0456 \u0434\u0430\u043D\u0456 \u0443 \u0441\u043F\u0438\u0441\u043A\u0443 \xB7 \u0432\u0456\u0434\u043A\u0440\u0438\u0439\u0442\u0435 \u043A\u0430\u0440\u0442\u043A\u0443 \u0434\u043B\u044F \u0434\u0435\u0442\u0430\u043B\u0435\u0439</p>' : ""}<div class="card-flags">${auditFlag(entry)}${alarms(entry).map((a) => `<span class="flag alarm">${esc(a)}</span>`).join("")}${entry.risks.slice(0, MAX_ROW_FLAGS).map(riskFlag).join("")}</div></div></details>
+  <div class="case-open"><a href="${esc(tenderHref)}">\u041F\u0435\u0440\u0435\u0433\u043B\u044F\u043D\u0443\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E <span aria-hidden="true">\u2192</span></a></div>
+</article>`;
 }
 
 // server/components/filters.ts
@@ -2468,8 +2676,8 @@ var MAX_GROUPS = 40;
 function presetsFor(action) {
   const base = [
     { label: "\u0423\u0441\u0456", hint: "\u043F\u043E\u0432\u043D\u0438\u0439 \u043F\u0435\u0440\u0435\u043B\u0456\u043A", query: "" },
-    { label: "\u041F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0434\u043E\u0432\u0435\u0434\u0435\u043D\u043E", hint: "\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F", query: "audit=violation" },
-    { label: "\u0417\u0430\u0432\u0438\u0449\u0435\u043D\u0430 \u0446\u0456\u043D\u0430", hint: "\u043C\u0438 \u043F\u043E\u0440\u0430\u0445\u0443\u0432\u0430\u043B\u0438 \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442\u0443", query: "price=1" },
+    { label: "\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0410\u0421\u0423", hint: "\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F", query: "audit=violation" },
+    { label: "\u0426\u0456\u043D\u043E\u0432\u0456 \u0441\u0438\u0433\u043D\u0430\u043B\u0438", hint: "\u0440\u043E\u0437\u0431\u0456\u0436\u043D\u043E\u0441\u0442\u0456 \u0446\u0456\u043D, \u044F\u043A\u0456 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u044E\u0442\u044C \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438", query: "price=1" },
     { label: "\u0411\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432", hint: "\u043F\u043E\u0434\u0430\u0432\u0441\u044F \u043E\u0434\u0438\u043D \u0443\u0447\u0430\u0441\u043D\u0438\u043A", query: "solo=1" },
     { label: "\u0412\u0456\u0434 100 \u043C\u043B\u043D", hint: "\u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0456 \u0441\u0443\u043C\u0438", query: "min=100000000" }
     // "Кілька ознак" and "Найновіші" used to live here too, but they are sorts,
@@ -2494,7 +2702,7 @@ function sortBar(action, c, extra = "") {
   const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
   const hidden = (name, value) => value ? `<input type="hidden" name="${name}" value="${esc(value)}">` : "";
   return `<form class="sortbar" method="get" action="${esc(action)}">
-  <input type="search" name="q" value="${esc(c.q)}" placeholder="\u041F\u043E\u0448\u0443\u043A \u0437\u0430 \u043D\u0430\u0437\u0432\u043E\u044E, \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u043E\u043C, \u0404\u0414\u0420\u041F\u041E\u0423" aria-label="\u041F\u043E\u0448\u0443\u043A">
+  <input type="search" name="q" value="${esc(c.q)}" placeholder="\u041D\u0430\u0437\u0432\u0430 \u0430\u0431\u043E \u0404\u0414\u0420\u041F\u041E\u0423" aria-label="\u041F\u043E\u0448\u0443\u043A">
   ${extra}
   ${hidden("risk", c.risk)}${hidden("region", c.region)}
   ${hidden("from", c.dateFrom)}${hidden("to", c.dateTo)}
@@ -2504,8 +2712,10 @@ function sortBar(action, c, extra = "") {
   ${c.priceOnly ? '<input type="hidden" name="price" value="1">' : ""}
   ${c.audit ? `<input type="hidden" name="audit" value="${esc(c.audit)}">` : ""}
 
-  <label>\u0421\u043E\u0440\u0442.
-    <select name="sort" onchange="this.form.submit()">
+  <details class="sort-options">
+  <summary>\u0421\u043E\u0440\u0442\u0443\u0432\u0430\u043D\u043D\u044F \u0442\u0430 \u0433\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F</summary><div class="sort-options-fields">
+  <label>\u0421\u043E\u0440\u0442\u0443\u0432\u0430\u043D\u043D\u044F
+    <select name="sort">
       <option value="value"${c.sort === "value" ? " selected" : ""}>\u0437\u0430 \u0441\u0443\u043C\u043E\u044E, \u0441\u043F\u0430\u0434\u0430\u043D\u043D\u044F</option>
       <option value="value-asc"${c.sort === "value-asc" ? " selected" : ""}>\u0437\u0430 \u0441\u0443\u043C\u043E\u044E, \u0437\u0440\u043E\u0441\u0442\u0430\u043D\u043D\u044F</option>
       <option value="date"${c.sort === "date" ? " selected" : ""}>\u043D\u043E\u0432\u0456\u0448\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</option>
@@ -2515,15 +2725,16 @@ function sortBar(action, c, extra = "") {
     </select>
   </label>
 
-  <label>\u0413\u0440\u0443\u043F\u0438
-    <select name="group" onchange="this.form.submit()">${dimensionOptions(c.group)}</select>
+  <label>\u0413\u0440\u0443\u043F\u0443\u0432\u0430\u043D\u043D\u044F
+    <select name="group">${dimensionOptions(c.group)}</select>
   </label>
 
   ${c.group ? `<label>\u043F\u043E\u0442\u0456\u043C
-    <select name="then" onchange="this.form.submit()">${dimensionOptions(c.then, c.group)}</select>
+    <select name="then">${dimensionOptions(c.then, c.group)}</select>
   </label>` : ""}
 
-  <button type="submit" class="go">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438</button>
+  </div><button type="submit" class="sort-apply">\u0417\u0430\u0441\u0442\u043E\u0441\u0443\u0432\u0430\u0442\u0438</button></details>
+  <button type="submit" class="go">\u0417\u043D\u0430\u0439\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 <span aria-hidden="true">\u2192</span></button>
 </form>`;
 }
 function groupBlock(group, depth) {
@@ -2571,82 +2782,45 @@ function datasetBounds() {
   return bounds;
 }
 function filterPanel(action, c, opts = {}, extra = "") {
-  const dimensionOptions = (selected, skip) => DIMENSIONS.filter((d) => d.value !== skip || d.value === "").map((d) => `<option value="${d.value}"${d.value === selected ? " selected" : ""}>${esc(d.label)}</option>`).join("");
-  const { earliest, latest, regions, rangeHint } = datasetBounds();
+  const { earliest, latest, regions } = datasetBounds();
+  const selected = (v, current2) => v === current2 ? " selected" : "";
   const active = activeCount(c);
-  const open = isFiltered(c) || Boolean(c.group);
-  const showReset = open || c.sort !== "value";
   return `<form class="filters" method="get" action="${esc(action)}">
-  <input type="hidden" name="q" value="${esc(c.q)}">
-  ${extra}
-  <details class="filters-more"${open ? " open" : ""}>
-    <summary>\u0411\u0456\u043B\u044C\u0448\u0435 \u0444\u0456\u043B\u044C\u0442\u0440\u0456\u0432${active > 0 ? ` <span class="badge">${active}</span>` : ""}${showReset ? ` <a class="reset" href="${esc(action)}">\u0441\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0435</a>` : ""}</summary>
-    <div class="inner">
-      <div class="filter-row">
-        <select name="risk" aria-label="\u041E\u0437\u043D\u0430\u043A\u0430">
-          <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0430 \u043E\u0437\u043D\u0430\u043A\u0430</option>
-          ${dataset().rules.map(
-    (r) => `<option value="${esc(r.risk_id)}"${r.risk_id === c.risk ? " selected" : ""}>${esc(shortRisk(r.risk_id))}</option>`
-  ).join("")}
-        </select>
-        <select name="region" aria-label="\u041E\u0431\u043B\u0430\u0441\u0442\u044C">
-          <option value="">\u0423\u0441\u044F \u0423\u043A\u0440\u0430\u0457\u043D\u0430</option>
-          ${regions.map((r) => `<option value="${esc(r)}"${r === c.region ? " selected" : ""}>${esc(r)}</option>`).join("")}
-        </select>
-        <select name="audit" aria-label="\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0438">
-          <option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0438\u0439 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0410\u0421\u0423</option>
-          <option value="violation"${c.audit === "violation" ? " selected" : ""}>\u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0434\u043E\u0432\u0435\u0434\u0435\u043D\u043E</option>
-          <option value="clear"${c.audit === "clear" ? " selected" : ""}>\u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043D\u043E, \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u043D\u0435\u043C\u0430\u0454</option>
-        </select>
-        <input type="hidden" name="sort" value="${esc(c.sort)}">
-        <input type="hidden" name="group" value="${esc(c.group)}">
-        <input type="hidden" name="then" value="${esc(c.then)}">
-      </div>
-
-      <div class="filter-row">
-        <span class="filter-label">\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</span>
-        <input type="date" name="from" value="${esc(c.dateFrom)}" aria-label="\u0414\u0430\u0442\u0430 \u0432\u0456\u0434" min="${esc(earliest)}" max="${esc(latest)}">
-        <span class="filter-label">\u043F\u043E</span>
-        <input type="date" name="to" value="${esc(c.dateTo)}" aria-label="\u0414\u0430\u0442\u0430 \u043F\u043E" min="${esc(earliest)}" max="${esc(latest)}">
-      </div>
-
-      <div class="filter-row">
-        <span class="filter-label">\u0421\u0443\u043C\u0430, \u20B4</span>
-        <input type="number" name="min" value="${c.min > 0 ? c.min : ""}" placeholder="\u0432\u0456\u0434" aria-label="\u0421\u0443\u043C\u0430 \u0432\u0456\u0434" min="0" step="100000" class="num">
-        <span class="filter-label">\u043F\u043E</span>
-        <input type="number" name="max" value="${c.max > 0 ? c.max : ""}" placeholder="\u0434\u043E" aria-label="\u0421\u0443\u043C\u0430 \u0434\u043E" min="0" step="100000" class="num">
-        <span class="filter-label faint">${esc(rangeHint)}</span>
-      </div>
-
-      <div class="filter-row">
-        ${opts.hideRail ? "" : `<label class="check"><input type="checkbox" name="rail" value="1"${c.railOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</label>`}
-        <label class="check"><input type="checkbox" name="solo" value="1"${c.soloOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0431\u0435\u0437 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0442\u0456\u0432</label>
-        ${opts.hidePrice ? "" : `<label class="check"><input type="checkbox" name="price" value="1"${c.priceOnly ? " checked" : ""}> \u043B\u0438\u0448\u0435 \u0434\u0435 \u0446\u0456\u043D\u0430 \u0437\u0430\u0432\u0438\u0449\u0435\u043D\u0430</label>`}
-        <button type="submit">\u0417\u0430\u0441\u0442\u043E\u0441\u0443\u0432\u0430\u0442\u0438 \u0444\u0456\u043B\u044C\u0442\u0440\u0438</button>
-      </div>
-    </div>
-  </details>
-</form>`;
+ <input type="hidden" name="q" value="${esc(c.q)}"><input type="hidden" name="sort" value="${esc(c.sort)}"><input type="hidden" name="group" value="${esc(c.group)}"><input type="hidden" name="then" value="${esc(c.then)}">${extra}
+ <details class="filters-more"><summary>\u0423\u0442\u043E\u0447\u043D\u0438\u0442\u0438 \u043F\u043E\u0448\u0443\u043A${active ? ` <span class="badge">${active}</span>` : ""}</summary>
+ <div class="filter-fieldsets">
+ <fieldset><legend>\u0414\u0435 \u0448\u0443\u043A\u0430\u0442\u0438</legend><label>\u041E\u0431\u043B\u0430\u0441\u0442\u044C<select name="region"><option value="">\u0423\u0441\u044F \u0423\u043A\u0440\u0430\u0457\u043D\u0430</option>${regions.map((r) => `<option value="${esc(r)}"${selected(r, c.region)}>${esc(r)}</option>`).join("")}</select></label>
+ ${opts.hideRail ? "" : `<label class="check"><input type="checkbox" name="rail" value="1"${c.railOnly ? " checked" : ""}>\u041B\u0438\u0448\u0435 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0456 \u043E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0457</label>`}</fieldset>
+ <fieldset><legend>\u0429\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438</legend><label>\u041E\u0437\u043D\u0430\u043A\u0430 \u0440\u0438\u0437\u0438\u043A\u0443<select name="risk"><option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0430 \u043E\u0437\u043D\u0430\u043A\u0430</option>${dataset().rules.map((r) => `<option value="${esc(r.risk_id)}"${selected(r.risk_id, c.risk)}>${esc(shortRisk(r.risk_id))}</option>`).join("")}</select></label>
+ <label>\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0438<select name="audit"><option value="">\u0411\u0443\u0434\u044C-\u044F\u043A\u0438\u0439 \u0430\u0431\u043E \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u0456\u0439</option><option value="violation"${selected("violation", c.audit)}>\u0414\u0410\u0421\u0423 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F</option><option value="clear"${selected("clear", c.audit)}>\u0414\u0410\u0421\u0423 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u043B\u0430 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C</option></select></label>
+ <label class="check"><input type="checkbox" name="solo" value="1"${c.soloOnly ? " checked" : ""}>\u041E\u0434\u0438\u043D \u0443\u0447\u0430\u0441\u043D\u0438\u043A</label>${opts.hidePrice ? "" : `<label class="check"><input type="checkbox" name="price" value="1"${c.priceOnly ? " checked" : ""}>\u0404 \u0446\u0456\u043D\u043E\u0432\u0438\u0439 \u0441\u0438\u0433\u043D\u0430\u043B</label>`}</fieldset>
+ <fieldset><legend>\u041A\u043E\u043B\u0438 \u043E\u043F\u0443\u0431\u043B\u0456\u043A\u043E\u0432\u0430\u043D\u043E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E</legend><label>\u0412\u0456\u0434 \u0434\u0430\u0442\u0438<input type="date" name="from" value="${esc(c.dateFrom)}" min="${esc(earliest)}" max="${esc(latest)}"></label><label>\u0414\u043E \u0434\u0430\u0442\u0438<input type="date" name="to" value="${esc(c.dateTo)}" min="${esc(earliest)}" max="${esc(latest)}"></label></fieldset>
+ <fieldset><legend>\u0421\u0443\u043C\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u0433\u0440\u043D</legend><label>\u041C\u0456\u043D\u0456\u043C\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430<input type="number" name="min" min="0" step="any" inputmode="decimal" value="${c.min || ""}" placeholder="\u0411\u0435\u0437 \u043E\u0431\u043C\u0435\u0436\u0435\u043D\u043D\u044F"></label><label>\u041C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430<input type="number" name="max" min="0" step="any" inputmode="decimal" value="${c.max || ""}" placeholder="\u0411\u0435\u0437 \u043E\u0431\u043C\u0435\u0436\u0435\u043D\u043D\u044F"></label></fieldset>
+ </div><div class="filter-actions"><button type="submit">\u0417\u0430\u0441\u0442\u043E\u0441\u0443\u0432\u0430\u0442\u0438 \u0444\u0456\u043B\u044C\u0442\u0440\u0438</button><a href="${esc(action)}">\u0421\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0438</a></div>
+ </details></form>`;
+}
+function appliedFilters(action, c) {
+  const chips = [];
+  if (c.q) chips.push([`\u041F\u043E\u0448\u0443\u043A: ${c.q}`, { q: "" }]);
+  if (c.region) chips.push([c.region, { region: "" }]);
+  if (c.railOnly) chips.push(["\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F", { rail: "" }]);
+  if (c.risk) chips.push([shortRisk(c.risk), { risk: "" }]);
+  if (c.audit) chips.push([c.audit === "violation" ? "\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0410\u0421\u0423: \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F" : "\u0412\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0414\u0410\u0421\u0423: \u0431\u0435\u0437 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u044C", { audit: "" }]);
+  if (c.priceOnly) chips.push(["\u0426\u0456\u043D\u043E\u0432\u0438\u0439 \u0441\u0438\u0433\u043D\u0430\u043B", { price: "" }]);
+  if (c.soloOnly) chips.push(["\u041E\u0434\u0438\u043D \u0443\u0447\u0430\u0441\u043D\u0438\u043A", { solo: "" }]);
+  if (c.dateFrom || c.dateTo) chips.push([`${c.dateFrom || "\u041F\u043E\u0447\u0430\u0442\u043E\u043A"} \u2014 ${c.dateTo || "\u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456"}`, { from: "", to: "" }]);
+  if (c.min || c.max) chips.push([`\u0421\u0443\u043C\u0430: ${c.min || 0} \u2014 ${c.max || "\u0431\u0435\u0437 \u043C\u0435\u0436\u0456"} \u0433\u0440\u043D`, { min: "", max: "" }]);
+  return chips.length ? `<div class="applied-filters" aria-label="\u0417\u0430\u0441\u0442\u043E\u0441\u043E\u0432\u0430\u043D\u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0438"><span>\u0412\u0438 \u043E\u0431\u0440\u0430\u043B\u0438:</span>${chips.map(([label, over]) => `<a href="${esc(keepControls(action, c, { ...over, page: "1" }))}" aria-label="${esc("\u041F\u0440\u0438\u0431\u0440\u0430\u0442\u0438 \u0444\u0456\u043B\u044C\u0442\u0440: " + label)}">${esc(label)} <span aria-hidden="true"> \xD7</span></a>`).join("")}</div>` : "";
 }
 function controlBar(action, c, opts = {}, params = {}) {
   const active = activeCount(c);
   const presets = params.url ? presetBar(action, params.url, c) : "";
   const extra = params.extra ?? "";
-  return `<div class="filter-sheet">
-  <input type="checkbox" id="filters-toggle" class="sr-only" aria-label="\u0424\u0456\u043B\u044C\u0442\u0440\u0438">
-  <label class="filters-trigger" for="filters-toggle">\u0424\u0456\u043B\u044C\u0442\u0440\u0438${active > 0 ? ` <span class="badge">${active}</span>` : ""}</label>
-  <label class="scrim filters-scrim" for="filters-toggle" aria-hidden="true"></label>
+  return `<div class="control-panel">
+  ${sortBar(action, c, extra)}
   ${presets}
-  <div class="drawer filters-drawer" aria-label="\u0424\u0456\u043B\u044C\u0442\u0440\u0438">
-    <div class="drawer-head">
-      <strong>\u0424\u0456\u043B\u044C\u0442\u0440\u0438</strong>
-      <label class="drawer-close" for="filters-toggle" role="button" aria-label="\u0417\u0430\u043A\u0440\u0438\u0442\u0438">&times;</label>
-    </div>
-    <div class="filters-drawer-body">
-      ${sortBar(action, c, extra)}
-      ${filterPanel(action, c, opts, extra)}
-    </div>
-  </div>
+  ${appliedFilters(action, c)}
+  ${filterPanel(action, c, opts, extra)}
 </div>`;
 }
 function resultLine(list, c, groupCount) {
@@ -2662,10 +2836,10 @@ function listBody(list, c, action, rowOpts = {}, extra = {}) {
     return `<div class="empty">\u0417\u0430 \u0446\u0438\u043C\u0438 \u0443\u043C\u043E\u0432\u0430\u043C\u0438 \u043D\u0456\u0447\u043E\u0433\u043E \u043D\u0435 \u0437\u043D\u0430\u0439\u0448\u043B\u043E\u0441\u044F.<br>${dropSearch} <a href="${esc(action)}">\u0421\u043A\u0438\u043D\u0443\u0442\u0438 \u0432\u0441\u0456 \u0444\u0456\u043B\u044C\u0442\u0440\u0438</a></div>`;
   }
   if (c.group) {
-    const groups = buildGroups(list, c.group, c.then, shortRisk);
-    const shown = groups.slice(0, MAX_GROUPS);
-    const hidden = groups.length - shown.length;
-    return `${resultLine(list, c, groups.length)}${shown.map((g) => groupBlock(g, 0)).join("")}${hidden > 0 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E ${MAX_GROUPS} \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0438\u0445 ${plural(MAX_GROUPS, "\u0433\u0440\u0443\u043F\u0443", "\u0433\u0440\u0443\u043F\u0438", "\u0433\u0440\u0443\u043F")} \u0456\u0437 ${groups.length.toLocaleString("uk-UA")}. \u0417\u0432\u0443\u0437\u044C\u0442\u0435 \u0432\u0438\u0431\u0456\u0440\u043A\u0443 \u0444\u0456\u043B\u044C\u0442\u0440\u0430\u043C\u0438, \u0449\u043E\u0431 \u043F\u043E\u0431\u0430\u0447\u0438\u0442\u0438 \u0440\u0435\u0448\u0442\u0443.</p>` : ""}`;
+    const groups2 = buildGroups(list, c.group, c.then, shortRisk);
+    const shown = groups2.slice(0, MAX_GROUPS);
+    const hidden = groups2.length - shown.length;
+    return `${resultLine(list, c, groups2.length)}${shown.map((g) => groupBlock(g, 0)).join("")}${hidden > 0 ? `<p class="note">\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u043E ${MAX_GROUPS} \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448\u0438\u0445 ${plural(MAX_GROUPS, "\u0433\u0440\u0443\u043F\u0443", "\u0433\u0440\u0443\u043F\u0438", "\u0433\u0440\u0443\u043F")} \u0456\u0437 ${groups2.length.toLocaleString("uk-UA")}. \u0417\u0432\u0443\u0437\u044C\u0442\u0435 \u0432\u0438\u0431\u0456\u0440\u043A\u0443 \u0444\u0456\u043B\u044C\u0442\u0440\u0430\u043C\u0438, \u0449\u043E\u0431 \u043F\u043E\u0431\u0430\u0447\u0438\u0442\u0438 \u0440\u0435\u0448\u0442\u0443.</p>` : ""}`;
   }
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const page3 = Math.min(c.page, pages);
@@ -2680,49 +2854,41 @@ ${pages > 1 ? `<div class="pager">
 }
 
 // server/pages/feed.ts
-var HELP = `<details class="help">
-  <summary>\u042F\u043A \u0447\u0438\u0442\u0430\u0442\u0438 \u0446\u044E \u0441\u0442\u043E\u0440\u0456\u043D\u043A\u0443</summary>
-  <div class="inner">
-    <p>\u041A\u043E\u0436\u0435\u043D \u0440\u044F\u0434\u043E\u043A \u2014 \u0446\u0435 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F, \u0443 \u044F\u043A\u0456\u0439 \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443. \u0414\u0435\u0440\u0436\u0430\u0432\u0430 \u0441\u0430\u043C\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u0442\u0430\u043A\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456; \u043C\u0438 \u043B\u0438\u0448\u0435 \u0437\u0431\u0438\u0440\u0430\u0454\u043C\u043E \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u043F\u043E ${esc(REGION)} \u0442\u0430 \u0444\u0456\u043B\u0456\u044F\u0445 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0439 \u043F\u043E\u043A\u0430\u0437\u0443\u0454\u043C\u043E \u0457\u0445 \u0437\u0440\u043E\u0437\u0443\u043C\u0456\u043B\u043E.</p>
-    <p>\u0427\u0435\u0440\u0432\u043E\u043D\u0456 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u2014 \u0442\u0435, \u043D\u0430 \u0449\u043E \u0432\u0430\u0440\u0442\u043E \u0433\u043B\u044F\u043D\u0443\u0442\u0438 \u043F\u0435\u0440\u0448\u0438\u043C: \u0454\u0434\u0438\u043D\u0438\u0439 \u0443\u0447\u0430\u0441\u043D\u0438\u043A \u043D\u0430 \u0432\u0435\u043B\u0438\u043A\u0438\u0445 \u0442\u043E\u0440\u0433\u0430\u0445, \u0441\u0443\u043C\u0430 \u043F\u043E\u043D\u0430\u0434 \u043C\u0456\u043B\u044C\u044F\u0440\u0434, \u043A\u0456\u043B\u044C\u043A\u0430 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432 \u043E\u0434\u0440\u0430\u0437\u0443.</p>
-    <p>\u0421\u0456\u0440\u0456 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u2014 \u0449\u043E \u0441\u0430\u043C\u0435 \u0437\u0430\u043F\u0456\u0434\u043E\u0437\u0440\u0438\u043B\u0430 \u0434\u0435\u0440\u0436\u0430\u0432\u0430. \u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C \u043D\u0430 \u0431\u0443\u0434\u044C-\u044F\u043A\u0443, \u0449\u043E\u0431 \u043F\u043E\u0431\u0430\u0447\u0438\u0442\u0438 \u0432\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u0442\u0456\u0454\u044E \u0441\u0430\u043C\u043E\u044E \u043E\u0437\u043D\u0430\u043A\u043E\u044E.</p>
-    <p><strong>\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043D\u0435 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</strong> \u0426\u0435 \u043F\u0456\u0434\u0441\u0442\u0430\u0432\u0430 \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E \u0439 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0457\u0457 \u043B\u044E\u0434\u0438\u043D\u043E\u044E.</p>
-  </div>
-</details>`;
-var PRIMER = `<div class="primer">
-  <span><b>1</b> \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u043F\u0456\u0434\u043E\u0437\u0440\u0456\u043B\u0456</span>
-  <span><b>2</b> \u043C\u0438 \u043F\u043E\u044F\u0441\u043D\u044E\u0454\u043C\u043E \u0456 \u0440\u0430\u0445\u0443\u0454\u043C\u043E \u0446\u0456\u043D\u0443</span>
-  <span><b>3</b> \u0443 \u043A\u043E\u0436\u043D\u0456\u0439 \u2014 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0456 \u0437\u0432\u0456\u0442</span>
-  <a href="/about">\u0414\u043E\u043A\u043B\u0430\u0434\u043D\u0456\u0448\u0435</a>
-</div>`;
 function feedPage(url) {
   const c = readControls(url);
-  const list = applyControls(dataset().cases, c, RAILWAY_EDRPOU);
-  return layout({
-    title: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456",
-    nav: "feed",
-    body: `
-<h1>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456, \u044F\u043A\u0456 \u0432\u0430\u0440\u0442\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438</h1>
-<p class="sub">\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0432\u0441\u0456\u0454\u0457 \u0423\u043A\u0440\u0430\u0457\u043D\u0438, \u044F\u043A\u0456 \u0434\u0435\u0440\u0436\u0430\u0432\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u044F\u043A \u043F\u0456\u0434\u043E\u0437\u0440\u0456\u043B\u0456.</p>
+  const ds = dataset();
+  const list = applyControls(ds.cases, c, RAILWAY_EDRPOU);
+  const latest = [...ds.runs].sort((a, b) => b.started_at.localeCompare(a.started_at))[0];
+  const scope = c.railOnly ? "\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F" : c.region || "\u0423\u0441\u044F \u0423\u043A\u0440\u0430\u0457\u043D\u0430";
+  const scopes = [
+    { label: "\u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0430", region: REGION, rail: "", active: c.region === REGION && !c.railOnly },
+    { label: "\u0423\u043A\u0440\u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F", region: "", rail: "1", active: c.railOnly && !c.region },
+    { label: "\u0423\u0441\u044F \u0423\u043A\u0440\u0430\u0457\u043D\u0430", region: "", rail: "", active: !c.region && !c.railOnly }
+  ];
+  const full = list.filter((x) => x.detailed).length;
+  const signals = list.reduce((n, x) => n + x.findings.length, 0);
+  return layout({ title: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", nav: "feed", body: `
+<section class="studio-hero">
+ <div class="studio-copy"><span class="studio-eyebrow">TENDER RADAR / \u041C\u041E\u041D\u0406\u0422\u041E\u0420\u0418\u041D\u0413 \u0417\u0410\u041A\u0423\u041F\u0406\u0412\u0415\u041B\u042C</span><h1>\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u043A\u043E\u0448\u0442\u0438.<br><span>\u041F\u0440\u043E\u0437\u043E\u0440\u0456 \u0440\u0456\u0448\u0435\u043D\u043D\u044F.</span></h1><p>\u0417\u043D\u0430\u0439\u0434\u0456\u0442\u044C \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E, \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0441\u0438\u0433\u043D\u0430\u043B\u0438 \u0440\u0438\u0437\u0438\u043A\u0443 \u0442\u0430 \u0432\u0456\u0434\u043A\u0440\u0438\u0439\u0442\u0435 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E.</p><a class="studio-help" href="/about">\u042F\u043A \u043F\u0440\u0430\u0446\u044E\u0454 \u0440\u0430\u0434\u0430\u0440 <span aria-hidden="true">\u2197</span></a></div>
+ <div class="studio-visual" aria-label="\u0414\u0430\u043D\u0456 \u043F\u043E\u0442\u043E\u0447\u043D\u043E\u0457 \u0432\u0438\u0431\u0456\u0440\u043A\u0438"><div class="studio-orbit" aria-hidden="true"></div><div class="studio-stat"><span>\u0417\u0410\u041A\u0423\u041F\u0406\u0412\u041B\u0406 \u0412 \u041F\u041E\u0422\u041E\u0427\u041D\u0406\u0419 \u0412\u0418\u0411\u0406\u0420\u0426\u0406</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0456 \u0434\u0430\u043D\u0456 \u0434\u043B\u044F \u0432\u0430\u0448\u043E\u0457 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438</small><div class="studio-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="studio-signal"><span class="studio-dot" aria-hidden="true"></span><div><strong>${signals.toLocaleString("uk-UA")} \u0446\u0456\u043D\u043E\u0432\u0438\u0445 \u0441\u0438\u0433\u043D\u0430\u043B\u0456\u0432</strong><small>\u0421\u0438\u0433\u043D\u0430\u043B \u2014 \u043F\u0440\u0438\u0432\u0456\u0434 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438, \u0430 \u043D\u0435 \u0437\u0432\u0438\u043D\u0443\u0432\u0430\u0447\u0435\u043D\u043D\u044F</small></div></div></div>
+</section>
+<section class="studio-workspace" aria-label="\u041F\u043E\u0448\u0443\u043A \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C">
+<div class="results-heading"><h2 id="results-heading">\u0417\u043D\u0430\u0439\u0434\u0456\u0442\u044C \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E</h2><span>\u0412\u0456\u0434 \u043F\u043E\u0448\u0443\u043A\u0443 \u0434\u043E \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u0430</span></div>
+<nav class="scope-nav" aria-label="\u0422\u0435\u0440\u0438\u0442\u043E\u0440\u0456\u044F \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443">${scopes.map((s) => `<a href="${esc(keepControls("/", c, { region: s.region, rail: s.rail, page: "1" }))}"${s.active ? ' aria-current="page"' : ""}>${s.label}</a>`).join("")}</nav>
+<div class="scope-caption"><span>${esc(scope)} \xB7 \u043F\u043E\u0442\u043E\u0447\u043D\u0430 \u0432\u0438\u0431\u0456\u0440\u043A\u0430</span><a href="/updates">${latest ? `\u041E\u0441\u0442\u0430\u043D\u043D\u0456\u0439 \u0437\u0430\u043F\u0443\u0441\u043A: ${shortDate(latest.started_at)}${latest.status !== "ok" || latest.errors ? " \xB7 \u0454 \u043F\u043E\u043C\u0438\u043B\u043A\u0438" : ""}` : "\u0406\u0441\u0442\u043E\u0440\u0456\u044F \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u044C"}</a></div>
 
-<p class="statline">
-  <b>${dataset().cases.length.toLocaleString("uk-UA")}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \xB7
-  <b>${shortMoney(dataset().totalValue)}</b> \xB7
-  <b>${dataset().flagCount.toLocaleString("uk-UA")}</b> \u043E\u0437\u043D\u0430\u043A \xB7
-  <b>${dataset().findingCount.toLocaleString("uk-UA")}</b> \u043F\u0435\u0440\u0435\u043F\u043B\u0430\u0442
-</p>
-
-${PRIMER}
+<section class="radar-results" aria-labelledby="results-heading">
 
 ${controlBar("/", c, {}, { url })}
-
+<details class="data-overview"><summary>\u041E\u0433\u043B\u044F\u0434 \u0434\u0430\u043D\u0438\u0445: \u0441\u0443\u043C\u0438, \u0441\u0438\u0433\u043D\u0430\u043B\u0438 \u0442\u0430 \u043F\u043E\u0432\u043D\u043E\u0442\u0430 \u043A\u0430\u0440\u0442\u043E\u043A</summary><section class="radar-metrics" aria-label="\u041F\u043E\u043A\u0430\u0437\u043D\u0438\u043A\u0438 \u043F\u043E\u0442\u043E\u0447\u043D\u043E\u0457 \u0432\u0438\u0431\u0456\u0440\u043A\u0438">
+ <div><span>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u043E\u0437\u043D\u0430\u043A\u0430\u043C\u0438 \u0440\u0438\u0437\u0438\u043A\u0443</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>\u041D\u0435 \u0432\u0441\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0440\u0435\u0433\u0456\u043E\u043D\u0443</small></div>
+ <div><span>\u0417\u0430\u0433\u0430\u043B\u044C\u043D\u0430 \u0441\u0443\u043C\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C</span><strong>${shortMoney(list.reduce((n, x) => n + (x.value_amount ?? 0), 0))}</strong><small>\u041E\u0431\u0441\u044F\u0433 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C, \u043D\u0435 \u0437\u0431\u0438\u0442\u043A\u0438</small></div>
+ <div><span>\u0426\u0456\u043D\u043E\u0432\u0456 \u0441\u0438\u0433\u043D\u0430\u043B\u0438</span><strong>${signals.toLocaleString("uk-UA")}</strong><small>\u041F\u043E\u0442\u0440\u0435\u0431\u0443\u044E\u0442\u044C \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u0430\u043D\u0430\u043B\u043E\u0433\u0456\u0432</small></div>
+ <div><span>\u0417 \u0434\u0435\u0442\u0430\u043B\u044F\u043C\u0438 \u0443 \u0441\u043F\u0438\u0441\u043A\u0443</span><strong>${full.toLocaleString("uk-UA")} <em>/ ${list.length.toLocaleString("uk-UA")}</em></strong><small>${full === list.length ? "\u0414\u0435\u0442\u0430\u043B\u0456 \u0454 \u0434\u043B\u044F \u0432\u0441\u0456\u0454\u0457 \u0432\u0438\u0431\u0456\u0440\u043A\u0438" : "\u0420\u0435\u0448\u0442\u0430 \u043C\u043E\u0436\u0443\u0442\u044C \u043C\u0430\u0442\u0438 \u043D\u0435\u043F\u043E\u0432\u043D\u0456 \u0434\u0430\u043D\u0456"}</small></div>
+</section></details>
 ${c.risk ? riskCard(c.risk) : ""}
-
 ${listBody(list, c, "/")}
-
-<p class="note">\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0426\u0435 \u043E\u0437\u043D\u0430\u043A\u0430 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0430 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0430 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0439 \u0444\u0430\u043A\u0442 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
-`
-  });
+</section></section>` });
 }
 
 // server/components/verdict.ts
@@ -2779,30 +2945,6 @@ ${q.criminal.map(
   </details>
 </div>`
   ).join("")}`;
-}
-function levelLabel(level) {
-  return level === "high" ? "\u0412\u0438\u0441\u043E\u043A\u0438\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442" : level === "medium" ? "\u0421\u0435\u0440\u0435\u0434\u043D\u0456\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442" : "\u041D\u0438\u0437\u044C\u043A\u0438\u0439 \u043F\u0440\u0456\u043E\u0440\u0438\u0442\u0435\u0442";
-}
-function verdictSummary(entry, sameEntity, sameOfficer, sameWinner) {
-  const c = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
-  return `<div class="card verdict compact ${esc(c.level)}">
-  <h3><span class="verdict-tag">${esc(levelLabel(c.level))}</span> ${esc(c.headline)} <a href="#conclusion">\u0427\u043E\u043C\u0443 \u2192</a></h3>
-</div>`;
-}
-function conclusionBlock(entry, sameEntity, sameOfficer, sameWinner) {
-  const c = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
-  return `<div class="card verdict ${esc(c.level)}">
-  <h3><span class="verdict-tag">${esc(levelLabel(c.level))}</span> ${esc(c.headline)}</h3>
-  ${c.observations.length > 0 ? `<ol class="findings">${c.observations.map(
-    (o) => `<li class="w-${esc(o.weight)}">
-    <strong>${esc(o.title)}</strong>
-    <span>${esc(o.detail)}</span>
-  </li>`
-  ).join("")}</ol>` : `<p class="lead">\u0414\u0435\u0440\u0436\u0430\u0432\u043D\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u043E\u0437\u043D\u0430\u0447\u0438\u043B\u0430 \u0446\u044E \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E, \u0430\u043B\u0435 \u043D\u0430\u0448\u0456 \u0432\u043B\u0430\u0441\u043D\u0456 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u2014 \u0446\u0456\u043D\u0430 \u043F\u0440\u043E\u0442\u0438 \u0440\u0438\u043D\u043A\u0443, \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u044F, \u043F\u043E\u0432\u0442\u043E\u0440\u044E\u0432\u0430\u043D\u0456\u0441\u0442\u044C \u0437\u0432'\u044F\u0437\u043A\u0456\u0432 \u2014 \u043D\u0456\u0447\u043E\u0433\u043E \u0434\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u043E\u0433\u043E \u043D\u0435 \u043F\u043E\u043A\u0430\u0437\u0430\u043B\u0438.</p>`}
-  <p><strong>\u0429\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0434\u0430\u043B\u0456:</strong></p>
-  <ul>${c.nextSteps.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
-  <p class="faint">\u0426\u0435\u0439 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A \u0441\u043A\u043B\u0430\u043B\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u0437 \u0447\u0438\u0441\u0435\u043B, \u043D\u0430\u0432\u0435\u0434\u0435\u043D\u0438\u0445 \u0432\u0438\u0449\u0435. \u0412\u0456\u043D \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F \u0456 \u043D\u0435 \u0454 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u0454\u044E \u0434\u0456\u0439 \u0431\u0443\u0434\u044C-\u044F\u043A\u043E\u0457 \u043E\u0441\u043E\u0431\u0438.</p>
-</div>`;
 }
 
 // server/pages/static.ts
@@ -3047,60 +3189,21 @@ async function tenderPage(tenderId, url) {
   const signals = alarms(entry);
   const prozorro = `https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}`;
   const buyer = readableName(entry.entity_name);
+  const conclusion = buildConclusion({ entry, sameEntity, sameOfficer, sameWinner });
   return layout({
     // The tab and any link preview name the thing, not just its number.
     title: `${trim(title, 60)} \xB7 ${shortMoney(entry.value_amount)}`,
     description: `${buyer ? `${buyer} \xB7 ` : ""}${money(entry.value_amount)} \xB7 ${signals[0] ?? (entry.risks.length ? `${entry.risks.length} ${plural(entry.risks.length, "\u043E\u0437\u043D\u0430\u043A\u0430", "\u043E\u0437\u043D\u0430\u043A\u0438", "\u043E\u0437\u043D\u0430\u043A")} \u0440\u0438\u0437\u0438\u043A\u0443` : "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F \u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438")} \xB7 ${entry.tender_ref || entry.tender_id}`,
     body: `
-<a class="back" href="${esc(back)}">${back === "/" ? "\u2190 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C" : "\u2190 \u043D\u0430\u0437\u0430\u0434 \u0434\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443"}</a>
-${star("tender", entry.tender_id, "/tender/" + encodeURIComponent(entry.tender_id), { label: true })}
-<h1 class="long">${esc(title)}</h1>
-<p class="sub">${esc(readableName(entry.entity_name))} \xB7 <span class="ref">${esc(entry.tender_ref || entry.tender_id)}</span></p>
-
-${signals.length ? `<div class="flags" style="margin-bottom:1.25rem">${signals.map((s) => `<span class="flag alarm">${esc(s)}</span>`).join("")}</div>` : ""}
-${verdictSummary(entry, sameEntity, sameOfficer, sameWinner)}
-
-<div class="actions">
-  <a class="action primary download" href="/tender/${encodeURIComponent(entry.tender_id)}/report">\u0417\u0432\u0456\u0442 \u0434\u043B\u044F \u0434\u0440\u0443\u043A\u0443 \u0442\u0430 PDF</a>
-  <a class="action" href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">\u0422\u0435\u043A\u0441\u0442\u043E\u0432\u0438\u043C \u0444\u0430\u0439\u043B\u043E\u043C</a>
-  <a class="action" href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E \u0432 Prozorro</a>
-</div>
-
-<div class="card">
-  <dl class="facts">
-    <dt>\u0421\u0443\u043C\u0430</dt><dd><strong>${money(entry.value_amount)}</strong> <span class="faint">(${shortMoney(entry.value_amount)})</span></dd>
-    <dt>\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A</dt><dd><a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">${esc(readableName(entry.entity_name))}</a><br><span class="faint">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(entry.entity_edrpou ?? "\u2014")}</span></dd>
-    <dt>\u0420\u0435\u0433\u0456\u043E\u043D</dt><dd>${entry.region ? `<a href="/?region=${encodeURIComponent(entry.region)}">${esc(entry.region)}</a>` : "\u2014"}</dd>
-    ${entry.method ? `<dt>\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0430</dt><dd>${esc(procedureLabel(entry.method) ?? "\u2014")}</dd>` : ""}
-    ${entry.detailed ? `<dt>\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432</dt><dd>${entry.bidders === 1 ? "<strong>\u043E\u0434\u0438\u043D</strong> \u2014 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u0457 \u043D\u0435 \u0431\u0443\u043B\u043E" : entry.bidders || "\u2014"}</dd>` : ""}
-    <dt>\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</dt><dd>${date(entry.tender_date)}</dd>
-    <dt>\u041F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043E\u044E</dt><dd>${date(entry.date_assessed)}</dd>
-    <dt>\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E</dt><dd><a href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u043A\u0430\u0440\u0442\u043A\u0443 \u0432 Prozorro \u2192</a></dd>
-  </dl>
-</div>
-
-<h2>\u0425\u0442\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u0432 \u0437\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E</h2>
-${entry.officer_name ? `<div class="card">
-  <h3><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a></h3>
-  <p class="lead">${otherOfficer.length ? `\u0426\u044F \u043E\u0441\u043E\u0431\u0430 \u0432\u043A\u0430\u0437\u0430\u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u043E\u044E \u0449\u0435 \u0443 <strong>${otherOfficer.length}</strong> ${plural(otherOfficer.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0440\u0430\u0437\u043E\u043C \u043D\u0430 <strong>${shortMoney(officerValue)}</strong>.` : "\u0406\u043D\u0448\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0437\u0430 \u0446\u0456\u0454\u044E \u043E\u0441\u043E\u0431\u043E\u044E \u0432 \u0431\u0430\u0437\u0456 \u043D\u0435\u043C\u0430\u0454."}</p>
-  <dl class="facts">
-    <dt>\u041F\u043E\u0448\u0442\u0430</dt><dd>${esc(entry.officer_email ?? "\u2014")}</dd>
-    <dt>\u0422\u0435\u043B\u0435\u0444\u043E\u043D</dt><dd>${esc(entry.officer_phone ?? "\u2014")}</dd>
-  </dl>
-  <p style="margin-top:.9rem"><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0434\u043E\u0441\u044C\u0454 \u043F\u043E\u0441\u0430\u0434\u043E\u0432\u0446\u044F \u2192</a></p>
-</div>` : `<div class="card"><p>\u041A\u0430\u0440\u0442\u043A\u0443 \u0446\u0456\u0454\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E, \u0442\u043E\u043C\u0443 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0430 \u043E\u0441\u043E\u0431\u0430 \u043D\u0435\u0432\u0456\u0434\u043E\u043C\u0430.</p><p><a href="${prozorro}" target="_blank" rel="noopener">\u041F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0443 \u043E\u0441\u043E\u0431\u0443 \u0432 Prozorro \u2192</a></p></div>`}
-
-<h2>\u0425\u0442\u043E \u0432\u0438\u0433\u0440\u0430\u0432</h2>
-${entry.winner_name ? `<div class="card">
-  <h3><a href="/supplier/${encodeURIComponent(entry.winner_edrpou ?? "")}">${esc(readableName(entry.winner_name))}</a></h3>
-  <p class="lead">${otherWinner.length ? `\u0426\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u043B\u0430 \u0449\u0435 \u0443 <strong>${otherWinner.length}</strong> ${plural(otherWinner.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0440\u0430\u0437\u043E\u043C \u043D\u0430 <strong>${shortMoney(winnerValue)}</strong>.` : "\u0406\u043D\u0448\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0437\u0430 \u0446\u0456\u0454\u044E \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0454\u044E \u0432 \u0431\u0430\u0437\u0456 \u043D\u0435\u043C\u0430\u0454."}</p>
-  <dl class="facts">
-    <dt>\u0404\u0414\u0420\u041F\u041E\u0423</dt><dd>${esc(entry.winner_edrpou ?? "\u2014")}</dd>
-    <dt>\u0421\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443</dt><dd>${money(entry.winner_amount)}</dd>
-  </dl>
-</div>` : `<div class="card"><p>\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0430\u0431\u043E \u043A\u0430\u0440\u0442\u043A\u0443 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E.</p><p><a href="${prozorro}" target="_blank" rel="noopener">\u041F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u0432 Prozorro \u2192</a></p></div>`}
-
-${entry.findings.length ? `<h2>\u0421\u043A\u0456\u043B\u044C\u043A\u0438 \u0446\u0435 \u043A\u043E\u0448\u0442\u0443\u0454 \u0432 \u0456\u043D\u0448\u0438\u0445</h2>
+<article class="tender-detail">
+<div class="detail-toolbar"><a class="back" href="${esc(back)}">\u2190 \u0414\u043E \u043F\u0435\u0440\u0435\u043B\u0456\u043A\u0443</a>${star("tender", entry.tender_id, url ? url.pathname + url.search : "/tender/" + encodeURIComponent(entry.tender_id), { label: true })}</div>
+<header class="detail-heading"><p class="detail-ref">${esc(entry.tender_ref || entry.tender_id)}</p><h1>${esc(title)}</h1><p class="detail-buyer">${esc(buyer)}</p></header>
+<section class="detail-overview" id="facts" aria-label="\u041E\u0441\u043D\u043E\u0432\u043D\u0456 \u0434\u0430\u043D\u0456"><div><span>\u0421\u0443\u043C\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</span><strong>${shortMoney(entry.value_amount)}</strong></div><div><span>\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432</span><strong>${entry.detailed ? entry.bidders ?? "\u041D\u0435\u043C\u0430\u0454 \u0434\u0430\u043D\u0438\u0445" : "\u041D\u0435\u043C\u0430\u0454 \u0434\u0430\u043D\u0438\u0445"}</strong></div><div><span>\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</span><strong>${date(entry.tender_date)}</strong></div></section>
+<div class="detail-source"><a href="${prozorro}" target="_blank" rel="noopener">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0432 Prozorro <span aria-hidden="true">\u2197</span></a><span>\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0442\u0430 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E</span></div>
+<div class="detail-columns"><section class="detail-signals" id="signals"><h2>\u0429\u043E \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u0443\u0432\u0430\u0433\u0438 <span>${entry.risks.length + entry.findings.length}</span></h2><p class="detail-caution">\u0421\u0438\u0433\u043D\u0430\u043B \u043D\u0435 \u0434\u043E\u0432\u043E\u0434\u0438\u0442\u044C \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
+${entry.bidders === 1 ? '<p class="detail-competition">\u041E\u0434\u0438\u043D \u0443\u0447\u0430\u0441\u043D\u0438\u043A \u2014 \u043D\u0435\u043C\u0430\u0454 \u0456\u043D\u0448\u043E\u0457 \u043F\u0440\u043E\u043F\u043E\u0437\u0438\u0446\u0456\u0457 \u0434\u043B\u044F \u043F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F.</p>' : ""}
+${entry.risks.map((r) => `<details class="detail-fold signal-fold"><summary><span><small>\u0414\u0435\u0440\u0436\u0430\u0432\u043D\u0438\u0439 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440</small><strong>${esc(shortRisk(r))}</strong></span></summary><div class="detail-fold-body"><p>${esc(dataset().ruleById.get(r)?.name ?? r)}</p><p class="detail-caution">\u0426\u0435 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u0430 \u043E\u0437\u043D\u0430\u043A\u0430. \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0434\u043E\u0433\u043E\u0432\u0456\u0440 \u0442\u0430 \u0437\u043C\u0456\u043D\u0438 \u0434\u043E \u043D\u044C\u043E\u0433\u043E \u0432 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u0456.</p><a href="${prozorro}" target="_blank" rel="noopener">\u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u2197</a><p class="detail-ref">\u0406\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 ${esc(r)} \xB7 <a href="/?risk=${encodeURIComponent(r)}">\u0406\u043D\u0448\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u0446\u0456\u0454\u044E \u043E\u0437\u043D\u0430\u043A\u043E\u044E</a></p></div></details>`).join("")}
+${entry.findings.length ? `<details class="detail-fold"><summary><span><small>\u0420\u043E\u0437\u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0441\u0438\u0441\u0442\u0435\u043C\u0438</small><strong>\u041F\u043E\u0440\u0456\u0432\u043D\u044F\u043D\u043D\u044F \u0446\u0456\u043D \xB7 ${entry.findings.length}</strong></span></summary><div class="detail-fold-body">${entry.findings.length ? `<h2>\u0421\u043A\u0456\u043B\u044C\u043A\u0438 \u0446\u0435 \u043A\u043E\u0448\u0442\u0443\u0454 \u0432 \u0456\u043D\u0448\u0438\u0445</h2>
 <p class="hint">\u0420\u0430\u0445\u0443\u0432\u0430\u043B\u0430 \u0441\u0438\u0441\u0442\u0435\u043C\u0430, \u043D\u0435 \u0434\u0435\u0440\u0436\u0430\u0432\u0430. \u041D\u0438\u0436\u0447\u0435 \u2014 \u0447\u0438\u0441\u043B\u0430.</p>
 ${entry.findings.map((f) => {
       const e = f.evidence;
@@ -3122,27 +3225,49 @@ ${entry.findings.map((f) => {
 </div>`;
     }).join("")}` : ""}
 
-${auditSection(entry)}
-<h2>\u0429\u043E \u0442\u0443\u0442 \u043D\u0435 \u0442\u0430\u043A</h2>
-<p class="hint">\u0421\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u043B\u043E ${entry.risks.length} ${plural(entry.risks.length, "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0438", "\u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440\u0456\u0432")} \u0456\u0437 ${dataset().rules.length} \u0447\u0438\u043D\u043D\u0438\u0445. <a href="/indicators">\u0429\u043E \u043E\u0437\u043D\u0430\u0447\u0430\u0454 \u043A\u043E\u0436\u0435\u043D \u2192</a></p>
-${entry.risks.map((r) => riskCard(r)).join("")}
+</div></details>` : ""}
+${!entry.risks.length && !entry.findings.length ? "<p>\u0414\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0438\u0445 \u0441\u0438\u0433\u043D\u0430\u043B\u0456\u0432 \u0443 \u043F\u043E\u0442\u043E\u0447\u043D\u0438\u0445 \u0434\u0430\u043D\u0438\u0445 \u043D\u0435\u043C\u0430\u0454.</p>" : ""}
+${entry.audit ? `<details class="detail-fold"><summary><span><small>\u0414\u0435\u0440\u0436\u0430\u0443\u0434\u0438\u0442\u0441\u043B\u0443\u0436\u0431\u0430</small><strong>${entry.audit.violation ? "\u0412\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F" : "\u041F\u043E\u0440\u0443\u0448\u0435\u043D\u044C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E"}</strong></span></summary><div class="detail-fold-body">${auditSection(entry)}</div></details>` : ""}
+</section><section class="detail-next" id="conclusion"><h2>\u0429\u043E \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438 \u0434\u0430\u043B\u0456</h2><ol>${conclusion.nextSteps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol><details class="detail-fold"><summary>\u0427\u043E\u043C\u0443 \u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043F\u0440\u043E\u043F\u043E\u043D\u0443\u0454 \u0446\u0456 \u043A\u0440\u043E\u043A\u0438</summary><div class="detail-fold-body">${conclusion.observations.map((o) => `<p><strong>${esc(o.title)}</strong><br>${esc(o.detail)}</p>`).join("")}<p class="detail-caution">\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u0438\u0439 \u0430\u043D\u0430\u043B\u0456\u0437 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u044E\u0454 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p></div></details></section></div>
+<section class="detail-reference" aria-label="\u0414\u043E\u0434\u0430\u0442\u043A\u043E\u0432\u0456 \u0432\u0456\u0434\u043E\u043C\u043E\u0441\u0442\u0456">
+<details class="detail-fold" id="participants"><summary><span><strong>\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0438 \u0442\u0430 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u0438</strong><small>${entry.winner_name ? "\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0435\u0446\u044C: " + esc(readableName(entry.winner_name)) : "\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A, \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0435\u0446\u044C, \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0430 \u043E\u0441\u043E\u0431\u0430"}</small></span></summary><div class="detail-fold-body"><h3>\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0430 \u043E\u0441\u043E\u0431\u0430 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430</h3>${entry.officer_name ? `<div class="card">
+  <h3><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">${esc(entry.officer_name)}</a></h3>
+  <p class="lead">${otherOfficer.length ? `\u0426\u0435\u0439 \u043A\u043E\u043D\u0442\u0430\u043A\u0442 \u0437\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0449\u0435 \u0443 <strong>${otherOfficer.length}</strong> ${plural(otherOfficer.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0440\u0430\u0437\u043E\u043C \u043D\u0430 <strong>${shortMoney(officerValue)}</strong>.` : "\u0406\u043D\u0448\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0437\u0430 \u0446\u0456\u0454\u044E \u043E\u0441\u043E\u0431\u043E\u044E \u0432 \u0431\u0430\u0437\u0456 \u043D\u0435\u043C\u0430\u0454."}</p>
+  <dl class="facts">
+    <dt>\u041F\u043E\u0448\u0442\u0430</dt><dd>${esc(entry.officer_email ?? "\u2014")}</dd>
+    <dt>\u0422\u0435\u043B\u0435\u0444\u043E\u043D</dt><dd>${esc(entry.officer_phone ?? "\u2014")}</dd>
+  </dl>
+  <p style="margin-top:.9rem"><a href="/officer/${encodeURIComponent(entry.officer_key ?? "")}">\u041F\u0435\u0440\u0435\u0433\u043B\u044F\u043D\u0443\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437 \u0446\u0438\u043C \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043E\u043C \u2192</a></p>
+</div>` : `<div class="card"><p>\u041A\u0430\u0440\u0442\u043A\u0443 \u0446\u0456\u0454\u0457 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E, \u0442\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u043D\u0456 \u0434\u0430\u043D\u0456 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0456.</p><p><a href="${prozorro}" target="_blank" rel="noopener">\u041F\u0435\u0440\u0435\u0433\u043B\u044F\u043D\u0443\u0442\u0438 \u043A\u043E\u043D\u0442\u0430\u043A\u0442 \u0432 Prozorro \u2192</a></p></div>`}
 
-<h2>\u041F\u0440\u0430\u0432\u043E\u0432\u0430 \u043A\u0432\u0430\u043B\u0456\u0444\u0456\u043A\u0430\u0446\u0456\u044F</h2>
-<details class="fold">
-  <summary>\u041D\u043E\u0440\u043C\u0438, \u043D\u0430\u0441\u043B\u0456\u0434\u043A\u0438, \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0430\u043B\u044C\u043D\u0456\u0441\u0442\u044C \u2014 \u0440\u043E\u0437\u0433\u043E\u0440\u043D\u0443\u0442\u0438</summary>
-  <div class="fold-body">${qualificationBlock(entry)}</div>
-</details>
+<h2>\u0425\u0442\u043E \u0432\u0438\u0433\u0440\u0430\u0432</h2>
+${entry.winner_name ? `<div class="card">
+  <h3><a href="/supplier/${encodeURIComponent(entry.winner_edrpou ?? "")}">${esc(readableName(entry.winner_name))}</a></h3>
+  <p class="lead">${otherWinner.length ? `\u0426\u044F \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0433\u043B\u0430 \u0449\u0435 \u0443 <strong>${otherWinner.length}</strong> ${plural(otherWinner.length, "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445", "\u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044F\u0445")} \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438, \u0440\u0430\u0437\u043E\u043C \u043D\u0430 <strong>${shortMoney(winnerValue)}</strong>.` : "\u0406\u043D\u0448\u0438\u0445 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u0437\u0430 \u0446\u0456\u0454\u044E \u043A\u043E\u043C\u043F\u0430\u043D\u0456\u0454\u044E \u0432 \u0431\u0430\u0437\u0456 \u043D\u0435\u043C\u0430\u0454."}</p>
+  <dl class="facts">
+    <dt>\u0404\u0414\u0420\u041F\u041E\u0423</dt><dd>${esc(entry.winner_edrpou ?? "\u2014")}</dd>
+    <dt>\u0421\u0443\u043C\u0430 \u0434\u043E\u0433\u043E\u0432\u043E\u0440\u0443</dt><dd>${money(entry.winner_amount)}</dd>
+  </dl>
+</div>` : `<div class="card"><p>\u041F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0430\u0431\u043E \u043A\u0430\u0440\u0442\u043A\u0443 \u0449\u0435 \u043D\u0435 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043E.</p><p><a href="${prozorro}" target="_blank" rel="noopener">\u041F\u043E\u0434\u0438\u0432\u0438\u0442\u0438\u0441\u044F \u043F\u0435\u0440\u0435\u043C\u043E\u0436\u0446\u044F \u0432 Prozorro \u2192</a></p></div>`}
 
-<h2 id="conclusion">\u041D\u0430\u0448 \u0432\u0438\u0441\u043D\u043E\u0432\u043E\u043A</h2>
-${conclusionBlock(entry, sameEntity, sameOfficer, sameWinner)}
-
-<h2>\u0426\u0435\u0439 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A \u0437\u0430\u0433\u0430\u043B\u043E\u043C</h2>
-<div class="card">
-  <p class="lead">\u0417\u0430 ${esc(readableName(entry.entity_name))} \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0430\u043D\u043E <strong>${sameEntity.length}</strong> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438.</p>
-  <p><a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u0434\u043E\u0441\u044C\u0454 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430 \u2192</a></p>
+</div></details>
+<details class="detail-fold"><summary>\u0423\u0441\u0456 \u0440\u0435\u043A\u0432\u0456\u0437\u0438\u0442\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</summary><div class="detail-fold-body"><div class="card">
+  <dl class="facts">
+    <dt>\u0421\u0443\u043C\u0430</dt><dd><strong>${money(entry.value_amount)}</strong> <span class="faint">(${shortMoney(entry.value_amount)})</span></dd>
+    <dt>\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A</dt><dd><a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">${esc(readableName(entry.entity_name))}</a><br><span class="faint">\u0404\u0414\u0420\u041F\u041E\u0423 ${esc(entry.entity_edrpou ?? "\u2014")}</span></dd>
+    <dt>\u0420\u0435\u0433\u0456\u043E\u043D</dt><dd>${entry.region ? `<a href="/?region=${encodeURIComponent(entry.region)}">${esc(entry.region)}</a>` : "\u2014"}</dd>
+    ${entry.method ? `<dt>\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u0430</dt><dd>${esc(procedureLabel(entry.method) ?? "\u2014")}</dd>` : ""}
+    ${entry.detailed ? `<dt>\u0423\u0447\u0430\u0441\u043D\u0438\u043A\u0456\u0432</dt><dd>${entry.bidders === 1 ? "<strong>\u043E\u0434\u0438\u043D</strong> \u2014 \u043A\u043E\u043D\u043A\u0443\u0440\u0435\u043D\u0446\u0456\u0457 \u043D\u0435 \u0431\u0443\u043B\u043E" : entry.bidders || "\u2014"}</dd>` : ""}
+    <dt>\u0414\u0430\u0442\u0430 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</dt><dd>${date(entry.tender_date)}</dd>
+    <dt>\u041F\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u043E \u0434\u0435\u0440\u0436\u0430\u0432\u043E\u044E</dt><dd>${date(entry.date_assessed)}</dd>
+    <dt>\u041F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E</dt><dd><a href="https://prozorro.gov.ua/tender/${encodeURIComponent(entry.tender_ref)}" target="_blank" rel="noopener">\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u043A\u0430\u0440\u0442\u043A\u0443 \u0432 Prozorro \u2192</a></dd>
+  </dl>
 </div>
 
-<p class="note">\u041D\u0430\u044F\u0432\u043D\u0456\u0441\u0442\u044C \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0438 \u043D\u0435 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F, \u0456 \u043D\u0435 \u0454 \u0437\u0432\u0438\u043D\u0443\u0432\u0430\u0447\u0435\u043D\u043D\u044F\u043C \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0445 \u043E\u0441\u0456\u0431. \u0426\u0435 \u043F\u0456\u0434\u0441\u0442\u0430\u0432\u0430 \u0434\u043B\u044F \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u043B\u044E\u0434\u0438\u043D\u043E\u044E.</p>
+<a href="/entity/${encodeURIComponent(entry.entity_edrpou ?? "")}">\u0414\u043E\u0441\u044C\u0454 \u0437\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0430 \xB7 ${sameEntity.length} \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \u2192</a></div></details>
+<details class="detail-fold"><summary><span><strong>\u041F\u0440\u0430\u0432\u043E\u0432\u0430 \u0434\u043E\u0432\u0456\u0434\u043A\u0430</strong><small>\u041D\u043E\u0440\u043C\u0438 \u0442\u0430 \u043F\u043E\u044F\u0441\u043D\u0435\u043D\u043D\u044F \u0434\u043B\u044F \u0444\u0430\u0445\u0456\u0432\u0446\u0456\u0432</small></span></summary><div class="detail-fold-body">${qualificationBlock(entry)}</div></details>
+<details class="detail-fold"><summary>\u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0438\u0442\u0438 \u0430\u0431\u043E \u043D\u0430\u0434\u0440\u0443\u043A\u0443\u0432\u0430\u0442\u0438 \u0437\u0432\u0456\u0442</summary><div class="detail-fold-body detail-downloads"><a href="/tender/${encodeURIComponent(entry.tender_id)}/report">\u0414\u043B\u044F \u0434\u0440\u0443\u043A\u0443 \u0442\u0430 PDF</a><a href="/tender/${encodeURIComponent(entry.tender_id)}/report.txt">\u0422\u0435\u043A\u0441\u0442\u043E\u0432\u0438\u0439 \u0444\u0430\u0439\u043B</a></div></details>
+</section></article>
 `
   });
 }
@@ -3576,31 +3701,12 @@ function railwayPage(url) {
     title: "\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F \u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u043E\u0457 \u043E\u0431\u043B\u0430\u0441\u0442\u0456",
     nav: "railway",
     body: `
-<h1>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F \u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u043E\u0457 \u043E\u0431\u043B\u0430\u0441\u0442\u0456</h1>
-<p class="sub">\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456. \u0422\u0440\u0438 \u0433\u0440\u0443\u043F\u0438, \u044F\u043A\u0456 \u043C\u0438 \u043D\u0435 \u0437\u043C\u0456\u0448\u0443\u0454\u043C\u043E.</p>
-
-<p class="statline">
-  <b>${all.length.toLocaleString("uk-UA")}</b> \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C \u0456\u0437 \u043F\u043E\u0437\u043D\u0430\u0447\u043A\u0430\u043C\u0438 \xB7
-  <b>${shortMoney(value)}</b> \u043D\u0430 \u0442\u0430\u043A\u0443 \u0441\u0443\u043C\u0443 \xB7
-  <b>${solo}</b> \u0437 \u0454\u0434\u0438\u043D\u0438\u043C \u0443\u0447\u0430\u0441\u043D\u0438\u043A\u043E\u043C \xB7
-  <b>${southern.length}</b> \u0443 \xAB\u041F\u0456\u0432\u0434\u0435\u043D\u043D\u043E\u0457 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456\xBB
-</p>
-
-<details class="help">
-  <summary>\u0429\u043E \u0441\u0430\u043C\u0435 \u0432\u0445\u043E\u0434\u0438\u0442\u044C \u0443 \u0446\u0435\u0439 \u0440\u043E\u0437\u0434\u0456\u043B</summary>
-  <div class="inner">
-    <p><strong>\u041F\u0456\u0432\u0434\u0435\u043D\u043D\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</strong> \u2014 \u0440\u0435\u0433\u0456\u043E\u043D\u0430\u043B\u044C\u043D\u0430 \u0444\u0456\u043B\u0456\u044F \u0410\u0422 \xAB\u0423\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F\xBB, \u0449\u043E \u043E\u0431\u0441\u043B\u0443\u0433\u043E\u0432\u0443\u0454 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0443. \u0426\u0435 \u0456 \u0454 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F \u043E\u0431\u043B\u0430\u0441\u0442\u0456 \u0443 \u043F\u0440\u044F\u043C\u043E\u043C\u0443 \u0437\u043D\u0430\u0447\u0435\u043D\u043D\u0456.</p>
-    <p><strong>\u0406\u043D\u0448\u0456 \u0444\u0456\u043B\u0456\u0457 \u0423\u043A\u0440\u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456</strong> \u0437\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u043E\u0432\u0430\u043D\u0456 \u0432 \u041A\u0438\u0454\u0432\u0456, \u0430\u043B\u0435 \u0437\u0430\u043A\u0443\u043F\u043E\u0432\u0443\u044E\u0442\u044C \u0446\u0435\u043D\u0442\u0440\u0430\u043B\u0456\u0437\u043E\u0432\u0430\u043D\u043E \u0434\u043B\u044F \u0432\u0441\u0456\u0454\u0457 \u043C\u0435\u0440\u0435\u0436\u0456, \u0437\u043E\u043A\u0440\u0435\u043C\u0430 \u0439 \u0434\u043B\u044F \u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0438\u0445 \u043F\u0456\u0434\u0440\u043E\u0437\u0434\u0456\u043B\u0456\u0432. \u041C\u0438 \u0432\u0456\u0434\u0441\u0442\u0435\u0436\u0443\u0454\u043C\u043E \u0457\u0445 \u043E\u043A\u0440\u0435\u043C\u043E \u0439 \u043D\u0435 \u0432\u0438\u0434\u0430\u0454\u043C\u043E \u0437\u0430 \u0445\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u0456.</p>
-    <p><strong>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0456 \u0437\u0430\u043A\u043B\u0430\u0434\u0438 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0438</strong> \u2014 \u043E\u0441\u0432\u0456\u0442\u043D\u0456 \u0442\u0430 \u043D\u0430\u0443\u043A\u043E\u0432\u0456 \u043E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0457 \u0433\u0430\u043B\u0443\u0437\u0456, \u0437\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u043E\u0432\u0430\u043D\u0456 \u0432 \u043E\u0431\u043B\u0430\u0441\u0442\u0456.</p>
-    <p>\u0412\u0456\u0434\u0431\u0456\u0440 \u0437\u0430 \u043D\u0430\u0437\u0432\u043E\u044E \u043D\u0430\u0432\u043C\u0438\u0441\u043D\u043E \u0432\u0443\u0437\u044C\u043A\u0438\u0439. \u0428\u0438\u0440\u0448\u0438\u0439 \u0448\u0430\u0431\u043B\u043E\u043D \u043F\u043E\u043C\u0438\u043B\u043A\u043E\u0432\u043E \u0437\u0430\u0440\u0430\u0445\u043E\u0432\u0443\u0432\u0430\u0432 \u0434\u043E \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0417\u043C\u0456\u0457\u0432\u0441\u044C\u043A\u0443 \u0442\u0435\u043F\u043B\u043E\u0432\u0443 \u0435\u043B\u0435\u043A\u0442\u0440\u043E\u0441\u0442\u0430\u043D\u0446\u0456\u044E \u0442\u0430 \u0434\u043E\u0441\u043B\u0456\u0434\u043D\u0443 \u0441\u0442\u0430\u043D\u0446\u0456\u044E \u043F\u0442\u0430\u0445\u0456\u0432\u043D\u0438\u0446\u0442\u0432\u0430.</p>
-  </div>
-</details>
-
-<h2>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456</h2>
+<header class="railway-heading"><div><h1>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F \u0425\u0430\u0440\u043A\u0456\u0432\u0441\u044C\u043A\u043E\u0457 \u043E\u0431\u043B\u0430\u0441\u0442\u0456</h1><p class="sub">\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456 \u0442\u0430 \u043F\u043E\u0432\u2019\u044F\u0437\u0430\u043D\u0438\u0445 \u043E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0439.</p></div><span class="railway-count">${all.length.toLocaleString("uk-UA")} \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C</span></header>
+<details class="railway-about"><summary>\u041F\u0440\u043E \u0440\u043E\u0437\u0434\u0456\u043B</summary><div class="railway-about-grid"><p><strong>\u041F\u0456\u0432\u0434\u0435\u043D\u043D\u0430 \u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</strong><br>\u0420\u0435\u0433\u0456\u043E\u043D\u0430\u043B\u044C\u043D\u0430 \u0444\u0456\u043B\u0456\u044F, \u0449\u043E \u043E\u0431\u0441\u043B\u0443\u0433\u043E\u0432\u0443\u0454 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0443.</p><p><strong>\u0406\u043D\u0448\u0456 \u0444\u0456\u043B\u0456\u0457 \u0423\u043A\u0440\u0437\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u0456</strong><br>\u0426\u0435\u043D\u0442\u0440\u0430\u043B\u0456\u0437\u043E\u0432\u0430\u043D\u0456 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456 \u0434\u043B\u044F \u0432\u0441\u0456\u0454\u0457 \u043C\u0435\u0440\u0435\u0436\u0456. \u041D\u0435 \u043B\u0438\u0448\u0435 \u0425\u0430\u0440\u043A\u0456\u0432\u0449\u0438\u043D\u0430.</p><p><strong>\u041C\u0456\u0441\u0446\u0435\u0432\u0456 \u0437\u0430\u043A\u043B\u0430\u0434\u0438</strong><br>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0447\u043D\u0456 \u043E\u0441\u0432\u0456\u0442\u043D\u0456 \u0442\u0430 \u043D\u0430\u0443\u043A\u043E\u0432\u0456 \u043E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0457 \u043E\u0431\u043B\u0430\u0441\u0442\u0456.</p></div></details>
 ${controlBar("/railway", c, { hideRail: true }, { url })}
 ${listBody(filtered, c, "/railway")}
 
-<h2>\u0425\u0442\u043E \u0437\u0430\u043A\u0443\u043F\u043E\u0432\u0443\u0454</h2>
+<details class="railway-analysis"><summary>\u0417\u0430\u043C\u043E\u0432\u043D\u0438\u043A\u0438, \u043F\u043E\u0441\u0442\u0430\u0447\u0430\u043B\u044C\u043D\u0438\u043A\u0438 \u0442\u0430 \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430</summary><div class="railway-analysis-body"><h2>\u0425\u0442\u043E \u0437\u0430\u043A\u0443\u043F\u043E\u0432\u0443\u0454</h2>
 ${blocks.map((block) => {
       const blockValue = block.list.reduce((sum2, x) => sum2 + (x.value_amount ?? 0), 0);
       const entities = /* @__PURE__ */ new Map();
@@ -3651,7 +3757,7 @@ ${topSuppliers.map(
     ).join("")}
 </div>
 
-<p class="note">\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0426\u0435 \u043E\u0437\u043D\u0430\u043A\u0430 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0430 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0430 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0439 \u0444\u0430\u043A\u0442 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
+</div></details><p class="note">\u041F\u043E\u0437\u043D\u0430\u0447\u043A\u0430 \u043E\u0437\u043D\u0430\u0447\u0430\u0454, \u0449\u043E \u0441\u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0432 \u0456\u043D\u0434\u0438\u043A\u0430\u0442\u043E\u0440 \u0434\u0435\u0440\u0436\u0430\u0432\u043D\u043E\u0457 \u0441\u0438\u0441\u0442\u0435\u043C\u0438 \u043C\u043E\u043D\u0456\u0442\u043E\u0440\u0438\u043D\u0433\u0443 \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C. \u0426\u0435 \u043E\u0437\u043D\u0430\u043A\u0430 \u0440\u0438\u0437\u0438\u043A\u0443, \u044F\u043A\u0430 \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0454 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438, \u0430 \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0439 \u0444\u0430\u043A\u0442 \u043F\u043E\u0440\u0443\u0448\u0435\u043D\u043D\u044F.</p>
 `
   });
 }

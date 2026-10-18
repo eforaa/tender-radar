@@ -128,7 +128,11 @@ export async function loadDataset(): Promise<Dataset> {
   const awards: AwardRow[] = await store.allAwards();
   const bids = await store.allBids();
   const runs: RunRow[] = await store.allRuns();
-  const findings: FindingRow[] = await store.allFindings();
+  // Monitoring conclusions have their own audit field. They are not price
+  // anomalies and must not enter the price counter, preset or severity.
+  const findings: FindingRow[] = (await store.allFindings()).filter(
+    (row) => row.detector_key === "peer_price" || row.detector_key === "own_price_growth",
+  );
   const monitorings = await store.allMonitorings();
 
   const monitoringsByTender = new Map<string, typeof monitorings>();

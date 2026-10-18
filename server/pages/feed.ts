@@ -1,56 +1,43 @@
 import { REGION, RAILWAY_EDRPOU } from "../../src/config.ts";
-import { layout, esc, shortMoney } from "../html.ts";
-import { readControls, applyControls } from "../controls.ts";
+import { layout, esc, shortMoney, shortDate } from "../html.ts";
+import { readControls, applyControls, keepControls } from "../controls.ts";
 import { dataset } from "../context.ts";
 import { riskCard } from "../components/risk.ts";
 import { controlBar, listBody } from "../components/filters.ts";
 
-const HELP = `<details class="help">
-  <summary>Як читати цю сторінку</summary>
-  <div class="inner">
-    <p>Кожен рядок — це закупівля, у якій спрацював індикатор державної системи моніторингу. Держава сама позначає такі закупівлі; ми лише збираємо позначки по ${esc(REGION)} та філіях залізниці й показуємо їх зрозуміло.</p>
-    <p>Червоні позначки — те, на що варто глянути першим: єдиний учасник на великих торгах, сума понад мільярд, кілька індикаторів одразу.</p>
-    <p>Сірі позначки — що саме запідозрила держава. Натисніть на будь-яку, щоб побачити всі закупівлі з тією самою ознакою.</p>
-    <p><strong>Позначка не означає, що встановлено порушення.</strong> Це підстава відкрити закупівлю й перевірити її людиною.</p>
-  </div>
-</details>`;
-
-/** One compact line, not a panel: a newcomer needs it once, a returning
- *  reader needs the screen. The detail lives behind the link. */
-const PRIMER = `<div class="primer">
-  <span><b>1</b> держава позначає підозрілі</span>
-  <span><b>2</b> ми пояснюємо і рахуємо ціну</span>
-  <span><b>3</b> у кожній — висновок і звіт</span>
-  <a href="/about">Докладніше</a>
-</div>`;
-
 export function feedPage(url: URL): string {
   const c = readControls(url);
-  const list = applyControls(dataset().cases, c, RAILWAY_EDRPOU);
+  const ds = dataset();
+  const list = applyControls(ds.cases, c, RAILWAY_EDRPOU);
+  const latest = [...ds.runs].sort((a, b) => b.started_at.localeCompare(a.started_at))[0];
+  const scope = c.railOnly ? "Залізниця" : c.region || "Уся Україна";
+  const scopes = [
+    { label: "Харківщина", region: REGION, rail: "", active: c.region === REGION && !c.railOnly },
+    { label: "Укрзалізниця", region: "", rail: "1", active: c.railOnly && !c.region },
+    { label: "Уся Україна", region: "", rail: "", active: !c.region && !c.railOnly },
+  ];
+  const full = list.filter((x) => x.detailed).length;
+  const signals = list.reduce((n, x) => n + x.findings.length, 0);
+  return layout({ title: "Закупівлі", nav: "feed", body: `
+<section class="studio-hero">
+ <div class="studio-copy"><span class="studio-eyebrow">TENDER RADAR / МОНІТОРИНГ ЗАКУПІВЕЛЬ</span><h1>Публічні кошти.<br><span>Прозорі рішення.</span></h1><p>Знайдіть закупівлю, перевірте сигнали ризику та відкрийте першоджерело.</p><a class="studio-help" href="/about">Як працює радар <span aria-hidden="true">↗</span></a></div>
+ <div class="studio-visual" aria-label="Дані поточної вибірки"><div class="studio-orbit" aria-hidden="true"></div><div class="studio-stat"><span>ЗАКУПІВЛІ В ПОТОЧНІЙ ВИБІРЦІ</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>Відкриті дані для вашої перевірки</small><div class="studio-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="studio-signal"><span class="studio-dot" aria-hidden="true"></span><div><strong>${signals.toLocaleString("uk-UA")} цінових сигналів</strong><small>Сигнал — привід перевірити, а не звинувачення</small></div></div></div>
+</section>
+<section class="studio-workspace" aria-label="Пошук закупівель">
+<div class="results-heading"><h2 id="results-heading">Знайдіть закупівлю</h2><span>Від пошуку до першоджерела</span></div>
+<nav class="scope-nav" aria-label="Територія моніторингу">${scopes.map((s) => `<a href="${esc(keepControls("/", c, { region: s.region, rail: s.rail, page: "1" }))}"${s.active ? ' aria-current="page"' : ""}>${s.label}</a>`).join("")}</nav>
+<div class="scope-caption"><span>${esc(scope)} · поточна вибірка</span><a href="/updates">${latest ? `Останній запуск: ${shortDate(latest.started_at)}${latest.status !== "ok" || latest.errors ? " · є помилки" : ""}` : "Історія оновлень"}</a></div>
 
-  return layout({
-    title: "Закупівлі",
-    nav: "feed",
-    body: `
-<h1>Закупівлі, які варто перевірити</h1>
-<p class="sub">Публічні закупівлі всієї України, які держава позначила як підозрілі.</p>
-
-<p class="statline">
-  <b>${dataset().cases.length.toLocaleString("uk-UA")}</b> закупівель ·
-  <b>${shortMoney(dataset().totalValue)}</b> ·
-  <b>${dataset().flagCount.toLocaleString("uk-UA")}</b> ознак ·
-  <b>${dataset().findingCount.toLocaleString("uk-UA")}</b> переплат
-</p>
-
-${PRIMER}
+<section class="radar-results" aria-labelledby="results-heading">
 
 ${controlBar("/", c, {}, { url })}
-
+<details class="data-overview"><summary>Огляд даних: суми, сигнали та повнота карток</summary><section class="radar-metrics" aria-label="Показники поточної вибірки">
+ <div><span>Закупівлі з ознаками ризику</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>Не всі закупівлі регіону</small></div>
+ <div><span>Загальна сума закупівель</span><strong>${shortMoney(list.reduce((n, x) => n + (x.value_amount ?? 0), 0))}</strong><small>Обсяг закупівель, не збитки</small></div>
+ <div><span>Цінові сигнали</span><strong>${signals.toLocaleString("uk-UA")}</strong><small>Потребують перевірки аналогів</small></div>
+ <div><span>З деталями у списку</span><strong>${full.toLocaleString("uk-UA")} <em>/ ${list.length.toLocaleString("uk-UA")}</em></strong><small>${full === list.length ? "Деталі є для всієї вибірки" : "Решта можуть мати неповні дані"}</small></div>
+</section></details>
 ${c.risk ? riskCard(c.risk) : ""}
-
 ${listBody(list, c, "/")}
-
-<p class="note">Позначка означає, що спрацював індикатор державної системи моніторингу закупівель. Це ознака ризику, яка потребує перевірки, а не встановлений факт порушення.</p>
-`,
-  });
+</section></section>` });
 }
