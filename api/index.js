@@ -537,6 +537,9 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{border-radius:var(-
 .detail-toolbar .star-form:has(.star span){margin:0;line-height:1;height:44px}
 .top .brand .brand-word{display:inline;font-size:23px;font-weight:700;letter-spacing:-.7px;color:var(--ink)}.top .studio-logo{color:var(--ink);width:32px;height:32px;margin-right:7px}
 @media(max-width:44rem){.top .brand .brand-word{font-size:22px}.top .studio-logo{width:29px;height:29px}}
+
+.top .studio-logo{width:34px;height:34px}.top .brand .brand-word{font-size:22px;font-weight:600;letter-spacing:-.6px}
+@media(max-width:44rem){.top .studio-logo{width:29px;height:29px;margin-right:5px}.top .brand .brand-word{font-size:20px}}
 `;
 
 // server/favourite-interaction.ts
@@ -1370,14 +1373,14 @@ function layout(opts) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(opts.title)} \u2014 \u0412\u0438\u0434\u043D\u043E</title>
+<title>${esc(opts.title)} \u2014 \u0422\u0435\u043D\u0434\u043E\u0441\u043A\u043E\u043F</title>
 <meta name="description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
-<meta property="og:site_name" content="\u0412\u0438\u0434\u043D\u043E">
+<meta property="og:site_name" content="\u0422\u0435\u043D\u0434\u043E\u0441\u043A\u043E\u043F">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="uk_UA">
-<meta property="og:title" content="${esc(opts.title)} \u2014 \u0412\u0438\u0434\u043D\u043E">
+<meta property="og:title" content="${esc(opts.title)} \u2014 \u0422\u0435\u043D\u0434\u043E\u0441\u043A\u043E\u043F">
 <meta property="og:description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%226%22%20fill%3D%22white%22%2F%3E%3Cpath%20d%3D%22M3%2016s4.5-8%2013-8%2013%208%2013%208-4.5%208-13%208S3%2016%203%2016Z%22%20fill%3D%22none%22%20stroke%3D%22%23172a20%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2216%22%20r%3D%224%22%20fill%3D%22%23172a20%22%2F%3E%3C%2Fsvg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2038%2036%22%20color%3D%22%23172a20%22%3E%3Cpath%20d%3D%22M2%2014%205%208Q7%205%2011%205H21A4.5%204.5%200%200%201%2021%2014Z%22%20fill%3D%22currentColor%22%2F%3E%3Cpath%20d%3D%22M10%2025Q10%2020%2017%2017V28L10%2034Z%22%20fill%3D%22currentColor%22%2F%3E%3Cpath%20d%3D%22M17%2017V23L10%2030V25Q10%2020%2017%2017Z%22%20fill%3D%22%23187443%22%2F%3E%3Cpath%20d%3D%22M24%202A14%2014%200%200%201%2035%2015%22%20fill%3D%22none%22%20stroke%3D%22%23187443%22%20stroke-width%3D%223.5%22%2F%3E%3C%2Fsvg%3E">
 
 <link rel="apple-touch-icon" href="/icon-180.png">
 ${siteOrigin() ? `<link rel="canonical" href="${esc(siteOrigin() + canonicalPath())}">
@@ -1398,7 +1401,7 @@ ${STUDIO_STYLES}</style>
 <a class="skip" href="#main">\u0414\u043E \u0432\u043C\u0456\u0441\u0442\u0443</a>
 
 <header class="top"><div class="inner">
-  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M3 16s4.5-8 13-8 13 8 13 8-4.5 8-13 8S3 16 3 16Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="16" r="4" fill="currentColor"/><path d="m23 6 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="brand-word">\u0412\u0438\u0434\u043D\u043E</span></a>
+  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 38 36" aria-hidden="true"><path d="M2 14 5 8Q7 5 11 5H21A4.5 4.5 0 0 1 21 14Z" fill="currentColor"/><path d="M10 25Q10 20 17 17V28L10 34Z" fill="currentColor"/><path d="M17 17V23L10 30V25Q10 20 17 17Z" fill="#187443"/><path d="M24 2A14 14 0 0 1 35 15" fill="none" stroke="#187443" stroke-width="3.5"/></svg><span class="brand-word">\u0422\u0435\u043D\u0434\u043E\u0441\u043A\u043E\u043F</span></a>
   <nav class="nav" aria-label="\u041E\u0441\u043D\u043E\u0432\u043D\u0456 \u0440\u043E\u0437\u0434\u0456\u043B\u0438">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>\u0417\u0430\u043B\u0456\u0437\u043D\u0438\u0446\u044F</a>
@@ -2876,7 +2879,7 @@ function feedPage(url) {
   const signals = list.reduce((n, x) => n + x.findings.length, 0);
   return layout({ title: "\u0417\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u0456", nav: "feed", body: `
 <section class="studio-hero">
- <div class="studio-copy"><span class="studio-eyebrow">\u0412\u0418\u0414\u041D\u041E / \u041C\u041E\u041D\u0406\u0422\u041E\u0420\u0418\u041D\u0413 \u0417\u0410\u041A\u0423\u041F\u0406\u0412\u0415\u041B\u042C</span><h1>\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u043A\u043E\u0448\u0442\u0438.<br><span>\u041F\u0440\u043E\u0437\u043E\u0440\u0456 \u0440\u0456\u0448\u0435\u043D\u043D\u044F.</span></h1><p>\u0417\u043D\u0430\u0439\u0434\u0456\u0442\u044C \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E, \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0441\u0438\u0433\u043D\u0430\u043B\u0438 \u0440\u0438\u0437\u0438\u043A\u0443 \u0442\u0430 \u0432\u0456\u0434\u043A\u0440\u0438\u0439\u0442\u0435 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E.</p><a class="studio-help" href="/about">\u042F\u043A \u043F\u0440\u0430\u0446\u044E\u0454 \u0440\u0430\u0434\u0430\u0440 <span aria-hidden="true">\u2197</span></a></div>
+ <div class="studio-copy"><span class="studio-eyebrow">\u0422\u0415\u041D\u0414\u041E\u0421\u041A\u041E\u041F / \u041C\u041E\u041D\u0406\u0422\u041E\u0420\u0418\u041D\u0413 \u0417\u0410\u041A\u0423\u041F\u0406\u0412\u0415\u041B\u042C</span><h1>\u041F\u0443\u0431\u043B\u0456\u0447\u043D\u0456 \u043A\u043E\u0448\u0442\u0438.<br><span>\u041F\u0440\u043E\u0437\u043E\u0440\u0456 \u0440\u0456\u0448\u0435\u043D\u043D\u044F.</span></h1><p>\u0417\u043D\u0430\u0439\u0434\u0456\u0442\u044C \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u043B\u044E, \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u0441\u0438\u0433\u043D\u0430\u043B\u0438 \u0440\u0438\u0437\u0438\u043A\u0443 \u0442\u0430 \u0432\u0456\u0434\u043A\u0440\u0438\u0439\u0442\u0435 \u043F\u0435\u0440\u0448\u043E\u0434\u0436\u0435\u0440\u0435\u043B\u043E.</p><a class="studio-help" href="/about">\u042F\u043A \u043F\u0440\u0430\u0446\u044E\u0454 \u0440\u0430\u0434\u0430\u0440 <span aria-hidden="true">\u2197</span></a></div>
  <div class="studio-visual" aria-label="\u0414\u0430\u043D\u0456 \u043F\u043E\u0442\u043E\u0447\u043D\u043E\u0457 \u0432\u0438\u0431\u0456\u0440\u043A\u0438"><div class="studio-orbit" aria-hidden="true"></div><div class="studio-stat"><span>\u0417\u0410\u041A\u0423\u041F\u0406\u0412\u041B\u0406 \u0412 \u041F\u041E\u0422\u041E\u0427\u041D\u0406\u0419 \u0412\u0418\u0411\u0406\u0420\u0426\u0406</span><strong>${list.length.toLocaleString("uk-UA")}</strong><small>\u0412\u0456\u0434\u043A\u0440\u0438\u0442\u0456 \u0434\u0430\u043D\u0456 \u0434\u043B\u044F \u0432\u0430\u0448\u043E\u0457 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u043A\u0438</small><div class="studio-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="studio-signal"><span class="studio-dot" aria-hidden="true"></span><div><strong>${signals.toLocaleString("uk-UA")} \u0446\u0456\u043D\u043E\u0432\u0438\u0445 \u0441\u0438\u0433\u043D\u0430\u043B\u0456\u0432</strong><small>\u0421\u0438\u0433\u043D\u0430\u043B \u2014 \u043F\u0440\u0438\u0432\u0456\u0434 \u043F\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438, \u0430 \u043D\u0435 \u0437\u0432\u0438\u043D\u0443\u0432\u0430\u0447\u0435\u043D\u043D\u044F</small></div></div></div>
 </section>
 <section class="studio-workspace" aria-label="\u041F\u043E\u0448\u0443\u043A \u0437\u0430\u043A\u0443\u043F\u0456\u0432\u0435\u043B\u044C">

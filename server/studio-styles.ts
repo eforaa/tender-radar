@@ -52,4 +52,7 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{border-radius:var(-
 .detail-toolbar .star-form:has(.star span){margin:0;line-height:1;height:44px}
 .top .brand .brand-word{display:inline;font-size:23px;font-weight:700;letter-spacing:-.7px;color:var(--ink)}.top .studio-logo{color:var(--ink);width:32px;height:32px;margin-right:7px}
 @media(max-width:44rem){.top .brand .brand-word{font-size:22px}.top .studio-logo{width:29px;height:29px}}
+
+.top .studio-logo{width:34px;height:34px}.top .brand .brand-word{font-size:22px;font-weight:600;letter-spacing:-.6px}
+@media(max-width:44rem){.top .studio-logo{width:29px;height:29px;margin-right:5px}.top .brand .brand-word{font-size:20px}}
 `;

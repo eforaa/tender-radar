@@ -683,14 +683,14 @@ export function layout(opts: { title: string; nav?: string; body: string; descri
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(opts.title)} — Видно</title>
+<title>${esc(opts.title)} — Тендоскоп</title>
 <meta name="description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
-<meta property="og:site_name" content="Видно">
+<meta property="og:site_name" content="Тендоскоп">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="uk_UA">
-<meta property="og:title" content="${esc(opts.title)} — Видно">
+<meta property="og:title" content="${esc(opts.title)} — Тендоскоп">
 <meta property="og:description" content="${esc(opts.description ?? SITE_DESCRIPTION)}">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%226%22%20fill%3D%22white%22%2F%3E%3Cpath%20d%3D%22M3%2016s4.5-8%2013-8%2013%208%2013%208-4.5%208-13%208S3%2016%203%2016Z%22%20fill%3D%22none%22%20stroke%3D%22%23172a20%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2216%22%20r%3D%224%22%20fill%3D%22%23172a20%22%2F%3E%3C%2Fsvg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2038%2036%22%20color%3D%22%23172a20%22%3E%3Cpath%20d%3D%22M2%2014%205%208Q7%205%2011%205H21A4.5%204.5%200%200%201%2021%2014Z%22%20fill%3D%22currentColor%22%2F%3E%3Cpath%20d%3D%22M10%2025Q10%2020%2017%2017V28L10%2034Z%22%20fill%3D%22currentColor%22%2F%3E%3Cpath%20d%3D%22M17%2017V23L10%2030V25Q10%2020%2017%2017Z%22%20fill%3D%22%23187443%22%2F%3E%3Cpath%20d%3D%22M24%202A14%2014%200%200%201%2035%2015%22%20fill%3D%22none%22%20stroke%3D%22%23187443%22%20stroke-width%3D%223.5%22%2F%3E%3C%2Fsvg%3E">
 
 <link rel="apple-touch-icon" href="/icon-180.png">
 ${siteOrigin() ? `<link rel="canonical" href="${esc(siteOrigin() + canonicalPath())}">
@@ -710,7 +710,7 @@ ${STUDIO_STYLES}</style>
 <a class="skip" href="#main">До вмісту</a>
 
 <header class="top"><div class="inner">
-  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M3 16s4.5-8 13-8 13 8 13 8-4.5 8-13 8S3 16 3 16Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="16" r="4" fill="currentColor"/><path d="m23 6 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="brand-word">Видно</span></a>
+  <a class="brand" href="/"><svg class="studio-logo" viewBox="0 0 38 36" aria-hidden="true"><path d="M2 14 5 8Q7 5 11 5H21A4.5 4.5 0 0 1 21 14Z" fill="currentColor"/><path d="M10 25Q10 20 17 17V28L10 34Z" fill="currentColor"/><path d="M17 17V23L10 30V25Q10 20 17 17Z" fill="#187443"/><path d="M24 2A14 14 0 0 1 35 15" fill="none" stroke="#187443" stroke-width="3.5"/></svg><span class="brand-word">Тендоскоп</span></a>
   <nav class="nav" aria-label="Основні розділи">
     <a href="/"${opts.nav === "feed" ? ' aria-current="page"' : ""}>Закупівлі</a>
     <a href="/railway"${opts.nav === "railway" ? ' aria-current="page"' : ""}>Залізниця</a>
