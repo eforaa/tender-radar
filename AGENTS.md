@@ -1,7 +1,9 @@
 # ТендоScope (repo `tender-radar`) — agent briefing
 
 Read fully before changing anything. Facts below were verified on 2026-11-04
-against the repository, GitHub and production. Talk to the owner in Russian.
+against the repository, GitHub and production, then cross-checked by a second
+agent against the code (six corrections applied). When the project changes,
+update this file in the same commit. Talk to the owner in Russian.
 Site UI and data labels are Ukrainian.
 
 ## What it is
@@ -83,14 +85,22 @@ docs/superpowers/*        original specs/plans (Aug 2026): design, frontend refr
 ## Pipelines
 
 - **`npm run daily`** (`scripts/daily.ts`) — what GitHub Actions runs every day
-  (`.github/workflows/daily.yml`, cron 05:20 UTC; runs typecheck+tests first).
-  Scans the public feed, enriches with state indicators and monitorings, runs
-  detectors, fetches full cards for the Kharkiv + railway subset
-  (`wantsFullCard`), writes cards to Turso when configured, exports
-  `web-data/`, rebuilds `api/index.js`, commits `data: щоденне оновлення
-  YYYY-MM-DD`, sends the Telegram digest (owner `TELEGRAM_CHAT_ID` always;
-  subscribers/channel when the DB is configured). Idempotent except the
-  broadcast. Saves exact source versions as a workflow artifact (90 days).
+  (`.github/workflows/daily.yml`, cron 05:20 UTC, **timeout 50 min**; the
+  workflow runs typecheck+tests first). Inside `daily.ts`: (0) independent
+  public feed scan via `src/ingest/tenders.ts` — `scopeReasons()` keeps
+  Kharkiv buyers, Kharkiv delivery addresses and railway organisations, full
+  cards go to the JSON store with `store.replaceTenderCards()`, exact source
+  bodies to `data/source-versions/` (content-addressed); (1) state risk
+  indicators; monitorings; own detectors; (4) `web-data/` export; (5) Telegram
+  digest (owner `TELEGRAM_CHAT_ID` always; subscribers/channel when the DB is
+  configured — Turso is used here **only for `tg_subscribers`**). The
+  **workflow**, not the script, then rebuilds `api/index.js`, commits
+  `data: щоденне оновлення YYYY-MM-DD` and uploads `data/source-versions/`
+  as an artifact (90 days). Idempotent except the broadcast, which has no
+  dedupe — a manual run beside the schedule sends the digest twice.
+  **`daily.ts` does not write detail cards to Turso**; only
+  `backfill-cards.ts`, `ingest-details.ts` and `migrate-supabase-to-db.ts`
+  do, while the tender page reads Turso for any case without a committed card.
 - **`npm run scheduled:run`** (`scripts/scheduled-run.ts`) — the LOCAL daily
   pipeline (no Telegram, no git): ingest-tenders → ingest-market → analyze →
   ai-batch → ingest-contract-documents → analyze-documents →
@@ -100,9 +110,12 @@ docs/superpowers/*        original specs/plans (Aug 2026): design, frontend refr
 - **AI extraction** (`src/analysis/ai-extract.ts`, `scripts/ai-extract.ts`,
   `ai-batch.ts`) spawns the local **Claude CLI** (`TR_CLAUDE_BIN` or `claude`)
   with `--output-format json --json-schema …`, tools disabled, hooks
-  disabled, no session persistence. Only public item text is sent. Output
-  claims must contain an exact verbatim quote found in the source, else the
-  whole extraction is rejected. Never let it infer unit prices, VAT or guilt.
+  disabled, no session persistence. Only public item text is sent. Each
+  claim must contain an exact verbatim quote found in the source and the
+  quote must contain the value; claims are validated **one by one** — the
+  valid ones land in `claims`, the rest in `rejected` with a reason, and the
+  result is stamped `status: "needs_review"` (a human decides; nothing is
+  auto-published). Never let it infer unit prices, VAT or guilt.
 - **Documents** (`scripts/ingest-contract-documents.ts`, `analyze-documents.ts`,
   `analyze-document-prices.ts`): download contract documents, extract text
   (PDF/OCR/DOC/DOCX), compare printed prices against sourced Prozorro Market
@@ -151,15 +164,21 @@ Present: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `SUPABASE_URL`,
 `SITE_URL=https://tender-radar-i7ka.vercel.app`.
 Missing: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (also needed in Vercel env
 for the site to fetch cards; and `SITE_URL` in Vercel env for canonical/og).
-Vercel env must also carry the Google auth trio for the sign-in gate.
+Vercel env must also carry the Google auth trio for the sign-in gate and
+`TELEGRAM_WEBHOOK_SECRET` — the webhook is fail-closed and answers 401
+without it (`server/router.ts handleTelegramWebhook`); `TELEGRAM_BOT_TOKEN`
+there too, so /start and /stop get replies.
 Never paste or commit credentials; the owner sets them in the dashboards.
 
 ## Open items (owner-dependent unless noted)
 
 1. Provision Turso (free 5 GB) and set the two secrets in GitHub + Vercel,
-   then run workflow `migrate.yml` once, then `backfill.yml` (resumable) so
-   every flagged tender gets a detail card; afterwards relax `wantsFullCard`
-   in `scripts/daily.ts` carefully (timeout risk on the 6 h job).
+   then run workflow `migrate.yml` once, then `backfill.yml` (resumable, its
+   own 6 h limit) so every flagged tender gets a detail card. Open design
+   question after that: `daily.ts` ingests cards into the JSON store only,
+   so new cards never reach Turso day to day — either `upsertCard` them in
+   `src/ingest/tenders.ts` (mind the 50 min daily budget) or re-run the
+   backfill periodically. Decide with the owner before coding.
 2. Decide on Vercel auto-promotion of `master` (otherwise every push needs a
    manual `vercel deploy --prod`).
 3. Known cosmetic: menu label "Хто продає" vs page H1 "Переможці" style
